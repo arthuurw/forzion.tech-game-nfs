@@ -263,6 +263,9 @@ export class Game {
         get cutoffTarget() {
           return game.audio.currentCutoffTarget();
         },
+        get firingHz() {
+          return game.audio.currentFiringHz();
+        },
         get throttling() {
           return game.audio.isThrottling();
         },

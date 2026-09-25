@@ -1,20 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AMBIENT_CUTOFF_HZ,
   AMBIENT_GAIN,
   ENGINE_GAIN_MAX,
+  ENGINE_HARMONICS,
   IDLE_FACTOR,
+  brownNoise,
   engineCutoff,
-  engineFrequency,
   engineGainFor,
+  engineHarmonics,
+  firingFrequency,
   tremoloDepth,
 } from '../../src/audio/audioMap';
+import { mulberry32 } from '../../src/world/CityGenerator';
 
 describe('audio map', () => {
-  // free-roam-city C36 (AC 28)
-  it('rpm maps linearly to 60..200 Hz', () => {
-    expect(engineFrequency(1000)).toBeCloseTo(60, 6);
-    expect(engineFrequency(4000)).toBeCloseTo(130, 6);
-    expect(engineFrequency(7000)).toBeCloseTo(200, 6);
+  // engine-sound C10 (supersede free-roam-city C36): 4 cilindros, 4 tempos → rpm / 30
+  it('firing frequency is rpm over 30', () => {
+    expect(firingFrequency(1000)).toBeCloseTo(33.333, 3);
+    expect(firingFrequency(4000)).toBeCloseTo(133.333, 3);
+    expect(firingFrequency(7000)).toBeCloseTo(233.333, 3);
   });
 
   // engine-sound C1
@@ -34,10 +39,41 @@ describe('audio map', () => {
 
   // engine-sound C3
   it('engine gain by throttle and ambient gain', () => {
-    expect(ENGINE_GAIN_MAX).toBeCloseTo(0.15, 6);
+    expect(ENGINE_GAIN_MAX).toBeCloseTo(0.12, 6);
     expect(IDLE_FACTOR).toBeCloseTo(0.4, 6);
-    expect(engineGainFor(false)).toBeCloseTo(0.06, 6);
-    expect(engineGainFor(true)).toBeCloseTo(0.15, 6);
-    expect(AMBIENT_GAIN).toBeCloseTo(0.12, 6);
+    expect(engineGainFor(false)).toBeCloseTo(0.048, 6);
+    expect(engineGainFor(true)).toBeCloseTo(0.12, 6);
+    expect(AMBIENT_GAIN).toBeCloseTo(0.05, 6);
+    expect(AMBIENT_CUTOFF_HZ).toBe(180);
+  });
+
+  // engine-sound C11: 24 harmônicos com amplitude 1/n^1.5, DC zero
+  it('engine wave harmonics fall off as 1 over n to the 1.5', () => {
+    const { real, imag } = engineHarmonics();
+    expect(ENGINE_HARMONICS).toBe(24);
+    expect(real.length).toBe(25);
+    expect(imag.length).toBe(25);
+    expect(imag[0]).toBe(0);
+    expect(real.every((v) => v === 0)).toBe(true);
+    expect(imag[1]).toBeCloseTo(1, 6);
+    expect(imag[2]).toBeCloseTo(1 / Math.pow(2, 1.5), 6);
+    expect(imag[24]).toBeCloseTo(1 / Math.pow(24, 1.5), 6);
+  });
+
+  // engine-sound C12: ruído marrom - energia concentrada nos graves (sem chiado)
+  it('brown noise is low-frequency dominated and bounded', () => {
+    const n = 8192;
+    const x = brownNoise(n, mulberry32(7));
+    expect(x.length).toBe(n);
+    for (const v of x) expect(Math.abs(v)).toBeLessThanOrEqual(1);
+    // diferença entre amostras vizinhas muito menor que a amplitude: sinal suave, não branco
+    let sumAbs = 0;
+    let sumDiff = 0;
+    for (let i = 1; i < n; i++) {
+      sumAbs += Math.abs(x[i]!);
+      sumDiff += Math.abs(x[i]! - x[i - 1]!);
+    }
+    expect(sumDiff / sumAbs).toBeLessThan(0.3);
+    expect(sumAbs / n).toBeGreaterThan(0.02);
   });
 });

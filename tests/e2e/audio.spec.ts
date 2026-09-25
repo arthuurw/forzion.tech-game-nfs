@@ -23,15 +23,15 @@ test.describe('audio', () => {
   });
 
   // engine-sound C5 (supersede free-roam-city C37)
-  test('gains are 0.12 ambient and 0.06 idle engine', async ({ page }) => {
+  test('gains are 0.05 ambient and 0.048 idle engine', async ({ page }) => {
     await startAudio(page);
     const gains = await page.evaluate(() => (window as any).__game.audio.gains);
-    expect(gains.ambient).toBeCloseTo(0.12, 6);
-    expect(gains.engineTarget).toBeCloseTo(0.06, 6);
+    expect(gains.ambient).toBeCloseTo(0.05, 6);
+    expect(gains.engineTarget).toBeCloseTo(0.048, 6);
     expect(gains.master).toBeCloseTo(1, 6);
     await advanceSim(page, 1);
     const settled = await page.evaluate(() => (window as any).__game.audio.gains);
-    expect(Math.abs(settled.engine - 0.06)).toBeLessThan(0.01);
+    expect(Math.abs(settled.engine - 0.048)).toBeLessThan(0.01);
   });
 
   // engine-sound C6
@@ -39,37 +39,36 @@ test.describe('audio', () => {
     await startAudio(page);
     await page.keyboard.down('KeyW');
     await advanceSim(page, 0.2);
-    expect((await page.evaluate(() => (window as any).__game.audio.gains)).engineTarget).toBeCloseTo(0.15, 6);
+    expect((await page.evaluate(() => (window as any).__game.audio.gains)).engineTarget).toBeCloseTo(0.12, 6);
     await page.keyboard.up('KeyW');
     await advanceSim(page, 0.2);
-    expect((await page.evaluate(() => (window as any).__game.audio.gains)).engineTarget).toBeCloseTo(0.06, 6);
+    expect((await page.evaluate(() => (window as any).__game.audio.gains)).engineTarget).toBeCloseTo(0.048, 6);
   });
 
-  // engine-sound C4 (supersede free-roam-city C46) - grafo por conexões registradas
+  // engine-sound C4 (supersede free-roam-city C46) - grafo descrito pelas propriedades reais dos nós
   test('synthesized audio graph', async ({ page }) => {
     await startAudio(page);
     const graph = await page.evaluate(() => (window as any).__game.audio.graph);
+    // fontes: oscilador de explosões (onda custom a 33.33 Hz = 1000 rpm / 30), sub uma oitava abaixo, ruído marrom em loop
     expect(graph.sources).toEqual([
-      'OscillatorNode(sawtooth)',
-      'OscillatorNode(square,detune=8)',
-      'OscillatorNode(sine,sub)',
-      'AudioBufferSourceNode(loop)',
+      'OscillatorNode(custom,33.33Hz,engine)',
+      'OscillatorNode(sine,16.67Hz,sub)',
+      'AudioBufferSourceNode(loop=true,ambient)',
     ]);
-    // cada aresta é "from -> to"; a ordem é a ordem em que connect() foi chamado
+    // cada aresta é "from -> to" na ordem em que connect() foi chamado; valores lidos dos nós reais
     expect(graph.edges).toEqual([
-      'GainNode(master) -> DynamicsCompressorNode',
-      'DynamicsCompressorNode -> AudioDestinationNode',
-      'OscillatorNode(sawtooth) -> BiquadFilterNode(lowpass)',
-      'OscillatorNode(square,detune=8) -> BiquadFilterNode(lowpass)',
-      'OscillatorNode(sine,sub) -> BiquadFilterNode(lowpass)',
-      'BiquadFilterNode(lowpass) -> GainNode(tremolo)',
-      'GainNode(tremolo) -> GainNode(engine)',
-      'GainNode(engine) -> GainNode(master)',
-      'OscillatorNode(lfo) -> GainNode(tremoloDepth)',
-      'GainNode(tremoloDepth) -> AudioParam(tremolo.gain)',
-      'AudioBufferSourceNode(loop) -> BiquadFilterNode(bandpass)',
-      'BiquadFilterNode(bandpass) -> GainNode(ambient)',
-      'GainNode(ambient) -> GainNode(master)',
+      'GainNode(1.000,master) -> DynamicsCompressorNode(-18dB,4:1,master)',
+      'DynamicsCompressorNode(-18dB,4:1,master) -> AudioDestinationNode',
+      'OscillatorNode(custom,33.33Hz,engine) -> BiquadFilterNode(lowpass,250Hz,engine)',
+      'OscillatorNode(sine,16.67Hz,sub) -> BiquadFilterNode(lowpass,250Hz,engine)',
+      'BiquadFilterNode(lowpass,250Hz,engine) -> GainNode(1.000,tremolo)',
+      'GainNode(1.000,tremolo) -> GainNode(0.048,engine)',
+      'GainNode(0.048,engine) -> GainNode(1.000,master)',
+      'OscillatorNode(sine,6.00Hz,lfo) -> GainNode(0.250,tremoloDepth)',
+      'GainNode(0.250,tremoloDepth) -> AudioParam(tremolo.gain)',
+      'AudioBufferSourceNode(loop=true,ambient) -> BiquadFilterNode(lowpass,180Hz,ambient)',
+      'BiquadFilterNode(lowpass,180Hz,ambient) -> GainNode(0.050,ambient)',
+      'GainNode(0.050,ambient) -> GainNode(1.000,master)',
     ]);
     expect(await page.locator('audio').count()).toBe(0);
   });
@@ -90,12 +89,15 @@ test.describe('audio', () => {
     await advanceSim(page, 2);
     const sample = await page.evaluate(() => {
       const g = (window as any).__game;
-      return { cutoff: g.audio.cutoffTarget as number, rpm: g.car.rpm as number };
+      return { cutoff: g.audio.cutoffTarget as number, rpm: g.car.rpm as number, firingHz: g.audio.firingHz as number };
     });
     await page.keyboard.up('KeyW');
     const expected = 250 + ((sample.rpm - 1000) / 6000) * (1400 - 250);
     expect(sample.cutoff).toBeGreaterThan(300);
     expect(Math.abs(sample.cutoff - expected)).toBeLessThan(60);
+    // C13: o oscilador principal segue rpm / 30 (valor real do AudioParam; rampa de 50 ms + até 5 passos
+    // de física entre a escrita do alvo e a leitura em headless ≈ 600 rpm = 20 Hz)
+    expect(Math.abs(sample.firingHz - sample.rpm / 30)).toBeLessThan(20);
   });
 
   // engine-sound C9 (regressão de free-roam-city C38, AC 30)
