@@ -266,6 +266,9 @@ export class Game {
         get firingHz() {
           return game.audio.currentFiringHz();
         },
+        get params() {
+          return game.audio.params();
+        },
         get throttling() {
           return game.audio.isThrottling();
         },

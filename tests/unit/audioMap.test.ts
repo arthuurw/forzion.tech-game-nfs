@@ -3,6 +3,8 @@ import {
   AMBIENT_CUTOFF_HZ,
   AMBIENT_GAIN,
   ENGINE_GAIN_MAX,
+  OSC_RAMP_TAU_S,
+  RAMP_TAU_S,
   ENGINE_HARMONICS,
   IDLE_FACTOR,
   brownNoise,
@@ -27,6 +29,15 @@ describe('audio map', () => {
     expect(engineCutoff(1000)).toBeCloseTo(250, 6);
     expect(engineCutoff(4000)).toBeCloseTo(825, 6);
     expect(engineCutoff(7000)).toBeCloseTo(1400, 6);
+    // clamp fora da faixa
+    expect(engineCutoff(500)).toBeCloseTo(250, 6);
+    expect(engineCutoff(8000)).toBeCloseTo(1400, 6);
+  });
+
+  // engine-sound C14
+  it('ramp time constants', () => {
+    expect(RAMP_TAU_S).toBeCloseTo(0.15, 9);
+    expect(OSC_RAMP_TAU_S).toBeCloseTo(0.05, 9);
   });
 
   // engine-sound C2

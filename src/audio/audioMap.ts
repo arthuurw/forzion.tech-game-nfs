@@ -30,6 +30,8 @@ export const ENGINE_HARMONIC_FALLOFF = 1.5;
 
 /** rampa dos ganhos/cutoff (constante de tempo do setTargetAtTime), em segundos */
 export const RAMP_TAU_S = 0.15;
+/** rampa da frequência dos osciladores (s) */
+export const OSC_RAMP_TAU_S = 0.05;
 
 function rpmFraction(rpm: number): number {
   const t = (rpm - RPM_MIN) / (RPM_MAX - RPM_MIN);

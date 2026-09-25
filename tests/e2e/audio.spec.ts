@@ -34,15 +34,25 @@ test.describe('audio', () => {
     expect(Math.abs(settled.engine - 0.048)).toBeLessThan(0.01);
   });
 
-  // engine-sound C6
+  // engine-sound C6 - alvo e valor REAL do AudioParam
   test('throttle raises engine gain', async ({ page }) => {
     await startAudio(page);
     await page.keyboard.down('KeyW');
-    await advanceSim(page, 0.2);
-    expect((await page.evaluate(() => (window as any).__game.audio.gains)).engineTarget).toBeCloseTo(0.12, 6);
+    await advanceSim(page, 1);
+    const up = await page.evaluate(() => {
+      const a = (window as any).__game.audio;
+      return { target: a.gains.engineTarget as number, real: a.params.engineGain as number };
+    });
+    expect(up.target).toBeCloseTo(0.12, 6);
+    expect(up.real).toBeGreaterThan(0.1);
     await page.keyboard.up('KeyW');
-    await advanceSim(page, 0.2);
-    expect((await page.evaluate(() => (window as any).__game.audio.gains)).engineTarget).toBeCloseTo(0.048, 6);
+    await advanceSim(page, 1);
+    const down = await page.evaluate(() => {
+      const a = (window as any).__game.audio;
+      return { target: a.gains.engineTarget as number, real: a.params.engineGain as number };
+    });
+    expect(down.target).toBeCloseTo(0.048, 6);
+    expect(down.real).toBeLessThan(0.06);
   });
 
   // engine-sound C4 (supersede free-roam-city C46) - grafo descrito pelas propriedades reais dos nós
@@ -89,15 +99,31 @@ test.describe('audio', () => {
     await advanceSim(page, 2);
     const sample = await page.evaluate(() => {
       const g = (window as any).__game;
-      return { cutoff: g.audio.cutoffTarget as number, rpm: g.car.rpm as number, firingHz: g.audio.firingHz as number };
+      return { cutoff: g.audio.cutoffTarget as number, rpm: g.car.rpm as number, firingHz: g.audio.firingHz as number, params: g.audio.params };
     });
     await page.keyboard.up('KeyW');
     const expected = 250 + ((sample.rpm - 1000) / 6000) * (1400 - 250);
     expect(sample.cutoff).toBeGreaterThan(300);
     expect(Math.abs(sample.cutoff - expected)).toBeLessThan(60);
+    // valor REAL do filtro: atrasa o alvo pela rampa, tau 0.15 s x taxa do cutoff (até ~770 Hz/s) = ~115 Hz -> 150 Hz
+    expect(sample.params.lowpassHz).toBeGreaterThan(300);
+    expect(Math.abs(sample.params.lowpassHz - expected)).toBeLessThan(150);
+    // C15: sub segue metade do oscilador principal; tremolo some acima de 2500 rpm
+    expect(sample.rpm).toBeGreaterThan(3000);
+    expect(Math.abs(sample.params.subHz - sample.params.engineHz / 2)).toBeLessThan(3);
+    expect(sample.params.tremoloDepth).toBeLessThan(0.05);
     // C13: o oscilador principal segue rpm / 30 (valor real do AudioParam; rampa de 50 ms + até 5 passos
     // de física entre a escrita do alvo e a leitura em headless ≈ 600 rpm = 20 Hz)
     expect(Math.abs(sample.firingHz - sample.rpm / 30)).toBeLessThan(20);
+  });
+
+  // engine-sound C15 - tremolo real em marcha lenta
+  test('idle tremolo depth is applied', async ({ page }) => {
+    await startAudio(page);
+    await advanceSim(page, 0.5);
+    const p = await page.evaluate(() => (window as any).__game.audio.params);
+    expect(Math.abs(p.tremoloDepth - 0.25)).toBeLessThan(0.005);
+    expect(Math.abs(p.subHz - p.engineHz / 2)).toBeLessThan(0.5);
   });
 
   // engine-sound C9 (regressão de free-roam-city C38, AC 30)

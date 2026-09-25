@@ -26,7 +26,7 @@ Supersede da feature `free-roam-city`: ex-36 (frequência 60..200 Hz → `rpm / 
 (ganhos → 0.05 / 0.048-0.12) e ex-46 (grafo). Os testes desses checks passam a afirmar os
 valores daqui. O usuário aprovou a revisão 2 com "siga com todas as frentes".
 
-13 checks in 1 slice · 0 one-way doors · 0 open
+15 checks in 1 slice · 0 one-way doors · 0 open (rodada 2 da verificação: C14-C15 adicionados; C1, C6, C8 endurecidos para afirmar valores reais)
 
 Comandos de prova: unitário `npx vitest run <arquivo> -t "<nome>"`; integração
 `npx playwright test <arquivo> -g "<nome>"` (lendo `window.__game.audio`).
@@ -35,7 +35,7 @@ Comandos de prova: unitário `npx vitest run <arquivo> -t "<nome>"`; integraçã
 
 ### S1 - Motor menos alto e mais vivo · 4 files · 24 KB · ~6k
 
-**C1** - `engineCutoff(rpm)` mapeia RPM 1000..7000 linearmente para 250..1400 Hz: 1000→250, 4000→825, 7000→1400
+**C1** - `engineCutoff(rpm)` mapeia RPM 1000..7000 linearmente para 250..1400 Hz: 1000→250, 4000→825, 7000→1400; fora da faixa é limitado: 500→250, 8000→1400
 Proof: `npx vitest run tests/unit/audioMap.test.ts -t "lowpass cutoff follows rpm"`
 
 **C2** - `tremoloDepth(rpm)` é 0.25 a 1000 RPM, 0.125 a 1750, 0 a 2500 e 0 a 5000 (linear até 2500, zero acima)
@@ -50,13 +50,13 @@ Proof: `npx playwright test tests/e2e/audio.spec.ts -g "synthesized audio graph"
 **C5** - Com o áudio ativo e sem acelerador, `__game.audio.gains` reporta `ambient` 0.05, `engineTarget` 0.048 e `master` 1; após 1 s de simulação `engine` (valor real do `AudioParam`) está a menos de 0.01 de 0.048
 Proof: `npx playwright test tests/e2e/audio.spec.ts -g "gains are 0.05 ambient and 0.048 idle engine"`
 
-**C6** - Segurar `W` leva `engineTarget` a 0.12; soltar `W` leva de volta a 0.048 (rampa `setTargetAtTime` com constante 0.15 s)
+**C6** - Segurar `W` por 1 s (sim) leva `engineTarget` a 0.12 e o valor **real** do `AudioParam` de ganho do motor (`__game.audio.params.engineGain`) acima de 0.10; soltar `W` por 1 s leva `engineTarget` a 0.048 e o valor real abaixo de 0.06 (rampa `setTargetAtTime` com constante 0.15 s)
 Proof: `npx playwright test tests/e2e/audio.spec.ts -g "throttle raises engine gain"`
 
 **C7** - O compressor do master tem `threshold` -18 dB, `ratio` 4 e `knee` 12
 Proof: `npx playwright test tests/e2e/audio.spec.ts -g "master compressor"`
 
-**C8** - Após 2 s segurando `W`, `__game.audio.cutoffTarget` está a menos de 60 Hz de `engineCutoff(__game.car.rpm)` lido no mesmo `evaluate` (tolerância: o RPM pode avançar ~400 entre o frame que escreveu o alvo e a leitura), e é maior que 300 Hz
+**C8** - Após 2 s segurando `W`, `__game.audio.cutoffTarget` está a menos de 60 Hz de `engineCutoff(__game.car.rpm)` lido no mesmo `evaluate` (tolerância: o RPM pode avançar ~400 entre o frame que escreveu o alvo e a leitura), e é maior que 300 Hz; o valor **real** do filtro (`params.lowpassHz`) é maior que 300 Hz e está a menos de 150 Hz do mesmo esperado (o valor real atrasa o alvo pela rampa: τ 0.15 s × taxa do cutoff de até ~770 Hz/s ≈ 115 Hz; sem a escrita por frame o filtro ficaria em 250 Hz, > 500 Hz longe)
 Proof: `npx playwright test tests/e2e/audio.spec.ts -g "lowpass cutoff follows rpm"`
 
 **C9** - `M` continua alternando o ganho master entre 0 e 1 com o grafo novo (regressão de free-roam-city ex-38)
@@ -71,6 +71,13 @@ Proof: `npx vitest run tests/unit/audioMap.test.ts -t "engine wave harmonics fal
 **C12** - `brownNoise(8192, rng)` devolve amostras em `[-1, 1]`, com razão `Σ|x[i]−x[i−1]| / Σ|x[i]|` menor que 0.3 (sinal suave, grave) e amplitude média maior que 0.02
 Proof: `npx vitest run tests/unit/audioMap.test.ts -t "brown noise is low-frequency dominated"`
 
+**C14** - `RAMP_TAU_S` é 0.15 s e `OSC_RAMP_TAU_S` é 0.05 s (constantes das rampas de ganho/filtro e de frequência)
+Proof: `npx vitest run tests/unit/audioMap.test.ts -t "ramp time constants"`
+
+**C15** - Valores reais por frame dos demais parâmetros: em marcha lenta (0.5 s sim) `params.tremoloDepth` a menos de 0.005 de 0.25 e `params.subHz` a menos de 0.5 Hz de `params.engineHz / 2`; após 2 s segurando `W` (RPM > 3000) `params.tremoloDepth` < 0.05 e `params.subHz` a menos de 3 Hz de `params.engineHz / 2`
+Proof: `npx playwright test tests/e2e/audio.spec.ts -g "idle tremolo depth is applied"`
+Proof: `npx playwright test tests/e2e/audio.spec.ts -g "lowpass cutoff follows rpm"`
+
 **C13** - Após 2 s segurando `W`, a frequência real do oscilador do motor (`__game.audio.firingHz`, lida do `AudioParam`) está a menos de 20 Hz de `__game.car.rpm / 30` lido no mesmo `evaluate` (rampa de 50 ms + até 5 passos de física entre a escrita do alvo e a leitura em headless ≈ 600 RPM = 20 Hz)
 Proof: `npx playwright test tests/e2e/audio.spec.ts -g "lowpass cutoff follows rpm"`
 
@@ -84,14 +91,16 @@ Proof: `npx playwright test tests/e2e/audio.spec.ts -g "lowpass cutoff follows r
 | master chain nodes (3) | master gain C4 · compressor C4, C7 · destination C4 | - |
 | engine gain states (2) | idle C3, C5 · throttle C3, C6 | - |
 | tremolo samples (4) | 1000 C2 · 1750 C2 · 2500 C2 · 5000 C2 | - |
-| cutoff samples (3) | 1000 C1 · 4000 C1 · 7000 C1 | - |
+| cutoff samples (5) | 500 C1 · 1000 C1 · 4000 C1 · 7000 C1 · 8000 C1 | - |
+| per-frame AudioParam writes in update() (5) | engine osc freq C13 · sub osc freq C15 · lowpass freq C8 · engine gain C6 · tremolo depth C15 | - |
+| ramp constants (2) | gain/filter 0.15 C14 · oscillator 0.05 C14 | - |
 | firing frequency samples (3) | 1000 C10 · 4000 C10 · 7000 C10 | - |
 | harmonic samples (4) | dc C11 · n=1 C11 · n=2 C11 · n=24 C11 | - |
 | compressor params (3) | threshold C7 · ratio C7 · knee C7 | - |
 | mute transitions (2) | 1→0 C9 · 0→1 C9 | - |
 | superseded checks (3) | free-roam-city ex-36 → C10 · ex-37 → C5 · ex-46 → C4 | - |
 
-- Claims cruzando a fronteira browser (Playwright): C4-C9, C13
+- Claims cruzando a fronteira browser (Playwright): C4-C9, C13, C15
 - Nenhum outro check afirma mais do que o caso único que sua prova exercita
 
 ## Test policy
@@ -111,7 +120,7 @@ Evidence:
 - `src/audio/AudioEngine.ts`: monta o grafo e encaminha valores para `AudioParam` sem decidir → instrumentation; coberto por C4-C9, C13
 - `src/core/Game.ts`: expõe `audio.graph`, `gains`, `compressor`, `cutoffTarget`, `firingHz` no debug handle → instrumentation; coberto por C4-C8, C13
 
-Cost: 6 provas unitárias em 1 arquivo e 7 Playwright em 1 arquivo.
+Cost: 7 provas unitárias em 1 arquivo e 8 Playwright em 1 arquivo.
 
 ## Swept
 
@@ -128,4 +137,5 @@ Cost: 6 provas unitárias em 1 arquivo e 7 Playwright em 1 arquivo.
 ## Handoff
 
 - S1 = 6k (`AudioEngine.ts` 6 KB, `audioMap.ts` 2 KB, `Game.ts` 9 KB, `audio.spec.ts` 4 KB, `audioMap.test.ts` 2 KB), abaixo do budget de 150k - one builder
+- **Rodada 2 (após FAIL do Verifier):** as escritas por frame de `update()` em `AudioParam` passaram a ser observadas pelos valores reais (`__game.audio.params`): C6 e C8 endurecidos, C15 novo para sub e tremolo; C1 ganhou amostras fora da faixa; C14 novo fixa as constantes de rampa. Nota de supersede em `free-roam-city/checks.md` corrigida para os valores da revisão 2.
 - **Settled mid-build:** revisão 2 aprovada pelo usuário após teste da revisão 1 (chiado + timbre sintético); checks C3/C4/C5 reescritos com os valores novos, C10-C13 adicionados; nenhuma prova enfraquecida - C4 ficou mais forte (propriedades reais em vez de rótulos)

@@ -1,6 +1,7 @@
 import {
   AMBIENT_CUTOFF_HZ,
   AMBIENT_GAIN,
+  OSC_RAMP_TAU_S,
   RAMP_TAU_S,
   TREMOLO_RATE_HZ,
   brownNoise,
@@ -132,8 +133,8 @@ export class AudioEngine {
     if (!this.ctx || !this.lowpass || !this.engineGain || !this.tremoloDepthGain) return;
     const now = this.ctx.currentTime;
     const f = firingFrequency(rpm);
-    this.engineOsc?.frequency.setTargetAtTime(f, now, 0.05);
-    this.subOsc?.frequency.setTargetAtTime(f / 2, now, 0.05);
+    this.engineOsc?.frequency.setTargetAtTime(f, now, OSC_RAMP_TAU_S);
+    this.subOsc?.frequency.setTargetAtTime(f / 2, now, OSC_RAMP_TAU_S);
     this.lowpass.frequency.setTargetAtTime(this.cutoffTarget, now, RAMP_TAU_S);
     this.engineGain.gain.setTargetAtTime(this.engineTarget, now, RAMP_TAU_S);
     this.tremoloDepthGain.gain.setTargetAtTime(tremoloDepth(rpm), now, RAMP_TAU_S);
@@ -164,6 +165,18 @@ export class AudioEngine {
 
   currentCutoffTarget(): number {
     return this.cutoffTarget;
+  }
+
+  /** Valores reais (lidos dos AudioParams agora) de tudo que `update()` escreve por frame. */
+  params(): { engineGain: number; lowpassHz: number; engineHz: number; subHz: number; tremoloDepth: number } | null {
+    if (!this.engineGain || !this.lowpass || !this.engineOsc || !this.subOsc || !this.tremoloDepthGain) return null;
+    return {
+      engineGain: this.engineGain.gain.value,
+      lowpassHz: this.lowpass.frequency.value,
+      engineHz: this.engineOsc.frequency.value,
+      subHz: this.subOsc.frequency.value,
+      tremoloDepth: this.tremoloDepthGain.gain.value,
+    };
   }
 
   /** Frequência-alvo atual do oscilador principal (Hz). */
