@@ -29,12 +29,12 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 
 ## Handoff
 
-**Feature**: free-roam-city - CONCLUÍDA (Verifier rodada 2: PASS, 45/45 checks, 11/11 mutantes mortos, gate exit 0)
-**Where**: tudo commitado em `main`; `verification.md` é o relatório final
+**Feature**: free-roam-city - CONCLUÍDA (Verifier rodada 3: PASS, 46/46 checks, 15/15 mutantes mortos, gate exit 0)
+**Where**: tudo commitado em `main`; `verification.md` é o relatório final; usuário testando no browser
 **In progress**: nenhum
-**Next step**: sub-projeto 2 (corridas) - novo plan.md em `.specs/features/races/`; ler AD-001..AD-009 e `LESSONS.md` antes
+**Next step**: coletar feedback de jogabilidade (feeling do carro, FPS, visual, som) e ajustar parâmetros; depois sub-projeto 2 (corridas) em `.specs/features/races/`
 **Blockers**: none
 **Uncommitted**: nenhum
 **Branch**: main
 
-Pendências residuais (precision gaps do Verifier, não bloqueiam): C42 não afirma a rotação do triângulo do minimapa por heading; C45 diz "1/60" mas o Rapier guarda float32 (tolerância 1e-6 só no teste); porta 8 (tipos de nó de áudio) sem asserção; `exposeDebug.ts` fora da lista de módulos puros de C39; C44 fixa marcha `2` após 1.5 s (dependente do tuning).
+Achados residuais menores (não bloqueiam): C46 afirma a ordem do grafo pela ordem dos campos de `graph()`, e `masterConnected` não detecta `master` desconectado do destino; C42 mata o mutante "sem rotate" por 1 px; `InputManager` ignora `event.repeat` sem prova própria.
