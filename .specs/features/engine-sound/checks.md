@@ -38,7 +38,7 @@ Comandos de prova: unitário `npx vitest run <arquivo> -t "<nome>"`; integraçã
 **C1** - `engineCutoff(rpm)` mapeia RPM 1000..7000 linearmente para 250..1400 Hz: 1000→250, 4000→825, 7000→1400; fora da faixa é limitado: 500→250, 8000→1400
 Proof: `npx vitest run tests/unit/audioMap.test.ts -t "lowpass cutoff follows rpm"`
 
-**C2** - `tremoloDepth(rpm)` é 0.25 a 1000 RPM, 0.125 a 1750, 0 a 2500 e 0 a 5000 (linear até 2500, zero acima)
+**C2** - `tremoloDepth(rpm)` é 0.25 a 1000 RPM, 0.125 a 1750, 0 a 2500 e 0 a 5000 (linear até 2500, zero acima); abaixo da faixa é limitado: 500→0.25
 Proof: `npx vitest run tests/unit/audioMap.test.ts -t "tremolo depth fades out by 2500 rpm"`
 
 **C3** - `engineGainFor(false)` é 0.048 e `engineGainFor(true)` é 0.12 (`ENGINE_GAIN_MAX` 0.12 × `IDLE_FACTOR` 0.4); `AMBIENT_GAIN` é 0.05 e `AMBIENT_CUTOFF_HZ` é 180
@@ -90,7 +90,7 @@ Proof: `npx playwright test tests/e2e/audio.spec.ts -g "lowpass cutoff follows r
 | ambient chain nodes (3) | brown source C4 · lowpass 180 C4 · ambient gain C4 | - |
 | master chain nodes (3) | master gain C4 · compressor C4, C7 · destination C4 | - |
 | engine gain states (2) | idle C3, C5 · throttle C3, C6 | - |
-| tremolo samples (4) | 1000 C2 · 1750 C2 · 2500 C2 · 5000 C2 | - |
+| tremolo samples (5) | 500 C2 · 1000 C2 · 1750 C2 · 2500 C2 · 5000 C2 | - |
 | cutoff samples (5) | 500 C1 · 1000 C1 · 4000 C1 · 7000 C1 · 8000 C1 | - |
 | per-frame AudioParam writes in update() (5) | engine osc freq C13 · sub osc freq C15 · lowpass freq C8 · engine gain C6 · tremolo depth C15 | - |
 | ramp constants (2) | gain/filter 0.15 C14 · oscillator 0.05 C14 | - |
@@ -117,8 +117,8 @@ Mesmas linhas de `free-roam-city` (o repositório ainda não as tem em diretrize
 Evidence:
 
 - `src/audio/audioMap.ts`: 4 mapeamentos lineares com clamp, 1 ramo (throttle), 1 gerador de harmônicos, 1 gerador de ruído → decides, not reached across a boundary; C1-C3, C10-C12
-- `src/audio/AudioEngine.ts`: monta o grafo e encaminha valores para `AudioParam` sem decidir → instrumentation; coberto por C4-C9, C13
-- `src/core/Game.ts`: expõe `audio.graph`, `gains`, `compressor`, `cutoffTarget`, `firingHz` no debug handle → instrumentation; coberto por C4-C8, C13
+- `src/audio/AudioEngine.ts`: monta o grafo e encaminha valores para `AudioParam` sem decidir → instrumentation; coberto por C4-C9, C13, C15 (valores reais via `params()`)
+- `src/core/Game.ts`: expõe `audio.graph`, `gains`, `compressor`, `cutoffTarget`, `firingHz`, `params` no debug handle → instrumentation; coberto por C4-C8, C13, C15
 
 Cost: 7 provas unitárias em 1 arquivo e 8 Playwright em 1 arquivo.
 

@@ -46,6 +46,8 @@ describe('audio map', () => {
     expect(tremoloDepth(1750)).toBeCloseTo(0.125, 6);
     expect(tremoloDepth(2500)).toBeCloseTo(0, 6);
     expect(tremoloDepth(5000)).toBeCloseTo(0, 6);
+    // clamp inferior: abaixo de 1000 rpm fica em 0.25
+    expect(tremoloDepth(500)).toBeCloseTo(0.25, 6);
   });
 
   // engine-sound C3

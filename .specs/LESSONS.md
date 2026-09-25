@@ -38,6 +38,18 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: verification.md round 1 finding doors - src/core/Game.ts:75-78 (bloom params nunca afirmados) (checks)
 - last seen: 2026-09-25T22:27:36Z
 
+### L-005 - Assert the live value of every parameter a per-frame update writes, not only the target field it was computed from
+- signal: `surviving_mutant` · recurrence: 1 feature(s) · scope: `audio` · harmful: 0
+- features: engine-sound
+- evidence: verification.md round 1 - src/audio/AudioEngine.ts:138 engineGain setTargetAtTime removed, C5/C6 green (audio)
+- last seen: 2026-09-25T23:43:13Z
+
+### L-006 - Sample both sides of every clamp a mapping claims, including below the minimum input
+- signal: `ac_gap` · recurrence: 1 feature(s) · scope: `audio` · harmful: 0
+- features: engine-sound
+- evidence: verification.md round 2 gap 1 - src/audio/audioMap.ts:54 tremoloDepth lower clamp unsampled (audio)
+- last seen: 2026-09-25T23:43:13Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.

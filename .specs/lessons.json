@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 5,
+  "next_id": 7,
   "lessons": [
     {
       "id": "L-001",
@@ -76,6 +76,42 @@
       ],
       "created": "2026-09-25T22:27:36Z",
       "last_seen": "2026-09-25T22:27:36Z"
+    },
+    {
+      "id": "L-005",
+      "key": "surviving_mutant::assert the live value of every parameter a per frame update writes not only the target field it was computed from",
+      "text": "Assert the live value of every parameter a per-frame update writes, not only the target field it was computed from",
+      "signal": "surviving_mutant",
+      "scope": "audio",
+      "status": "candidate",
+      "features": [
+        "engine-sound"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "verification.md round 1 - src/audio/AudioEngine.ts:138 engineGain setTargetAtTime removed, C5/C6 green (audio)"
+      ],
+      "created": "2026-09-25T23:43:13Z",
+      "last_seen": "2026-09-25T23:43:13Z"
+    },
+    {
+      "id": "L-006",
+      "key": "ac_gap::sample both sides of every clamp a mapping claims including below the minimum input",
+      "text": "Sample both sides of every clamp a mapping claims, including below the minimum input",
+      "signal": "ac_gap",
+      "scope": "audio",
+      "status": "candidate",
+      "features": [
+        "engine-sound"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "verification.md round 2 gap 1 - src/audio/audioMap.ts:54 tremoloDepth lower clamp unsampled (audio)"
+      ],
+      "created": "2026-09-25T23:43:13Z",
+      "last_seen": "2026-09-25T23:43:13Z"
     }
   ]
 }
