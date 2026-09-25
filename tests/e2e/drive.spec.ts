@@ -42,7 +42,7 @@ test.describe('drive', () => {
     const speed = await speedKmh(page);
     await page.keyboard.up('KeyS');
     expect(speed).toBeLessThanOrEqual(-5);
-    expect(speed).toBeGreaterThanOrEqual(-30.5);
+    expect(speed).toBeGreaterThanOrEqual(-30);
   });
 
   // extra: sinal da direção (A vira à esquerda = heading cresce)

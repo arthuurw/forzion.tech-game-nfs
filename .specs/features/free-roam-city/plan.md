@@ -45,7 +45,7 @@ O repositório está vazio; todo módulo abaixo é criado pela porta 1 (layout d
 | --- | --- |
 | domain | new term: `CityLayout` - dados puros da cidade gerada (quarteirões, prédios, postes, letreiros, limites), vive em `world/` |
 | domain | new term: `CarState` - snapshot por frame do carro (posição, heading, velocidade em m/s, marcha, RPM), vive em `vehicle/` |
-| domain | new term: `InputState` - teclas pressionadas neste tick (`throttle`, `brake`, `steer`, `handbrake`, `reset`, `mute`), vive em `core/` |
+| domain | new term: `InputState` - teclas pressionadas neste tick (`throttle`, `brake`, `steerLeft`, `steerRight`, `handbrake`, `reset`, `mute`; `steerAxis()` deriva -1/0/+1), vive em `core/` |
 | domain | new term: `Gear` - inteiro `-1` (ré), `0` (neutro), `1..6`; câmbio automático por faixa de velocidade, vive em `vehicle/drivetrain.ts` |
 | stored data | nothing - o jogo não persiste nada neste sub-projeto |
 

@@ -5,7 +5,7 @@ Plan: `.specs/features/free-roam-city/plan.md`
 
 ## Intent
 
-40 checks in 4 slices · 9 one-way doors · 0 open
+45 checks in 4 slices · 9 one-way doors · 0 open (C41-C45 adicionados na rodada 2 de verificação: lacunas de prova, nenhum check anterior enfraquecido)
 
 Comandos de prova (repositório novo, definidos por este build):
 
@@ -25,7 +25,7 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "brake when moving forwa
 **C3** - Segurar `W` por 3 s e depois `S` por 1 s termina com velocidade dianteira menor que a medida ao soltar `W` (AC 2)
 Proof: `npx playwright test tests/e2e/drive.spec.ts -g "brake reduces speed"`
 
-**C4** - Com velocidade dianteira de 1 km/h ou menos, `S` produz força de motor negativa e a força é cortada quando a ré passa de 30 km/h (AC 3)
+**C4** - Com velocidade dianteira de 1 km/h ou menos, `S` produz força de motor negativa; a força é cortada a partir de -29.5 km/h (amostras: -29 negativa, -30 zero, -31 zero), garantindo que a ré nunca passe de 30 km/h mesmo com o overshoot de um passo (AC 3)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "reverse below 1 kmh and capped at 30"`
 
 **C5** - Segurar `S` por 5 s a partir do repouso termina com velocidade dianteira entre -30 km/h e -5 km/h (AC 3)
@@ -55,7 +55,7 @@ Proof: `npx vitest run tests/unit/fixedStepper.test.ts -t "steps at 1/60 with a 
 **C13** - Para heading 0 e chassi em `(0,0,0)` o alvo da câmera é `(0, 2.5, -6)` olhando para `(0,1,0)`; para heading π/2 é `(-6, 2.5, 0)` (AC 11)
 Proof: `npx vitest run tests/unit/chaseCamera.test.ts -t "target is 6 m behind and 2.5 m above along heading"`
 
-**C14** - Suavização com fator 5/s e `dt` 0.1 move a câmera 50 % da distância até o alvo (`1 - e^{-0.5}` ≈ 0.393 se exponencial; este check fixa a fórmula `lerp(current, target, 1 - exp(-5·dt))`) (AC 11)
+**C14** - Suavização com fator 5/s: com `dt` 0.1 a câmera percorre `1 - e^{-0.5}` ≈ 0.393 da distância até o alvo; fórmula fixada `lerp(current, target, 1 - exp(-5·dt))` (AC 11)
 Proof: `npx vitest run tests/unit/chaseCamera.test.ts -t "smoothing follows 1 - exp(-5 dt)"`
 
 **C15** - Cada tecla mapeia para exatamente um campo de `InputState`: `W`→`throttle`, `S`→`brake`, `A`→`steer +1`, `D`→`steer -1`, `Space`→`handbrake`, `R`→`reset`, `M`→`mute`; tecla desconhecida não altera nada (AC 1-5, 9, 30)
@@ -81,7 +81,7 @@ Proof: `npx vitest run tests/unit/cityGenerator.test.ts -t "lamp posts every 20 
 **C21** - Após o primeiro frame, `renderer.info.render.calls` é 60 ou menos com a cidade e o carro na cena (AC 17)
 Proof: `npx playwright test tests/e2e/render.spec.ts -g "draw calls at most 60"`
 
-**C22** - Os materiais de letreiro e de janela têm `emissiveIntensity` de 2.0 ou mais (AC 17)
+**C22** - Os materiais de letreiro, de janela e de cabeça de poste têm `emissiveIntensity` de 2.0 ou mais (AC 17)
 Proof: `npx playwright test tests/e2e/render.spec.ts -g "neon emissive intensity at least 2"`
 
 **C23** - O material da rua tem `roughness` de 0.25 ou menos e `scene.environment` não é nulo (AC 18)
@@ -95,7 +95,7 @@ Proof: `npx playwright test tests/e2e/render.spec.ts -g "bloom pass and ACES ton
 **C25** - `formatSpeed(13.9)` retorna `"50"`, `formatSpeed(-2.0)` retorna `"7"` (módulo), `formatSpeed(0.27)` retorna `"1"` (m/s × 3.6 arredondado) (AC 20)
 Proof: `npx vitest run tests/unit/hudFormat.test.ts -t "speed in kmh as integer"`
 
-**C26** - O HUD no DOM mostra o mesmo valor que `__game.car.speedKmh` arredondado após 2 s segurando `W` (AC 20)
+**C26** - O HUD no DOM mostra o valor de `__game.car.speedKmh` arredondado após 2 s segurando `W`, com tolerância de 3 km/h porque o DOM é escrito no frame anterior à leitura e a física pode ter avançado até 5 passos (AC 20)
 Proof: `npx playwright test tests/e2e/hud.spec.ts -g "speed label matches car state"`
 
 **C27** - `gearFor(kmh)` cobre as 7 faixas: -5→-1, 0→1, 29.9→1, 30→2, 60→3, 95→4, 130→5, 170→6, 200→6 (AC 21)
@@ -138,11 +138,28 @@ Proof: `npx playwright test tests/e2e/audio.spec.ts -g "M toggles master gain"`
 
 ### Portas transversais
 
-**C39** - Nenhum arquivo em `src/world/CityGenerator.ts`, `src/vehicle/drivetrain.ts`, `src/core/FixedStepper.ts`, `src/core/input.ts`, `src/camera/chaseMath.ts`, `src/hud/format.ts`, `src/hud/minimapMath.ts`, `src/audio/audioMap.ts` importa `three` ou `@dimforge/rapier3d-compat` (door 1)
+**C39** - Nenhum arquivo em `src/world/CityGenerator.ts`, `src/vehicle/drivetrain.ts`, `src/core/FixedStepper.ts`, `src/core/input.ts`, `src/camera/chaseMath.ts`, `src/hud/format.ts`, `src/hud/minimapMath.ts`, `src/audio/audioMap.ts` importa `three` ou `@dimforge/rapier3d-compat` por `import ... from`, `import '...'`, `import(...)` ou `require(...)` (door 1)
 Proof: `npx vitest run tests/unit/purity.test.ts -t "pure modules do not import three or rapier"`
 
 **C40** - `__game.car.wheelCount` é 4 e `__game.car.controllerKind` é `"DynamicRayCastVehicleController"` (door 2)
 Proof: `npx playwright test tests/e2e/drive.spec.ts -g "rapier vehicle controller with 4 wheels"`
+
+### Rodada 2 - lacunas de prova apontadas pelo Verifier
+
+**C41** - IF a montagem do jogo lança (ex.: `#minimap` ausente no DOM) THEN o overlay de erro mostra texto começando com `Falha ao iniciar o jogo:` e `__game` fica indefinido (AC 25 estendido; Swept dependency failure)
+Proof: `npx playwright test tests/e2e/hud.spec.ts -g "boot failure shows error overlay"`
+
+**C42** - Após o primeiro frame, o `<canvas id="minimap">` real tem 160 × 160 px e contém pelo menos 10 pixels na cor do carro `#ff7a1a` numa janela de 20 px ao redor do centro e pelo menos 100 pixels na cor de quarteirão `#2b2d3d` (AC 23)
+Proof: `npx playwright test tests/e2e/hud.spec.ts -g "minimap draws blocks and car"`
+
+**C43** - Com o carro parado por 2 s de simulação, a posição da câmera está a menos de 0.1 m de `(x - 6·sin h, y + 2.5, z - 6·cos h)` calculado a partir de `__game.car` (AC 11; consumidor de `ChaseCamera`)
+Proof: `npx playwright test tests/e2e/render.spec.ts -g "camera sits 6 m behind and 2.5 m above"`
+
+**C44** - Após 1.5 s segurando `W`, `#gear` mostra `2` (o mesmo que `gearLabel(__game.car.gear)`) e a largura de `#rpm-fill` em % está entre 0 e 100 e a menos de 15 pontos de `rpmBarWidth(__game.car.rpm)` (tolerância porque o DOM é escrito no frame anterior) (AC 21, AC 22; consumidor de `Hud`)
+Proof: `npx playwright test tests/e2e/hud.spec.ts -g "gear and rpm bar match car state"`
+
+**C45** - Portas com atributos literais: `UnrealBloomPass` com `strength 0.8, radius 0.4, threshold 0.7` na ordem `RenderPass, UnrealBloomPass, OutputPass`; `world.timestep` igual a 1/60; `city.seed` igual a 1337; força de motor aplicada só nas rodas 2 e 3 (traseiras) enquanto `W` está pressionado (doors 2, 3, 5, 6)
+Proof: `npx playwright test tests/e2e/render.spec.ts -g "landing door literals"`
 
 ## Coverage
 
@@ -155,16 +172,19 @@ Proof: `npx playwright test tests/e2e/drive.spec.ts -g "rapier vehicle controlle
 | speed cap edges (2) | 219 C8 · 220 C8 | - |
 | stepper cases (3) | 0.05 C12 · 0.2 C12 · 0.01 C12 | - |
 | neon palette (4 colors) | C19, table-driven over all 4 | - |
-| loader outcomes (3) | glb ok C1 · glb fails C33 · webgl2 missing C32 | - |
-| overlays (2) | loading C31 · error C32 | - |
+| boot/loader outcomes (4) | glb ok C1 · glb fails C33 · webgl2 missing C32 · game construction throws C41 | - |
+| overlays (2) | loading C31 · error C32, C41 | - |
+| minimap elements (4) | canvas 160 px C42 · window 320 m C30 · blocks drawn C42 · car triangle by heading C42 | - |
+| hud elements (3) | speed C26 · gear C44 · rpm bar C44 | - |
+| bloom literals (3) | strength C45 · radius C45 · threshold C45 | - |
 | audio gains (3) | ambient C37 · engine C37 · master C37 | - |
 | mute transitions (2) | 1→0 C38 · 0→1 C38 | - |
 | rpm samples (4) | 0 C28 · 15 C28 · 29.9 C28 · 30 C28 | - |
-| landing doors (9) | 1 C39 · 2 C40 · 3 C24 · 4 C34 · 5 C12 · 6 C16 · 7 C33 · 8 C35 · 9 C25 | - |
+| landing doors (9) | 1 C39 · 2 C40, C45 · 3 C24, C45 · 4 C34 · 5 C12, C45 · 6 C16, C45 · 7 C33 · 8 C35 · 9 C25 | - |
 | startup config: debug handle (1 assembly) | `src/main.ts` C34 | - |
 | pure modules (8 files) | C39, table-driven over all 8 | - |
 
-- Claims cruzando a fronteira browser (Playwright): C1, C3, C5, C9, C10, C11, C21-C24, C26, C31-C33, C35, C37, C38, C40
+- Claims cruzando a fronteira browser (Playwright): C1, C3, C5, C9, C10, C11, C21-C24, C26, C31-C33, C35, C37, C38, C40-C45
 - Nenhum outro check afirma mais do que o caso único que sua prova exercita
 
 ## Test policy
@@ -186,23 +206,23 @@ Evidence (forma prevista do código; recontada pelo Verifier sobre o diff):
 - `src/core/FixedStepper.ts`: 2 pontos de decisão (acumular, cap de 5) → decides; C12
 - `src/camera/chaseMath.ts`: 0 ramos, 2 fórmulas → decides (valores); C13, C14
 - `src/world/CityGenerator.ts`: contagens e limites por quarteirão, paleta, espaçamento → decides; C16-C20
-- `src/core/Loader.ts`: 3 desfechos (ok, glb falha, sem WebGL2) → decides, reached across a boundary; fronteira C31-C33; sem camada própria porque cada desfecho só é observável no browser
+- `src/core/Loader.ts` + `src/main.ts`: 4 desfechos (ok, glb falha, sem WebGL2, montagem lança) → decides, reached across a boundary; fronteira C31-C33, C41; sem camada própria porque cada desfecho só é observável no browser
 - `src/hud/format.ts`, `src/hud/minimapMath.ts`, `src/audio/audioMap.ts`: mapeamentos com 1-2 ramos → decides; C25, C29, C30, C36
-- `src/vehicle/Car.ts`, `src/world/CityScene.ts`, `src/camera/ChaseCamera.ts`, `src/hud/Hud.ts`, `src/audio/Engine.ts`, `src/core/GameLoop.ts`: encaminham para three/Rapier/DOM sem decidir → instrumentation; cobertos pelas provas Playwright dos consumidores
+- `src/vehicle/Car.ts`, `src/world/CityScene.ts`, `src/camera/ChaseCamera.ts`, `src/hud/Hud.ts`, `src/hud/Minimap.ts`, `src/audio/AudioEngine.ts`, `src/core/GameLoop.ts`: encaminham para three/Rapier/DOM sem decidir → instrumentation; cobertos pelas provas Playwright dos consumidores (Car: C1-C11, C40, C45; CityScene: C21-C23; ChaseCamera: C43; Hud: C26, C44; Minimap: C42; AudioEngine: C35, C37, C38; GameLoop: C1 via `simTime`)
 
-Cost: 22 provas unitárias em 9 arquivos de teste e 18 provas Playwright em 4 arquivos. Sem
+Cost: 22 provas unitárias em 10 arquivos de teste e 23 provas Playwright em 4 arquivos. Sem
 estas linhas, a tabela de marchas e o mapa de teclas seriam provados só pelo caminho que o
 Playwright atravessa.
 
 ## Swept
 
 - validation: C6, C8, C17, C18 - limites de direção, cap de velocidade, faixas do gerador
-- failure modes: C32, C33 - sem WebGL2 e GLB ausente
+- failure modes: C32, C33, C41 - sem WebGL2, GLB ausente, montagem do jogo lança
 - idempotency: n/a - nenhuma operação é repetível com efeito; reset (`R`) é idempotente por construção e coberto por C11
 - authorization: n/a - jogo local, sem usuários nem rotas
 - concurrency: C12 - o acumulador é o único ponto onde ordem importa (física vs render); sem workers, sem rede
 - data lifecycle: n/a - nada é persistido neste sub-projeto (plan `## Relations`)
-- dependency failure: C33 - GLB; o WASM do Rapier falhando cai no mesmo overlay de C32 (mesma mensagem genérica de erro), sem check próprio por não ser reproduzível sem alterar o bundle
+- dependency failure: C33 - GLB; qualquer outra falha antes do primeiro frame (WASM do Rapier, montagem da cena) cai no `catch` do boot com a mensagem `Falha ao iniciar o jogo: <erro>`, provado por C41
 - state transitions: C11, C27, C35, C38 - reset, marchas, idle→running do áudio, mute
 - observability: C33 - `console.warn` no fallback; `__game` (C34) é a superfície de observação em DEV; sem métricas em produção por decisão do plano
 
@@ -212,4 +232,5 @@ Playwright atravessa.
 
 - **Boundary:** C1-C40 fechados (commits `5f760df` + o commit da integração)
 - **Settled mid-build:** (autor, antes de qualquer código) C28 corrigido de 7000 para 6980 RPM a 29.9 km/h - erro de aritmética do próprio check. "Segurar por N s" em C1, C3, C5, C9, C10 e C33 é lido como N segundos de **simulação** (`__game.simTime`), porque em headless o acumulador limita 5 passos por frame e 1 s de relógio vale menos de 1 s de física; o check é sobre a dinâmica do carro, não sobre a GPU. O nome da classe do controlador (C40) é verificado por `instanceof`, porque o bundle compat do Rapier é minificado. Nenhum check foi enfraquecido.
+- **Rodada 2 (após FAIL do Verifier):** C41-C45 adicionados como provas novas; C4 endurecido (corte da ré em -29.5 km/h para nunca passar de 30); C14 e C26 tiveram o texto tornado preciso (tolerâncias declaradas); C22 passou a cobrir a cabeça do poste; C39 passou a cobrir `import '...'`, `import()` e `require()`. Plano `## Impact` corrigido: `InputState` guarda `steerLeft`/`steerRight`, e `steerAxis()` deriva -1/0/+1.
 - **Abandoned:** `frictionSlip` 2.5 e força de motor 9000 N/roda - o carro empinava (rodas dianteiras sem contato) e não virava; ficou 10 (padrão do Rapier) e 4000 N com lastro baixo no chassi.

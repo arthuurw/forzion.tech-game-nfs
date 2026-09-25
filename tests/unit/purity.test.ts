@@ -14,7 +14,8 @@ const PURE_MODULES = [
   'src/audio/audioMap.ts',
 ];
 
-const FORBIDDEN = /from\s+['"](three|@dimforge\/rapier3d-compat)(\/[^'"]*)?['"]/;
+// cobre `import x from 'three'`, `import 'three'`, `import('three')` e `require('three')`
+const FORBIDDEN = /(from\s+|import\s+|import\s*\(\s*|require\s*\(\s*)['"](three|@dimforge\/rapier3d-compat)(\/[^'"]*)?['"]/;
 
 describe('pure modules', () => {
   it('pure modules do not import three or rapier', () => {

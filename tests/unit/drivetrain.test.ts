@@ -24,6 +24,7 @@ describe('drivetrain', () => {
     expect(computeDrive({ ...idle, brake: true }, 1).engineForce).toBeLessThan(0);
     expect(computeDrive({ ...idle, brake: true }, 0).engineForce).toBeLessThan(0);
     expect(computeDrive({ ...idle, brake: true }, -29).engineForce).toBeLessThan(0);
+    expect(computeDrive({ ...idle, brake: true }, -30).engineForce).toBe(0);
     expect(computeDrive({ ...idle, brake: true }, -31).engineForce).toBe(0);
   });
 

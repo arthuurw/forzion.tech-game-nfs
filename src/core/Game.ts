@@ -180,6 +180,15 @@ export class Game {
         get wheelContact() {
           return [0, 1, 2, 3].map((i) => game.car.controller.wheelIsInContact(i));
         },
+        get wheelEngineForce() {
+          return [0, 1, 2, 3].map((i) => game.car.controller.wheelEngineForce(i));
+        },
+        get gear() {
+          return game.car.state().gear;
+        },
+        get rpm() {
+          return game.car.state().rpm;
+        },
         placeholder: game.car.placeholder,
         teleport: (x: number, y: number, z: number, heading: number) => game.car.teleport(x, y, z, heading),
         setRotation: (q: { x: number; y: number; z: number; w: number }) => game.car.setRotation(q),
@@ -187,6 +196,16 @@ export class Game {
       render: {
         get calls() {
           return game.drawCalls;
+        },
+      },
+      camera: {
+        get position() {
+          return { x: game.chase.camera.position.x, y: game.chase.camera.position.y, z: game.chase.camera.position.z };
+        },
+      },
+      physics: {
+        get timestep() {
+          return game.world.timestep;
         },
       },
       materials: {
@@ -198,6 +217,9 @@ export class Game {
         },
         get signEmissiveIntensities() {
           return game.city.signMaterials.map((m) => m.emissiveIntensity);
+        },
+        get lampEmissiveIntensity() {
+          return game.city.lampMaterial.emissiveIntensity;
         },
       },
       scene: {
@@ -211,6 +233,9 @@ export class Game {
         },
         get bloomEnabled() {
           return game.bloom.enabled;
+        },
+        get bloomParams() {
+          return { strength: game.bloom.strength, radius: game.bloom.radius, threshold: game.bloom.threshold };
         },
       },
       get toneMapping() {

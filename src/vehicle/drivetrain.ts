@@ -28,6 +28,8 @@ export interface DriveCommand {
 
 export const MAX_SPEED_KMH = 220;
 export const MAX_REVERSE_KMH = 30;
+/** a força é cortada meio km/h antes do limite: um passo de física pode ultrapassar ~0.25 km/h */
+export const REVERSE_CUTOFF_KMH = MAX_REVERSE_KMH - 0.5;
 export const ENGINE_FORCE = 4000;
 export const REVERSE_FORCE = 2500;
 export const BRAKE_FORCE = 6000;
@@ -91,8 +93,8 @@ export function computeDrive(input: DriveInput, speedKmh: number): DriveCommand 
       engineForce = 0;
       brakeFront = BRAKE_FORCE;
       brakeRear = BRAKE_FORCE;
-    } else if (speedKmh > -MAX_REVERSE_KMH) {
-      // parado ou em ré: S é ré, cortada acima de 30 km/h
+    } else if (speedKmh > -REVERSE_CUTOFF_KMH) {
+      // parado ou em ré: S é ré, cortada antes de 30 km/h
       engineForce = -REVERSE_FORCE;
     }
   }
