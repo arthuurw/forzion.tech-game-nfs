@@ -111,7 +111,7 @@ export class Game {
     this.chase.update(dt, state);
     this.hud.update(state);
     this.minimap.update(state);
-    this.audio.setRpm(state.rpm);
+    this.audio.update(state.rpm, this.input.state.throttle);
 
     this.renderer.info.reset();
     this.composer.render();
@@ -256,6 +256,15 @@ export class Game {
         },
         get graph() {
           return game.audio.graph();
+        },
+        get compressor() {
+          return game.audio.compressorParams();
+        },
+        get cutoffTarget() {
+          return game.audio.currentCutoffTarget();
+        },
+        get throttling() {
+          return game.audio.isThrottling();
         },
       },
     };
