@@ -15,6 +15,9 @@ export class AudioEngine {
   private engineGain: GainNode | null = null;
   private ambientGain: GainNode | null = null;
   private engineOsc: OscillatorNode | null = null;
+  private engineFilter: BiquadFilterNode | null = null;
+  private ambientSource: AudioBufferSourceNode | null = null;
+  private ambientFilter: BiquadFilterNode | null = null;
   private muted = false;
 
   start(): void {
@@ -34,6 +37,7 @@ export class AudioEngine {
     engineFilter.type = 'lowpass';
     engineFilter.frequency.value = 900;
     engineFilter.Q.value = 2;
+    this.engineFilter = engineFilter;
     this.engineGain = ctx.createGain();
     this.engineGain.gain.value = ENGINE_GAIN;
     this.engineOsc.connect(engineFilter).connect(this.engineGain).connect(this.master);
@@ -43,9 +47,11 @@ export class AudioEngine {
     const noise = ctx.createBufferSource();
     noise.buffer = makeNoiseBuffer(ctx);
     noise.loop = true;
+    this.ambientSource = noise;
     const ambientFilter = ctx.createBiquadFilter();
     ambientFilter.type = 'lowpass';
     ambientFilter.frequency.value = 420;
+    this.ambientFilter = ambientFilter;
     this.ambientGain = ctx.createGain();
     this.ambientGain.gain.value = AMBIENT_GAIN;
     noise.connect(ambientFilter).connect(this.ambientGain).connect(this.master);
@@ -75,6 +81,25 @@ export class AudioEngine {
 
   contextState(): string {
     return this.ctx?.state ?? 'none';
+  }
+
+  /** Descrição do grafo para debug/testes: tipo de cada nó na ordem de conexão. */
+  graph(): { engine: string[]; ambient: string[]; masterConnected: boolean } {
+    const node = (n: AudioNode | null, detail = ''): string =>
+      n ? `${n.constructor.name}${detail ? `(${detail})` : ''}` : 'none';
+    return {
+      engine: [
+        node(this.engineOsc, this.engineOsc?.type ?? ''),
+        node(this.engineFilter, this.engineFilter?.type ?? ''),
+        node(this.engineGain),
+      ],
+      ambient: [
+        node(this.ambientSource, this.ambientSource?.loop ? 'loop' : ''),
+        node(this.ambientFilter, this.ambientFilter?.type ?? ''),
+        node(this.ambientGain),
+      ],
+      masterConnected: this.master !== null && this.ctx !== null && this.master.numberOfOutputs > 0,
+    };
   }
 }
 

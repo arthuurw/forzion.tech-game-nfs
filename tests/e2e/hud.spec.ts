@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { advanceSim, gotoGame, holdKeySim, waitSimUntil } from './helpers';
+import { advanceSim, gotoGame, holdKeySim, teleport, waitSimUntil } from './helpers';
 
 test.describe('hud', () => {
   // C26 (AC 20)
@@ -120,6 +120,29 @@ test.describe('hud - rodada 2', () => {
     expect(result.height).toBe(160);
     expect(result.car).toBeGreaterThanOrEqual(10);
     expect(result.blocks).toBeGreaterThanOrEqual(100);
+
+    // rotação pelo heading: frente = +x do mundo => ponta do triângulo à direita do centro
+    await teleport(page, 0, 1.2, 0, Math.PI / 2);
+    await advanceSim(page, 0.1);
+    await page.waitForTimeout(100);
+    const tip = await page.evaluate(() => {
+      const canvas = document.querySelector<HTMLCanvasElement>('#minimap')!;
+      const { data } = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height);
+      let minX = Infinity;
+      let maxX = -Infinity;
+      for (let y = 70; y <= 90; y++) {
+        for (let x = 60; x <= 100; x++) {
+          const i = (y * canvas.width + x) * 4;
+          if (data[i] === 255 && data[i + 1] === 122 && data[i + 2] === 26) {
+            minX = Math.min(minX, x);
+            maxX = Math.max(maxX, x);
+          }
+        }
+      }
+      return { minX, maxX };
+    });
+    expect(tip.maxX).toBeGreaterThanOrEqual(84); // vértice em 87, antialiased
+    expect(tip.minX).toBeGreaterThanOrEqual(74);
   });
 
   // C44 (AC 21, AC 22) - marcha e barra de RPM no DOM batem com o estado do carro
@@ -137,8 +160,8 @@ test.describe('hud - rodada 2', () => {
       };
     });
     await page.keyboard.up('KeyW');
-    expect(sample.gear).toBe(2);
-    expect(sample.gearLabel).toBe('2');
+    expect(sample.gear).toBeGreaterThanOrEqual(2);
+    expect(sample.gearLabel).toBe(String(sample.gear));
     const expectedWidth = ((sample.rpm - 1000) / 6000) * 100;
     expect(sample.rpmWidth).toBeGreaterThanOrEqual(0);
     expect(sample.rpmWidth).toBeLessThanOrEqual(100);

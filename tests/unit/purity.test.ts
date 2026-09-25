@@ -2,12 +2,13 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-// C39 (door 1) - table-driven over the 8 pure modules
+// C39 (door 1) - table-driven over the 9 pure modules
 const PURE_MODULES = [
   'src/world/CityGenerator.ts',
   'src/vehicle/drivetrain.ts',
   'src/core/FixedStepper.ts',
   'src/core/input.ts',
+  'src/core/exposeDebug.ts',
   'src/camera/chaseMath.ts',
   'src/hud/format.ts',
   'src/hud/minimapMath.ts',
@@ -19,7 +20,7 @@ const FORBIDDEN = /(from\s+|import\s+|import\s*\(\s*|require\s*\(\s*)['"](three|
 
 describe('pure modules', () => {
   it('pure modules do not import three or rapier', () => {
-    expect(PURE_MODULES.length).toBe(8);
+    expect(PURE_MODULES.length).toBe(9);
     for (const rel of PURE_MODULES) {
       const source = readFileSync(resolve(process.cwd(), rel), 'utf8');
       expect(FORBIDDEN.test(source), rel).toBe(false);

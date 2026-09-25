@@ -254,6 +254,9 @@ export class Game {
         get gains() {
           return game.audio.gains();
         },
+        get graph() {
+          return game.audio.graph();
+        },
       },
     };
   }

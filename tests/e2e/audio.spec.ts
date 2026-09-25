@@ -26,6 +26,17 @@ test.describe('audio', () => {
     expect(gains.master).toBeCloseTo(1, 6);
   });
 
+  // C46 (door 8) - grafo sintetizado, sem arquivos de som
+  test('synthesized audio graph', async ({ page }) => {
+    await page.keyboard.press('KeyW');
+    await page.waitForFunction(() => (window as any).__game.audio.state === 'running');
+    const graph = await page.evaluate(() => (window as any).__game.audio.graph);
+    expect(graph.engine).toEqual(['OscillatorNode(sawtooth)', 'BiquadFilterNode(lowpass)', 'GainNode']);
+    expect(graph.ambient).toEqual(['AudioBufferSourceNode(loop)', 'BiquadFilterNode(lowpass)', 'GainNode']);
+    expect(graph.masterConnected).toBe(true);
+    expect(await page.locator('audio').count()).toBe(0);
+  });
+
   // C38 (AC 30)
   test('M toggles master gain', async ({ page }) => {
     await page.keyboard.press('KeyW');
