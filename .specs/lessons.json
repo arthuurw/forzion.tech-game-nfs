@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "promote_threshold": 2,
+  "window_days": 45,
+  "quarantine_threshold": 2,
+  "next_id": 5,
+  "lessons": [
+    {
+      "id": "L-001",
+      "key": "ac_gap::every catch branch in an entry point owes its own boundary proof asserting the exact user visible message",
+      "text": "Every catch branch in an entry point owes its own boundary proof asserting the exact user-visible message",
+      "signal": "ac_gap",
+      "scope": "boot",
+      "status": "candidate",
+      "features": [
+        "free-roam-city"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "verification.md round 1 gap 1 - src/main.ts:34-38 (catch do boot sem prova) (boot)"
+      ],
+      "created": "2026-09-25T22:27:35Z",
+      "last_seen": "2026-09-25T22:27:35Z"
+    },
+    {
+      "id": "L-002",
+      "key": "ac_gap::prove a canvas drawing module by reading pixels from the real canvas not only by testing its math helper",
+      "text": "Prove a canvas drawing module by reading pixels from the real canvas, not only by testing its math helper",
+      "signal": "ac_gap",
+      "scope": "hud",
+      "status": "candidate",
+      "features": [
+        "free-roam-city"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "verification.md round 1 gap 2 - src/hud/Minimap.ts:27-43 (desenho sem prova) (hud)"
+      ],
+      "created": "2026-09-25T22:27:36Z",
+      "last_seen": "2026-09-25T22:27:36Z"
+    },
+    {
+      "id": "L-003",
+      "key": "spec_precision_gap::declare every tolerance in the check text itself never only in the test body",
+      "text": "Declare every tolerance in the check text itself, never only in the test body",
+      "signal": "spec_precision_gap",
+      "scope": "checks",
+      "status": "candidate",
+      "features": [
+        "free-roam-city"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "verification.md round 1 finding C26 - tests/e2e/hud.spec.ts:17 (tolerancia so no teste) (checks)"
+      ],
+      "created": "2026-09-25T22:27:36Z",
+      "last_seen": "2026-09-25T22:27:36Z"
+    },
+    {
+      "id": "L-004",
+      "key": "spec_precision_gap::a landing door with literal attributes owes a proof that asserts those literals not only the class name",
+      "text": "A Landing door with literal attributes owes a proof that asserts those literals, not only the class name",
+      "signal": "spec_precision_gap",
+      "scope": "checks",
+      "status": "candidate",
+      "features": [
+        "free-roam-city"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "verification.md round 1 finding doors - src/core/Game.ts:75-78 (bloom params nunca afirmados) (checks)"
+      ],
+      "created": "2026-09-25T22:27:36Z",
+      "last_seen": "2026-09-25T22:27:36Z"
+    }
+  ]
+}
