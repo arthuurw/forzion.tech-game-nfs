@@ -28,8 +28,8 @@ export interface DriveCommand {
 
 export const MAX_SPEED_KMH = 220;
 export const MAX_REVERSE_KMH = 30;
-export const ENGINE_FORCE = 9000;
-export const REVERSE_FORCE = 4000;
+export const ENGINE_FORCE = 4000;
+export const REVERSE_FORCE = 2500;
 export const BRAKE_FORCE = 6000;
 export const HANDBRAKE_FORCE = 9000;
 export const HANDBRAKE_REAR_FRICTION = 0.4;

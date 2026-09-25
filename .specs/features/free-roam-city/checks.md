@@ -209,3 +209,7 @@ Playwright atravessa.
 ## Handoff
 
 - S1 = 11k (core, vehicle, camera); S2 = +8k (world) → 19k; S3 = +6k (hud) → 25k; S4 = +3k (audio) → 28k; config e testes ≈ +8k → 36k total, abaixo do budget de 150k - one builder
+
+- **Boundary:** C1-C40 fechados (commits `5f760df` + o commit da integração)
+- **Settled mid-build:** (autor, antes de qualquer código) C28 corrigido de 7000 para 6980 RPM a 29.9 km/h - erro de aritmética do próprio check. "Segurar por N s" em C1, C3, C5, C9, C10 e C33 é lido como N segundos de **simulação** (`__game.simTime`), porque em headless o acumulador limita 5 passos por frame e 1 s de relógio vale menos de 1 s de física; o check é sobre a dinâmica do carro, não sobre a GPU. O nome da classe do controlador (C40) é verificado por `instanceof`, porque o bundle compat do Rapier é minificado. Nenhum check foi enfraquecido.
+- **Abandoned:** `frictionSlip` 2.5 e força de motor 9000 N/roda - o carro empinava (rodas dianteiras sem contato) e não virava; ficou 10 (padrão do Rapier) e 4000 N com lastro baixo no chassi.

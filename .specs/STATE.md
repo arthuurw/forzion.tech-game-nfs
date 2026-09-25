@@ -30,9 +30,9 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 ## Handoff
 
 **Feature**: free-roam-city
-**Where**: plan.md escrito, aguardando revisão do usuário; checks.md não existe
-**In progress**: nenhum código
-**Next step**: usuário aprova o plano → derivar `checks.md`
+**Where**: C1-C40 com provas verdes (22 vitest + 20 playwright); aguardando Verifier
+**In progress**: nenhum
+**Next step**: Verifier escreve `verification.md`; depois `validate_verification.py`
 **Blockers**: none
-**Uncommitted**: `.specs/` inteiro (repositório ainda não é git)
-**Branch**: n/a
+**Uncommitted**: nenhum após o commit de integração
+**Branch**: main

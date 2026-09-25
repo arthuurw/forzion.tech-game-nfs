@@ -8,7 +8,7 @@ export default defineConfig({
   retries: 0,
   use: {
     baseURL: 'http://localhost:5173',
-    viewport: { width: 800, height: 600 },
+    viewport: { width: 640, height: 360 },
     launchOptions: {
       args: ['--autoplay-policy=no-user-gesture-required', '--use-gl=angle', '--use-angle=swiftshader'],
     },
