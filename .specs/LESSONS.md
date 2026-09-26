@@ -80,6 +80,12 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: round1 drivetrain.ts:176 (vehicle) (+1 more)
 - last seen: 2026-09-26T19:03:24Z
 
+### L-012 - A force defined as against the direction of motion owes a case in each direction; a single-direction case cannot tell a sign from a constant.
+- signal: `surviving_mutant` · recurrence: 1 feature(s) · scope: `vehicle` · harmful: 0
+- features: car-handling
+- evidence: round3 F5 drivetrain.ts:181 (vehicle)
+- last seen: 2026-09-26T19:11:40Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.
