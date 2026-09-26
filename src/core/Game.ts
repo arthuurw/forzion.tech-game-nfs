@@ -562,6 +562,10 @@ export class Game {
         get lateralG() {
           return game.car.lateralG;
         },
+        /** torque da ajuda de giro no último passo (N·m, eixo Y do mundo; yaw-assist) */
+        get yawAssistNm() {
+          return game.car.yawAssistNm;
+        },
         placeholder: game.car.placeholder,
         get collisionEvents() {
           return {

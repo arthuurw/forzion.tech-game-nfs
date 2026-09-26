@@ -140,7 +140,7 @@ test.describe('drive', () => {
       const mod = await import('/src/vehicle/carSpec.ts' as string);
       return [(window as any).__game.car.spec, mod.DEFAULT_CAR];
     });
-    expect(Object.keys(expected).length).toBe(29);
+    expect(Object.keys(expected).length).toBe(32);
     expect(live).toEqual(expected);
   });
 
