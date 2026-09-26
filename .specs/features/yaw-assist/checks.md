@@ -53,6 +53,8 @@ Proof: `npx vitest run tests/physics/agility.test.ts -t "reaches at least 0.85 g
 | 0.3 | 1.9 | 0 | 4 | 0 (abaixo de 2 m/s) |
 | 0.3 | 10 | 0 | 1 | 0 (menos de 2 rodas no chão) |
 | 0.3 | 10 | 0 | 2 | ≠ 0 |
+| 0.3 | 10 | 0.5 | 4 | 4632.8 (o teto de `lateralG` age abaixo de `maxNm`; sem o teto daria 5000) |
+| 0.3 | 2 | 0 | 4 | 1903.6 (exatamente 2 m/s já tem ajuda) |
 
 Proof: `npx vitest run tests/unit/yawAssist.test.ts -t "yaw assist torque follows the target yaw rate"`
 
@@ -60,8 +62,10 @@ Proof: `npx vitest run tests/unit/yawAssist.test.ts -t "yaw assist torque follow
 - `CarSpec` tem `yawAssistGain`, `yawAssistMaxNm` e `yawAssistLateralG`, finitos e > 0 em `DEFAULT_CAR`.
 - No harness, a 60 km/h com `steer +1`, o giro em regime com `{ ...DEFAULT_CAR, yawAssistMaxNm: 0 }` é pelo menos 15 % menor que com `DEFAULT_CAR` (a ajuda muda o carro, e o valor vem da ficha).
 - `car.yawAssistNm` depois de um passo com `steer +1` a 60 km/h é > 0, e parado é 0.
+- No browser, `__game.car.yawAssistNm` é 0 parado no spawn e > 0 depois de `W` por 1 s e `W` + `A` por 0.3 s.
 
 Proof: `npx vitest run tests/physics/agility.test.ts -t "car applies the yaw assist from its spec"`
+Proof: `npx playwright test tests/e2e/drive.spec.ts -g "car debug exposes the yaw assist torque"`
 
 **C9** - ✅ `yawAssist.ts` está na lista de módulos puros, sem `three` nem `@dimforge/rapier3d-compat` (door 1).
 Proof: `npx vitest run tests/unit/purity.test.ts -t "pure modules do not import three or rapier"`
@@ -87,7 +91,7 @@ Proof: `npx playwright test tests/e2e/visual.spec.ts -g "camera swings left whil
 | --- | --- | --- |
 | plan ACs (11) | 1 C1 · 2 C2 · 3 C3 · 4 C4 · 5 C5 · 6 C6 · 7 C7, C8 · 8 C10 · 9 C11 · 10 C12 · 11 C13 | - |
 | landing doors (1) | 1 C7, C8, C9 | - |
-| yaw assist cases (8) | alvo livre C7 · alvo limitado C7 · lado oposto C7 · soltar C7 · ré C7 · abaixo de 2 m/s C7 · 1 roda C7 · 2 rodas C7 | - |
+| yaw assist cases (10) | alvo livre C7 · alvo limitado C7 · lado oposto C7 · soltar C7 · ré C7 · abaixo de 2 m/s C7 · 1 roda C7 · 2 rodas C7 · teto de lateralG C7 · exatamente 2 m/s C7 | - |
 | spec fields (3) | gain C8 · maxNm C8 · lateralG C8 | - |
 | superseded car-feel checks (2) | cf-8 → C5 · cf-9 → C6 | - |
 | startup config: car construction (1 assembly) | `src/core/Game.ts` constrói o `Car` com `DEFAULT_CAR` (check 35 da car-handling, na 3ª prova de C13) | - |
