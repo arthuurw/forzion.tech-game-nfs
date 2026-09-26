@@ -102,12 +102,13 @@ describe('stability', () => {
       }
       return sum / n;
     };
+    // positiva = lado esquerdo para cima: numa curva à esquerda o carro inclina para fora
     const left = meanRoll(1);
-    expect(left).toBeGreaterThanOrEqual(-6.0);
-    expect(left).toBeLessThanOrEqual(-1.0);
+    expect(left).toBeGreaterThanOrEqual(1.0);
+    expect(left).toBeLessThanOrEqual(6.0);
     const right = meanRoll(-1);
-    expect(right).toBeGreaterThanOrEqual(1.0);
-    expect(right).toBeLessThanOrEqual(6.0);
+    expect(right).toBeGreaterThanOrEqual(-6.0);
+    expect(right).toBeLessThanOrEqual(-1.0);
   });
 
   // C5 (AC 5)

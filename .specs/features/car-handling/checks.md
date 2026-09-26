@@ -57,7 +57,7 @@ Proof: `npx vitest run tests/physics/stability.test.ts -t "no rollover across th
 **C3** - ✅ Nos mesmos 54 casos, depois dos 3 s com todas as entradas soltas, as 4 rodas estão em contato (`wheelIsInContact`) em algum passo dentro de 60 passos (1.0 s) (AC 3)
 Proof: `npx vitest run tests/physics/stability.test.ts -t "all four wheels back on the ground after release"`
 
-**C4** - Curva à esquerda (`steer +1`) a partir de 80 km/h, com `throttle` ligado sempre que a velocidade está abaixo de 80 km/h, por 3 s:
+**C4** - ✅ Curva à esquerda (`steer +1`) a partir de 80 km/h, com `throttle` ligado sempre que a velocidade está abaixo de 80 km/h, por 3 s:
 - A rolagem média dos passos 90–180 está entre +1.0° e +6.0°. Positiva: o lado esquerdo, de dentro da curva, sobe, ou seja, o carro inclina para fora.
 - O mesmo com `steer −1` dá média entre −6.0° e −1.0°.
 

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { DEFAULT_CAR } from '../../src/vehicle/carSpec';
-import { allWheelsInContact, createHarness, forwardSpeed, horizontalSpeed, initRapier, tiltDeg } from './harness';
+import { allWheelsInContact, createHarness, horizontalSpeed, initRapier, tiltDeg } from './harness';
 
 beforeAll(async () => {
   await initRapier();
@@ -26,12 +26,16 @@ describe('physics harness', () => {
     expect(h.car.controller).toBeInstanceOf(RAPIER.DynamicRayCastVehicleController);
     expect(h.car.controller.numWheels()).toBe(4);
     h.settle();
-    for (let i = 0; i < 60; i++) h.step();
+    const heights: number[] = [];
+    for (let i = 0; i < 60; i++) {
+      h.step();
+      heights.push(h.car.body.translation().y);
+    }
     expect(allWheelsInContact(h.car)).toBe(true);
-    // a velocidade do carro (a da frente, a do jogo) e a horizontal; o linvel.y lido entre passos
-    // guarda o resíduo gravidade × dt que o controlador desfaz no passo seguinte (y fica parado)
-    expect(Math.abs(forwardSpeed(h.car)) * 3.6).toBeLessThan(0.1);
     expect(horizontalSpeed(h.car) * 3.6).toBeLessThan(0.1);
+    // o linvel.y lido entre passos guarda o resíduo gravidade × dt; a altura é que prova o repouso
+    const last10 = heights.slice(-10);
+    expect(Math.max(...last10) - Math.min(...last10)).toBeLessThan(0.001);
     expect(tiltDeg(h.car)).toBeLessThan(1);
 
     const config = readFileSync(resolve(process.cwd(), 'vite.config.ts'), 'utf8');
