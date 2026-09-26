@@ -12,6 +12,7 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
    - 1.3 `city-terrain` - cidade de 3 km com morros, rio, baía, rodovia em anel, pontes e streaming por chunks (concluída)
    - 1.4 `car-handling` - mecânica do carro: não capota, aderência, direção, câmbio, freios e motor de carro real (concluída)
    - 1.5 `facade-glint` - farol não faz fachada piscar (antialiasing de especular no shader da fachada, metal e tijolo mais foscos) (concluída)
+   - 1.6 `car-feel` - balanço da carroceria, volante mais rápido, menos aderência, câmera inclinando junto (checks escritos, em build)
 2. corridas - checkpoints, cronômetro, sprint/circuito, IA oponente por waypoints
 3. garagem + tuning visual - pintura, rodas, vinil, body kit, underglow
 4. tuning de performance - motor, turbo, pneus alterando parâmetros do Rapier
