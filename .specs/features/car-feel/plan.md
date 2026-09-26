@@ -23,7 +23,7 @@ Medições no harness de física (`tests/physics`, `DEFAULT_CAR`), round 4 da ca
 Quando isto sair:
 - A carroceria inclina e mergulha de forma visível, e balança um pouco ao sair da curva.
 - O volante responde mais rápido e o carro vira mais em alta.
-- O carro tem menos aderência, e a traseira escapa um pouco acelerando forte em marcha baixa, dá para segurar no volante.
+- O carro tem menos aderência. A traseira escapa com freio de mão + acelerador (power slide da car-handling), não só no acelerador (ver Out of scope).
 - A câmera inclina junto com o carro.
 - Nada disso volta a capotar o carro.
 
@@ -53,7 +53,7 @@ None - no stored-data shape change
 
 ## Surface
 
-None - nothing consumed outside. `window.__game.camera` (só DEV) ganha os campos de leitura `roll` e `direction` (direção de visão, lida pela prova de C16).
+None - nothing consumed outside. `window.__game.camera` (só DEV) ganha os campos de leitura `roll` e `direction` (direção de visão, lida pela prova do AC 14).
 
 ## Landing
 
@@ -83,7 +83,7 @@ O carro inclina na curva, mergulha na frenagem, agacha na aceleração e balanç
 
 ### S2: volante mais rápido e aderência de carro de rua (P1)
 
-As rodas viram mais rápido, o carro vira mais em alta, gruda menos, e a traseira escapa um pouco com acelerador forte em marcha baixa.
+As rodas viram mais rápido, o carro vira mais em alta e gruda menos.
 
 **Acceptance Criteria**
 
@@ -92,8 +92,7 @@ As rodas viram mais rápido, o carro vira mais em alta, gruda menos, e a traseir
 8. WHILE a direção fica toda para um lado por 3 s, em velocidade constante mantida pelo acelerador, de 60 a 180 km/h the system SHALL manter a aceleração lateral de cada janela de 0.5 s em no máximo 0.95 g
 9. WHILE a direção fica toda para um lado a 60 km/h the system SHALL atingir pelo menos 0.75 g numa janela de 0.5 s dentro dos primeiros 2 s
 10. WHILE a direção fica toda para um lado por 3 s sem acelerador, de 60 a 180 km/h, ou com acelerador de 120 a 180 km/h the system SHALL manter o sideslip em no máximo 12°
-11. WHEN a direção fica toda para um lado com o acelerador pressionado a partir de 50 km/h em 2ª marcha THEN the system SHALL levar o sideslip acima de 10° em até 2.0 s (a traseira escapa)
-12. WHEN, depois do AC 11, acelerador e direção são soltos THEN the system SHALL trazer o sideslip abaixo de 8° em até 2.0 s, com a velocidade dianteira > 0
+(AC 11 e AC 12, traseira escapando só no acelerador, foram retirados em 2026-09-26; ver Out of scope. A numeração segue.)
 
 **Independent test:** `npx vitest run tests/physics/feel.test.ts tests/unit/drivetrain.test.ts`
 
@@ -113,6 +112,7 @@ O horizonte inclina junto com a carroceria, suavizado.
 
 | Excluded | Why |
 | --- | --- |
+| traseira escapando só no acelerador (antigos AC 11 e AC 12) | no veículo do Rapier o acelerador deixa a traseira mais estável: o círculo de atrito escala tração e força lateral juntas. Medido no build: ~2° de sideslip em 2ª a 50 km/h, contra 10° pedidos, em ~90 combinações de números. Fazer escapar exige física de pneu própria (contraria a AD-002; o protótipo levou o 0–100 a 9.5 s). Retirado pelo usuário em 2026-09-26; o power slide com freio de mão + acelerador (car-handling C36) continua |
 | inclinar a câmera na arfagem (frenagem e aceleração) | não pedido; o balanço da câmera pedido é na curva. A arfagem já aparece na carroceria (AC 3, AC 4) |
 | controle de tração ou estabilidade | continua fora, como na car-handling |
 | modelo de pneu próprio | contradiz a AD-002 |
@@ -125,7 +125,6 @@ O horizonte inclina junto com a carroceria, suavizado.
 | quanto a carroceria balança | rolagem 3.5–6° a 80 km/h e oscilação de volta 0.3–1.5° | "carroceria parada" e "rolagem na curva"; acima de ~6° parece carro de passeio mole | y |
 | quanto a câmera inclina | 60 % da rolagem, até 4° | acompanha sem enjoar; 100 % faria o horizonte girar tanto quanto o carro | y |
 | menos aderência | teto de 0.95 g (era 1.15) e mínimo de 0.75 g a 60 km/h | "aderência demais"; carro de rua esportivo fica em ~0.9 g | y |
-| traseira viva | só acelerando forte em marcha baixa (AC 11); sem acelerador ou em alta continua saindo de frente (AC 10) | "traseira mais viva" sem virar um carro que roda sozinho | y |
 | volante | 4.0 rad/s para virar (0.14 s até o batente), 5.0 para voltar, `steerLateralG` 1.7 | "volante lento/pesado"; o teclado é digital, mais rápido que isso fica nervoso | y |
 
 **Open questions:** none - all resolved or logged above.
@@ -138,7 +137,7 @@ O horizonte inclina junto com a carroceria, suavizado.
 | tela do jogo | câmera parado ou em linha reta | AC 13 - rolagem ~0 dá inclinação ~0 |
 | teclado | `A` e `D` juntos | existing - `steerAxis` devolve 0 (`src/core/input.ts:52`), a rampa volta ao centro |
 | HUD | marcha, RPM, velocidade | n/a - o HUD não muda |
-| áudio | motor e derrapagem | existing - `skidding` já liga pelo escorregamento lateral (car-handling AC 23), então a traseira escapando (AC 11) já faz som e marca |
+| áudio | motor e derrapagem | existing - `skidding` já liga pelo escorregamento lateral (car-handling AC 23), então a traseira escapando no freio de mão já faz som e marca |
 
 ## Sources
 

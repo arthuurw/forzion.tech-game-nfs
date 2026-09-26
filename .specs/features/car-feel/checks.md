@@ -3,7 +3,7 @@
 Profile: standard
 Plan: `.specs/features/car-feel/plan.md`
 
-17 checks in 3 slices · 1 one-way door · 0 open
+15 checks in 3 slices · 1 one-way door · 0 open
 
 ## Comandos de prova
 
@@ -89,19 +89,7 @@ Proof: `npx vitest run tests/physics/feel.test.ts -t "reaches at least 0.75 g at
 Substitui car-handling C10. (AC 10)
 Proof: `npx vitest run tests/physics/feel.test.ts -t "understeers without throttle or at speed"`
 
-**C11** - A partir de 50 km/h, com `steer +1` e `throttle`:
-- `car.gear` é 2 em algum passo dos primeiros 30 (o câmbio sai da 1ª).
-- O sideslip passa de 10° em algum passo dos primeiros 120 (2.0 s).
-
-(AC 11)
-Proof: `npx vitest run tests/physics/feel.test.ts -t "power oversteer in second gear"`
-
-**C12** - Na continuação de C11, no primeiro passo com sideslip > 10°, `throttle` e `steer` são soltos:
-- O sideslip fica abaixo de 8° em algum passo dos 120 seguintes (2.0 s).
-- A velocidade dianteira fica > 0 em todos esses passos.
-
-(AC 12)
-Proof: `npx vitest run tests/physics/feel.test.ts -t "recovers from power oversteer"`
+C11 e C12 foram retirados com os AC 11 e AC 12 do plano (decisão do usuário em 2026-09-26, ver Out of scope do plano). Os números seguintes não mudam.
 
 **C13** - ✅ Ficha e leitura da suspensão (door 1):
 - `CarSpec` tem `suspensionStiffness`, `suspensionCompression` e `suspensionRelaxation`, e em `DEFAULT_CAR` os três são finitos e > 0.
@@ -161,7 +149,7 @@ Na tabela de Coverage, `ch-N` é o check N da car-handling.
 
 | Set (size) | Member -> proof | Unproven |
 | --- | --- | --- |
-| plan ACs (15) | 1 C1 · 2 C2 · 3 C3 · 4 C4 · 5 C5 · 6 C6, C13 · 7 C7, C13 · 8 C8 · 9 C9 · 10 C10 · 11 C11 · 12 C12 · 13 C14 · 14 C15, C16 · 15 C16 | - |
+| plan ACs (13) | 1 C1 · 2 C2 · 3 C3 · 4 C4 · 5 C5 · 6 C6, C13 · 7 C7, C13 · 8 C8 · 9 C9 · 10 C10 · 13 C14 · 14 C15, C16 · 15 C16 | - |
 | landing doors (1) | 1 C13 | - |
 | roll directions (2) | esquerda C1, C2 · direita C1 | - |
 | understeer cases, 5 sem acelerador + 3 com (8) | C10, table-driven over all 8 | - |
@@ -187,7 +175,7 @@ Mesmas linhas das features anteriores.
 
 Evidence:
 - **`src/camera/chaseMath.ts` `cameraRoll`, `stepRoll`** → decides, reached across a boundary. Própria: C14, C15. Fronteira: C16.
-- **`src/vehicle/drivetrain.ts`** → contrato igual; só os números da ficha mudam. Própria: C6, C7. Fronteira: C8-C12.
+- **`src/vehicle/drivetrain.ts`** → contrato igual; só os números da ficha mudam. Própria: C6, C7. Fronteira: C8-C10.
 - **`src/vehicle/Car.ts`** → lê a suspensão da ficha. Fronteira pelo harness: C13 e C1-C4.
 - **`src/vehicle/carSpec.ts`** → dados, C13.
 - **`src/camera/ChaseCamera.ts`, `src/core/Game.ts`** → instrumentation, cobertos por C16.
@@ -197,13 +185,13 @@ Cost: 4 provas unitárias em 3 arquivos, 10 de física real em 2 arquivos e 1 Pl
 ## Swept
 
 - **validation**: C14 (inclinação da câmera limitada a ±4°); C7 (guarda de `v` < 1 e ré)
-- **failure modes**: C5 (continua sem capotar com a suspensão mais mole); C12 (a traseira que escapa volta)
+- **failure modes**: C5 (continua sem capotar com a suspensão mais mole)
 - **idempotency**: existing - `stepDrivetrain` puro (check 26 da car-handling); `cameraRoll` e `stepRoll` são funções puras
 - **authorization**: n/a - jogo local, sem contas
 - **concurrency**: n/a - um laço de física em passo fixo (AD-006) e a câmera no frame de render; nada assíncrono
 - **data lifecycle**: n/a - nada persistido
 - **dependency failure**: existing - sem o GLB o carro placeholder usa a mesma física (check 33 da free-roam-city)
-- **state transitions**: C2 (curva → reta, a carroceria volta); C11, C12 (aderência → escorregamento → aderência)
+- **state transitions**: C2 (curva → reta, a carroceria volta)
 - **observability**: C16 - `__game.camera.roll` em DEV; `__game.car.bodyRoll`, `bodyPitch`, `sideslip`, `lateralG` já existem (check 33 da car-handling)
 
 ## Handoff
@@ -214,4 +202,4 @@ Cost: 4 provas unitárias em 3 arquivos, 10 de física real em 2 arquivos e 1 Pl
   - S3 +15k → 38k: `chaseMath.ts` 3 KB, `chaseMath.test.ts` 4 KB, `ChaseCamera.ts` 3 KB, `Game.ts` ~36 KB lido em parte, `visual.spec.ts` ~26 KB lido em parte.
 - **Total:** ~38k, abaixo do budget de 150k - one builder.
 - **Base:** `wc -c` dos arquivos existentes mais os novos pelo tamanho dos análogos, dividido por 4.
-- **Números de ajuste:** os valores da ficha (`tireGrip`, `rearGripFactor`, suspensão, `comHeightM`) e o modo de reduzir a aderência (`frictionSlip` ou rigidez lateral) são do build, até C1-C12 e C17 passarem. Os limites não mudam. Se um limite novo brigar com um que continua valendo (por exemplo menos aderência lateral contra a frenagem de 34-45 m da car-handling C22), é stop-and-ask.
+- **Números de ajuste:** os valores da ficha (`tireGrip`, `rearGripFactor`, suspensão, `comHeightM`) e o modo de reduzir a aderência (`frictionSlip` ou rigidez lateral) são do build, até C1-C10 e C17 passarem. Os limites não mudam. Se um limite novo brigar com um que continua valendo (por exemplo menos aderência lateral contra a frenagem de 34-45 m da car-handling C22), é stop-and-ask.
