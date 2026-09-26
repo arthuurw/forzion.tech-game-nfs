@@ -56,6 +56,16 @@ function centralSpawn(roads: Road[]): { x: number; y: number; z: number; heading
   return { x: p[i * 3]!, y: p[i * 3 + 1]!, z: p[i * 3 + 2]!, heading };
 }
 
+/** Opções da sonda DEV `render.headlightShimmer` (facade-glint). */
+interface HeadlightShimmerOpts {
+  headlight: boolean;
+  specularAA: boolean;
+  /** false zera só o especular das fachadas (padrão true) */
+  specular?: boolean;
+  /** true usa os materiais de antes da facade-glint (normalScale 1, metal com metalness 0.5) */
+  legacyMaterials?: boolean;
+}
+
 function mapSrc(m: THREE.MeshStandardMaterial): string | null {
   const img = m.map?.image as { currentSrc?: string; src?: string } | undefined;
   return img?.currentSrc ?? img?.src ?? null;
@@ -584,7 +594,7 @@ export class Game {
           }
           return flicker / ((frames - 2) * w * h);
         },
-        headlightShimmer: (type: number, opts: { headlight: boolean; specularAA: boolean }) =>
+        headlightShimmer: (type: number, opts: HeadlightShimmerOpts) =>
           game.probeHeadlightShimmer(type, opts),
         probeRoadMarks: (roadId: number, index: number) => game.probeRoadMarks(roadId, index),
       },
@@ -786,11 +796,12 @@ export class Game {
    * malha, a física não muda) na rua do lote a 12 m da fachada e virado para ela,
    * com a câmera de perseguição atrás. Esconde chuva, partículas e cones, troca o
    * espelho pelo chão escuro, liga/desliga o farol e o antialiasing de especular
-   * e renderiza 12 quadros andando carro e câmera 0.15 m por quadro, paralelo à
-   * fachada. Devolve `flicker` (como `render.shimmer`) e `litMean`, a luminância
+   * (`specular: false` zera só o especular das fachadas; `legacyMaterials` usa
+   * os materiais de antes da facade-glint) e renderiza 12 quadros andando carro
+   * e câmera 0.15 m por quadro, paralelo à fachada. Devolve `flicker` (como `render.shimmer`) e `litMean`, a luminância
    * média do quarto central da tela no primeiro quadro. Restaura tudo no fim.
    */
-  probeHeadlightShimmer(type: number, opts: { headlight: boolean; specularAA: boolean }): { flicker: number; litMean: number } {
+  probeHeadlightShimmer(type: number, opts: HeadlightShimmerOpts): { flicker: number; litMean: number } {
     const frames = 12;
     const step = 0.15;
     const data = this.city.data;
@@ -829,6 +840,16 @@ export class Game {
     this.headlight.intensity = opts.headlight ? intensity : 0;
     const aa = this.city.facadeSpecularAA.value;
     this.city.facadeSpecularAA.value = opts.specularAA ? 1 : 0;
+    const spec = this.city.facadeSpecular.value;
+    this.city.facadeSpecular.value = opts.specular === false ? 0 : 1;
+    // aparência de antes da facade-glint (db836b8): normal map inteiro, metal com metalness 0.5
+    const look = this.city.facadeMaterials.map((m) => ({ normalScale: m.normalScale.clone(), metalness: m.metalness }));
+    if (opts.legacyMaterials) {
+      this.city.facadeMaterials.forEach((m, i) => {
+        m.normalScale.set(1, 1);
+        m.metalness = i === 1 ? 0.5 : 0.05;
+      });
+    }
 
     const gl = this.renderer.getContext();
     const w = gl.drawingBufferWidth;
@@ -853,6 +874,11 @@ export class Game {
     }
 
     this.city.facadeSpecularAA.value = aa;
+    this.city.facadeSpecular.value = spec;
+    this.city.facadeMaterials.forEach((m, i) => {
+      m.normalScale.copy(look[i]!.normalScale);
+      m.metalness = look[i]!.metalness;
+    });
     this.headlight.intensity = intensity;
     hidden.forEach((o, i) => (o.visible = was[i]!));
     if (ground) {

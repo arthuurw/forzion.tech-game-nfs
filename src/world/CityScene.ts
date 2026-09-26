@@ -54,6 +54,8 @@ export class CityScene {
    * Em produção fica sempre 1; só a sonda DEV `render.headlightShimmer` muda o valor.
    */
   readonly facadeSpecularAA = { value: 1 };
+  /** `uFacadeSpecular` das 4 fachadas: 1 = especular normal; só a sonda DEV zera, para separar o brilho do difuso */
+  readonly facadeSpecular = { value: 1 };
   /** lotes de cada malha de fachada, na ordem das instâncias */
   readonly facadeLots: Lot[][] = [];
   readonly signMaterials: THREE.MeshStandardMaterial[] = [];
@@ -112,7 +114,7 @@ export class CityScene {
     // --- prédios: 4 malhas instanciadas para o mundo todo ---
     for (let type = 0; type < FACADE_TYPES; type++) {
       const set = assets.textures[FACADE_SETS[type]!];
-      const material = makeFacadeMaterial(set, type, this.facadeSpecularAA);
+      const material = makeFacadeMaterial(set, type, this.facadeSpecularAA, this.facadeSpecular);
       this.facadeMaterials.push(material);
       const lots = data.lots.filter((l) => l.facadeType === type);
       this.facadeLots.push(lots);
@@ -354,6 +356,7 @@ function makeFacadeMaterial(
   set: PbrSet | undefined,
   type: number,
   specularAA: { value: number },
+  specular: { value: number },
 ): THREE.MeshStandardMaterial {
   const tint = ['#b8b4ac', '#9aa0a8', '#a0776a', '#c8c0b0'][type] ?? '#aaaaaa';
   const material = new THREE.MeshStandardMaterial({
@@ -372,6 +375,7 @@ function makeFacadeMaterial(
 
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uSpecularAA = specularAA;
+    shader.uniforms.uFacadeSpecular = specular;
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
@@ -412,6 +416,7 @@ varying vec2 vCell;
 flat varying float vSeedF;
 varying float vRoof;
 uniform float uSpecularAA;
+uniform float uFacadeSpecular;
 float windowHash(vec2 c, float s) { return fract(sin(dot(c + s * 97.0, vec2(12.9898, 78.233))) * 43758.5453); }`,
       )
       .replace(
@@ -457,7 +462,10 @@ vec3 nDy = dFdy(normal);
 float nVariance = 0.25 * (dot(nDx, nDx) + dot(nDy, nDy));
 float kernelR2 = min(2.0 * nVariance, 0.18);
 float aaRoughness = sqrt(clamp(material.roughness * material.roughness + kernelR2, 0.0, 1.0));
-material.roughness = mix(material.roughness, aaRoughness, uSpecularAA);`,
+material.roughness = mix(material.roughness, aaRoughness, uSpecularAA);
+material.specularColor *= uFacadeSpecular;
+material.specularColorBlended *= uFacadeSpecular;
+material.specularF90 *= uFacadeSpecular;`,
       );
   };
   // chave única por tipo para o three não reaproveitar o programa de outro material

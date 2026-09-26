@@ -120,3 +120,10 @@ Cost: 5 provas Playwright em 1 arquivo.
   - C1 passa a isolar o especular (`specular: true` − `specular: false`, com farol e AA); C2 usa a mesma diferença.
   - Autorizado mudar a aparência: baixar `normalScale` e/ou `metalness` do metal (tipo 1) e o `normalScale` do tijolo (tipo 2) até C1 passar, sem quebrar C3. Registrar aqui os valores finais.
   - Para C2 continuar provando a sonda, o caso "sem AA" usa a aparência antiga. Se a sonda precisar de chave para isso, ela fica só em DEV.
+- **Medido no build com a métrica nova (`specular: true` − `specular: false`, farol ligado; σ² 0.25, κ 0.18 salvo indicação):**
+  - Materiais atuais com AA: 0 0.000875 · 1 0.0181-0.0183 · 2 0.0033 · 3 0.00026 (C1 passa em 0 e 3; a margem do tipo 0 é pequena).
+  - Sem AA e materiais de `db836b8` (C2): 0 0.00122 · 1 0.0219 · 2 0.0068 · 3 0.00026.
+  - Tijolo (tipo 2), só `normalScale`: 1 → 0.0033 · 0.7 → 0.0031 · 0.5 → 0.0029 · 0.4 → 0.0018 · 0.3 → 0.0015 · 0.25 → 0.0015 · 0.15 → 0.0032 · 0 → 0.0029. Com AA mais forte (σ² 2, κ 1), metalness 0 ou `roughness` 1: mínimo 0.0014. Nenhum valor passa.
+  - Causa no tijolo: o `roughnessMap`. Com `normalScale` 0.25 e sem `roughnessMap` cai para 0.00106, e sem janelas também −0.0002. Onde o mapa é mais liso, o pico do especular (∝ 1/α²) fica várias vezes mais forte bem no centro do foco (luz e câmera quase alinhadas), e esse padrão desliza ~2.5 px por quadro.
+  - Metal (tipo 1): `normalScale` 0.25 → 0.0016-0.0022; + metalness 0.05 → 0.0018; metalness 0.05 + `normalScale` 0.25 + AA mais forte (σ² 2, κ 1) → **0.00057** (litMean 2.11×). O resto vem da parede mais clara em volta das bordas das janelas.
+  - **Stop:** `normalScale` do tijolo sozinho não faz C1 passar no tipo 2. A aparência não foi mudada. Opções para o usuário: mexer no `roughnessMap`/`roughness` do tijolo (por exemplo, rugosidade mínima), aceitar o tipo 2 perto de 0.0015 ou mudar o limite.
