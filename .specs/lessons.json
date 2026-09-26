@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 15,
+  "next_id": 16,
   "lessons": [
     {
       "id": "L-001",
@@ -257,6 +257,24 @@
       ],
       "created": "2026-09-26T21:47:45Z",
       "last_seen": "2026-09-26T21:47:45Z"
+    },
+    {
+      "id": "L-015",
+      "key": "surviving_mutant::a table case that saturates at an outer clamp cannot prove an inner limit add a case where the inner limit acts below the clamp",
+      "text": "A table case that saturates at an outer clamp cannot prove an inner limit; add a case where the inner limit acts below the clamp.",
+      "signal": "surviving_mutant",
+      "scope": "vehicle",
+      "status": "candidate",
+      "features": [
+        "yaw-assist"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "round1 yawAssist.ts:32 (vehicle)"
+      ],
+      "created": "2026-09-26T23:09:45Z",
+      "last_seen": "2026-09-26T23:09:45Z"
     }
   ]
 }

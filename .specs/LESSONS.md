@@ -98,6 +98,12 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: round1 F3 ChaseCamera.ts:92 (camera)
 - last seen: 2026-09-26T21:47:45Z
 
+### L-015 - A table case that saturates at an outer clamp cannot prove an inner limit; add a case where the inner limit acts below the clamp.
+- signal: `surviving_mutant` · recurrence: 1 feature(s) · scope: `vehicle` · harmful: 0
+- features: yaw-assist
+- evidence: round1 yawAssist.ts:32 (vehicle)
+- last seen: 2026-09-26T23:09:45Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.
