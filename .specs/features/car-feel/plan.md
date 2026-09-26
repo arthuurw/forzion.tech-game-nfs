@@ -43,7 +43,8 @@ Reusa a ficha `CarSpec` (door 1 da car-handling), o `stepDrivetrain`, o `Car`, o
 | Front | What changes |
 | --- | --- |
 | domain | `CarSpec` ganha `suspensionStiffness`, `suspensionCompression`, `suspensionRelaxation` (door 1). Leem: `Car` e o `tests/physics`. A garagem e o tuning (sub-projetos 3 e 4) passam a poder mexer na suspensão |
-| checks existentes | car-handling AC 4 (rolagem 1–6°), AC 5 (arfagem −0.5 a −4°), AC 6 (rampa 2.5 / 3.5 rad/s), AC 7 (`steerLateralG` 1.3), AC 8 (≤ 1.15 g), AC 9 (≥ 0.80 g) e a parte "com acelerador" do AC 10 ficam **superados** pelos ACs daqui. Os testes C4, C5, C6, C7, C8, C9, C10 e os valores de direção de C28 viram os checks novos, registrados na tabela de superados do `checks.md` |
+| domain | acoplamento: `suspensionStiffness` também decide o comprimento livre da mola. Em `Car`, rest length = `LOADED_SUSPENSION` + g/(4·k), com `LOADED_SUSPENSION` fixo, então a altura parada do carro é a mesma com qualquer mola. O sub-projeto 4 (tuning) precisa saber disso: trocar `k` muda a rolagem, a arfagem e quanto a roda descarregada desce, mas não baixa nem sobe o carro parado |
+| checks existentes | car-handling AC 4 (rolagem 1–6°), AC 5 (arfagem −0.5 a −4°), AC 6 (rampa 2.5 / 3.5 rad/s), AC 7 (`steerLateralG` 1.3), AC 8 (≤ 1.15 g), AC 9 (≥ 0.80 g) e AC 10 (sideslip ≤ 12°, com e sem acelerador, 60 a 180 km/h) ficam **superados** pelos ACs daqui; o AC 10 daqui mantém os 10 casos. Os testes C4, C5, C6, C7, C8, C9, C10 e os valores de direção de C28 viram os checks novos, registrados na tabela de superados do `checks.md` |
 | checks existentes | continuam valendo sem mudança: car-handling AC 1–3 (sem capotar, matriz de 54 casos), AC 11–25 (freio de mão, freios, motor, câmbio, HUD), C36–C38; visual-upgrade C33 (câmera desloca para a esquerda virando à esquerda) |
 | stored data | nothing to migrate - nada é persistido |
 
@@ -53,7 +54,7 @@ None - no stored-data shape change
 
 ## Surface
 
-None - nothing consumed outside. `window.__game.camera` (só DEV) ganha os campos de leitura `roll` e `direction` (direção de visão, lida pela prova do AC 14).
+None - nothing consumed outside. `window.__game.camera` (só DEV) ganha os campos de leitura `roll`, `direction` (direção de visão) e `up` (o "cima" da câmera no mundo), lidos pela prova do AC 14.
 
 ## Landing
 
@@ -91,7 +92,7 @@ As rodas viram mais rápido, o carro vira mais em alta e gruda menos.
 7. The system SHALL limitar o ângulo alvo a `min(steerMaxRad, atan(steerLateralG × 9.81 × wheelbaseM / v²))` com `steerLateralG` = 1.7 (`steerMaxRad` continua 0.55)
 8. WHILE a direção fica toda para um lado por 3 s, em velocidade constante mantida pelo acelerador, de 60 a 180 km/h the system SHALL manter a aceleração lateral de cada janela de 0.5 s em no máximo 0.95 g
 9. WHILE a direção fica toda para um lado a 60 km/h the system SHALL atingir pelo menos 0.75 g numa janela de 0.5 s dentro dos primeiros 2 s
-10. WHILE a direção fica toda para um lado por 3 s sem acelerador, de 60 a 180 km/h, ou com acelerador de 120 a 180 km/h the system SHALL manter o sideslip em no máximo 12°
+10. WHILE a direção fica toda para um lado por 3 s, sem acelerador ou com acelerador, de 60 a 180 km/h the system SHALL manter o sideslip em no máximo 12°
 (AC 11 e AC 12, traseira escapando só no acelerador, foram retirados em 2026-09-26; ver Out of scope. A numeração segue.)
 
 **Independent test:** `npx vitest run tests/physics/feel.test.ts tests/unit/drivetrain.test.ts`
@@ -135,7 +136,7 @@ O horizonte inclina junto com a carroceria, suavizado.
 | --- | --- | --- |
 | tela do jogo | horizonte inclinado na curva | AC 13, AC 14, AC 15 |
 | tela do jogo | câmera parado ou em linha reta | AC 13 - rolagem ~0 dá inclinação ~0 |
-| teclado | `A` e `D` juntos | existing - `steerAxis` devolve 0 (`src/core/input.ts:52`), a rampa volta ao centro |
+| teclado | `A` e `D` juntos | existing - `steerAxis` devolve 0 (`src/core/input.ts:49`), a rampa volta ao centro |
 | HUD | marcha, RPM, velocidade | n/a - o HUD não muda |
 | áudio | motor e derrapagem | existing - `skidding` já liga pelo escorregamento lateral (car-handling AC 23), então a traseira escapando no freio de mão já faz som e marca |
 
