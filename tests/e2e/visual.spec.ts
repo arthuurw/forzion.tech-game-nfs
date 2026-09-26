@@ -300,6 +300,39 @@ test.describe('visual - S4 câmera (rodada 2)', () => {
     expect(Math.abs(leftDisp - s.lateral)).toBeLessThan(0.15);
   });
 
+  // car-feel C16 (AC 14, AC 15): a câmera inclina junto com a carroceria sem mudar para onde olha
+  test('camera leans with the body', async ({ page }) => {
+    await open(page);
+    expect(Math.abs(await page.evaluate(() => (window as any).__game.camera.roll as number))).toBeLessThan(0.001);
+    await page.evaluate(() => (window as any).__game.car.setForwardSpeed(60 / 3.6));
+    await page.keyboard.down('KeyW');
+    await page.keyboard.down('KeyA');
+    await advanceSim(page, 2);
+    const s = await page.evaluate(() => {
+      const g = (window as any).__game;
+      return {
+        roll: g.camera.roll as number,
+        bodyRoll: g.car.bodyRoll as number,
+        direction: g.camera.direction as { x: number; y: number; z: number },
+        camera: g.camera.position as { x: number; y: number; z: number },
+        car: g.car.position as { x: number; y: number; z: number },
+      };
+    });
+    await page.keyboard.up('KeyA');
+    await page.keyboard.up('KeyW');
+    expect(Math.sign(s.roll)).toBe(Math.sign(s.bodyRoll));
+    expect(Math.abs(s.roll)).toBeGreaterThanOrEqual(0.01745);
+    // direção de visão contra a direção da câmera até o ponto de lookAt (1 m acima do carro)
+    const lx = s.car.x - s.camera.x;
+    const ly = s.car.y + 1 - s.camera.y;
+    const lz = s.car.z - s.camera.z;
+    const len = Math.hypot(lx, ly, lz);
+    const dLen = Math.hypot(s.direction.x, s.direction.y, s.direction.z);
+    const cos = (s.direction.x * lx + s.direction.y * ly + s.direction.z * lz) / (len * dLen);
+    const angleDeg = (Math.acos(Math.min(1, cos)) * 180) / Math.PI;
+    expect(angleDeg).toBeLessThan(0.5);
+  });
+
   // C41 (AC 27): janelas acesas não cintilam com a câmera andando (reflexo da rua oculto: mede só as fachadas)
   test('lit windows stay stable while the camera moves', async ({ page }) => {
     await open(page);

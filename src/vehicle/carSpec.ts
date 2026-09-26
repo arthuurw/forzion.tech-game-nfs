@@ -1,7 +1,7 @@
 /**
  * Ficha técnica do carro (door 1 da car-handling). Pura: sem three nem rapier.
  * `drivetrain` lê motor, câmbio, freios e direção; `Car` lê massa, geometria,
- * arrasto e aderência. A garagem e o tuning (sub-projetos 3 e 4) vão trocar ou
+ * arrasto, aderência e suspensão. A garagem e o tuning (sub-projetos 3 e 4) vão trocar ou
  * alterar esta ficha.
  *
  * Unidades (AD-007): kg, m, s, N, N·m, rad, rpm.
@@ -44,6 +44,12 @@ export interface CarSpec {
   steerLateralG: number;
   steerRateRadS: number;
   steerReturnRadS: number;
+  /** rigidez da mola por unidade de massa do chassi (o Rapier multiplica pela massa; door 1 da car-feel) */
+  suspensionStiffness: number;
+  /** amortecimento na compressão, por unidade de massa */
+  suspensionCompression: number;
+  /** amortecimento na extensão, por unidade de massa */
+  suspensionRelaxation: number;
 }
 
 export const DEFAULT_CAR: CarSpec = {
@@ -73,11 +79,14 @@ export const DEFAULT_CAR: CarSpec = {
   rollingResistance: 0.013,
   brakeForceN: 11500,
   brakeBiasFront: 0.65,
-  tireGrip: 1.05,
-  rearGripFactor: 1.2,
+  tireGrip: 0.86,
+  rearGripFactor: 1.25,
   handbrakeRearGrip: 0.4,
   steerMaxRad: 0.55,
-  steerLateralG: 1.3,
-  steerRateRadS: 2.5,
-  steerReturnRadS: 3.5,
+  steerLateralG: 1.7,
+  steerRateRadS: 4.0,
+  steerReturnRadS: 5.0,
+  suspensionStiffness: 17,
+  suspensionCompression: 2.7,
+  suspensionRelaxation: 0.8,
 };

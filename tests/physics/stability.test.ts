@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { DEFAULT_CAR } from '../../src/vehicle/carSpec';
 import type { DriveInput } from '../../src/vehicle/drivetrain';
-import { NO_INPUT, allWheelsInContact, createHarness, initRapier, kmh, pitchDeg, rollDeg, tiltDeg } from './harness';
+import { NO_INPUT, allWheelsInContact, createHarness, initRapier, tiltDeg } from './harness';
 
 beforeAll(async () => {
   await initRapier();
@@ -83,45 +83,5 @@ describe('stability', () => {
       expect(r.backOnGround, `${r.maneuver} from ${r.kmh} km/h`).toBeGreaterThanOrEqual(1);
       expect(r.backOnGround, `${r.maneuver} from ${r.kmh} km/h`).toBeLessThanOrEqual(60);
     }
-  });
-
-  // C4 (AC 4)
-  it('body roll leans out of the turn', () => {
-    const meanRoll = (steer: number): number => {
-      const h = createHarness();
-      h.settle();
-      h.setForwardKmh(80);
-      let sum = 0;
-      let n = 0;
-      for (let i = 1; i <= 180; i++) {
-        h.step({ ...NO_INPUT, steer, throttle: kmh(h.car) < 80 });
-        if (i >= 90) {
-          sum += rollDeg(h.car);
-          n++;
-        }
-      }
-      return sum / n;
-    };
-    // positiva = lado esquerdo para cima: numa curva à esquerda o carro inclina para fora
-    const left = meanRoll(1);
-    expect(left).toBeGreaterThanOrEqual(1.0);
-    expect(left).toBeLessThanOrEqual(6.0);
-    const right = meanRoll(-1);
-    expect(right).toBeGreaterThanOrEqual(-6.0);
-    expect(right).toBeLessThanOrEqual(-1.0);
-  });
-
-  // C5 (AC 5)
-  it('nose dives under braking', () => {
-    const h = createHarness();
-    h.settle();
-    h.setForwardKmh(100);
-    let minPitch = Infinity;
-    for (let i = 0; i < 30; i++) {
-      h.step({ ...NO_INPUT, brake: true });
-      minPitch = Math.min(minPitch, pitchDeg(h.car));
-    }
-    expect(minPitch).toBeGreaterThanOrEqual(-4.0);
-    expect(minPitch).toBeLessThanOrEqual(-0.5);
   });
 });

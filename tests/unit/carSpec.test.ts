@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CAR } from '../../src/vehicle/carSpec';
 
-// os 26 campos literais da door 1 (plan.md, Landing)
+// os 26 campos literais da door 1 da car-handling mais os 3 da door 1 da car-feel (plan.md, Landing)
 const FIELDS = [
   'massKg',
   'comHeightM',
@@ -29,10 +29,13 @@ const FIELDS = [
   'steerLateralG',
   'steerRateRadS',
   'steerReturnRadS',
+  'suspensionStiffness',
+  'suspensionCompression',
+  'suspensionRelaxation',
 ];
 
 describe('car spec', () => {
-  // C28 (door 1)
+  // car-handling C28 (door 1) + car-feel C13
   it('default car spec values', () => {
     const c = DEFAULT_CAR;
     expect(c.massKg).toBe(1250);
@@ -49,9 +52,15 @@ describe('car spec', () => {
     expect(c.brakeBiasFront).toBe(0.65);
     expect(c.handbrakeRearGrip).toBe(0.4);
     expect(c.steerMaxRad).toBe(0.55);
-    expect(c.steerLateralG).toBe(1.3);
-    expect(c.steerRateRadS).toBe(2.5);
-    expect(c.steerReturnRadS).toBe(3.5);
+    // car-feel C13: valores de direção substituem os da car-handling C28
+    expect(c.steerLateralG).toBe(1.7);
+    expect(c.steerRateRadS).toBe(4.0);
+    expect(c.steerReturnRadS).toBe(5.0);
+    // car-feel C13 (door 1): suspensão na ficha, finita e > 0
+    for (const field of ['suspensionStiffness', 'suspensionCompression', 'suspensionRelaxation'] as const) {
+      expect(Number.isFinite(c[field]), field).toBe(true);
+      expect(c[field], field).toBeGreaterThan(0);
+    }
 
     expect(c.torqueCurve.length).toBeGreaterThanOrEqual(4);
     for (let i = 1; i < c.torqueCurve.length; i++) {
@@ -60,7 +69,7 @@ describe('car spec', () => {
     expect(c.torqueCurve[0]![0]).toBeLessThanOrEqual(c.idleRpm);
     expect(c.torqueCurve[c.torqueCurve.length - 1]![0]).toBeGreaterThanOrEqual(c.redlineRpm);
 
-    expect(FIELDS.length).toBe(26);
+    expect(FIELDS.length).toBe(29);
     expect(Object.keys(c).sort()).toEqual([...FIELDS].sort());
     for (const field of FIELDS) {
       const value = (c as unknown as Record<string, unknown>)[field];
