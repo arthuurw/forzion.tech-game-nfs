@@ -7,7 +7,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { blurFor } from '../camera/chaseMath';
+import { blurFor, chaseTarget } from '../camera/chaseMath';
 import { GradeShader } from '../post/GradeShader';
 import { Effects } from '../vehicle/Effects';
 import { flickerIntensity } from '../world/flicker';
@@ -57,6 +57,16 @@ function centralSpawn(roads: Road[]): { x: number; y: number; z: number; heading
   return { x: p[i * 3]!, y: p[i * 3 + 1]!, z: p[i * 3 + 2]!, heading };
 }
 
+/** Opções da sonda DEV `render.headlightShimmer` (facade-glint). */
+interface HeadlightShimmerOpts {
+  headlight: boolean;
+  specularAA: boolean;
+  /** false zera só o especular das fachadas (padrão true) */
+  specular?: boolean;
+  /** true usa os materiais de antes da facade-glint (normalScale 1, metal com metalness 0.5, sem piso de rugosidade) */
+  legacyMaterials?: boolean;
+}
+
 function mapSrc(m: THREE.MeshStandardMaterial): string | null {
   const img = m.map?.image as { currentSrc?: string; src?: string } | undefined;
   return img?.currentSrc ?? img?.src ?? null;
@@ -91,6 +101,8 @@ export class Game {
   readonly rain: Rain;
   readonly effects: Effects;
   readonly headlightCones: THREE.Mesh[] = [];
+  readonly headlight: THREE.SpotLight;
+  private readonly spawn: { x: number; y: number; z: number; heading: number };
   readonly quality: QualityPreset;
   private readonly eventQueue: RAPIER.EventQueue;
   readonly hud: Hud;
@@ -143,6 +155,7 @@ export class Game {
     // spawn: parado numa avenida do centro, alinhado a ela, 12 m antes do cruzamento
     // central (AC 33): à frente e à esquerda há pista livre (a avenida transversal)
     const spawn = centralSpawn(network.roads);
+    this.spawn = spawn;
     this.car = new Car(this.world, this.scene, assets, { x: spawn.x, y: spawn.y + 1.2, z: spawn.z }, DEFAULT_CAR);
     this.car.teleport(spawn.x, spawn.y + 1.2, spawn.z, spawn.heading);
     this.city.chunks.update(spawn.x, spawn.z);
@@ -152,6 +165,7 @@ export class Game {
     headlight.position.set(0, 0.6, 1.8);
     headlight.target.position.set(0, -0.5, 20);
     this.car.mesh.add(headlight, headlight.target);
+    this.headlight = headlight;
 
     // cones de farol visíveis (AC 12): aditivos e bem transparentes
     const coneLength = 14;
@@ -626,6 +640,8 @@ export class Game {
           }
           return flicker / ((frames - 2) * w * h);
         },
+        headlightShimmer: (type: number, opts: HeadlightShimmerOpts) =>
+          game.probeHeadlightShimmer(type, opts),
         probeRoadMarks: (roadId: number, index: number) => game.probeRoadMarks(roadId, index),
       },
       camera: {
@@ -653,6 +669,12 @@ export class Game {
       materials: {
         get roadRoughness() {
           return game.city.roadMaterial.roughness;
+        },
+        /** antialiasing de especular das fachadas: o uniform compartilhado vale 1 nos 4 materiais */
+        get facadeSpecularAA() {
+          return game.city.facadeMaterials.every(
+            (m) => (m.userData.specularAA as { value: number } | undefined)?.value === 1,
+          );
         },
         get windowEmissiveIntensity() {
           return game.city.facadeMaterials[0]!.emissiveIntensity;
@@ -813,6 +835,131 @@ export class Game {
         return game.lastWaterReset;
       },
     };
+  }
+
+  /**
+   * Só DEV/testes (facade-glint): cintilação do farol numa fachada do tipo `type`.
+   * Pega o lote do centro desse tipo mais próximo do spawn, põe o carro (só a
+   * malha, a física não muda) na rua do lote a 12 m da fachada e virado para ela,
+   * com a câmera de perseguição atrás. Esconde chuva, partículas e cones, troca o
+   * espelho pelo chão escuro, liga/desliga o farol e o antialiasing de especular
+   * (`specular: false` zera só o especular das fachadas; `legacyMaterials` usa
+   * os materiais de antes da facade-glint) e renderiza 12 quadros andando carro
+   * e câmera 0.15 m por quadro, paralelo à fachada. Devolve `flicker` (como `render.shimmer`) e `litMean`, a luminância
+   * média do quarto central da tela no primeiro quadro. Restaura tudo no fim.
+   */
+  probeHeadlightShimmer(type: number, opts: HeadlightShimmerOpts): { flicker: number; litMean: number } {
+    const frames = 12;
+    const step = 0.15;
+    const data = this.city.data;
+    const lot = data.lots
+      .filter((l) => l.facadeType === type && l.downtown)
+      .reduce((best, l) =>
+        Math.hypot(l.x - this.spawn.x, l.z - this.spawn.z) < Math.hypot(best.x - this.spawn.x, best.z - this.spawn.z) ? l : best,
+      );
+    // a rua fica do lado −side·esquerda do centro do lote; esquerda do heading r = (cos r, −sin r)
+    const lx = Math.cos(lot.rotation) * lot.side;
+    const lz = -Math.sin(lot.rotation) * lot.side;
+    const d = lot.depth / 2 + 12;
+    const x0 = lot.x - lx * d;
+    const z0 = lot.z - lz * d;
+    const heading = Math.atan2(lx, lz);
+    const alongX = Math.sin(lot.rotation);
+    const alongZ = Math.cos(lot.rotation);
+    const carNow = this.car.body.translation();
+    const rideHeight = carNow.y - heightAt(data.carved, carNow.x, carNow.z);
+
+    const cam = this.chase.camera;
+    const camPos = cam.position.clone();
+    const camQuat = cam.quaternion.clone();
+    const hidden: THREE.Object3D[] = [this.rain.points, ...this.effects.objects, ...this.headlightCones];
+    let ground: THREE.Mesh | null = null;
+    if (this.city.reflector) {
+      hidden.push(this.city.reflector);
+      const size = this.city.reflectorSize;
+      ground = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ color: '#07080d' }));
+      ground.rotation.x = -Math.PI / 2;
+      this.scene.add(ground);
+    }
+    const was = hidden.map((o) => o.visible);
+    hidden.forEach((o) => (o.visible = false));
+    const intensity = this.headlight.intensity;
+    this.headlight.intensity = opts.headlight ? intensity : 0;
+    const aa = this.city.facadeSpecularAA.value;
+    this.city.facadeSpecularAA.value = opts.specularAA ? 1 : 0;
+    const spec = this.city.facadeSpecular.value;
+    this.city.facadeSpecular.value = opts.specular === false ? 0 : 1;
+    // aparência de antes da facade-glint (db836b8): normal map inteiro, metal com metalness 0.5, sem piso de rugosidade
+    const floorOf = (m: THREE.MeshStandardMaterial) => m.userData.roughnessFloor as { value: number };
+    const look = this.city.facadeMaterials.map((m) => ({
+      normalScale: m.normalScale.clone(),
+      metalness: m.metalness,
+      roughnessFloor: floorOf(m).value,
+    }));
+    if (opts.legacyMaterials) {
+      this.city.facadeMaterials.forEach((m, i) => {
+        m.normalScale.set(1, 1);
+        m.metalness = i === 1 ? 0.5 : 0.05;
+        floorOf(m).value = 0;
+      });
+    }
+
+    const gl = this.renderer.getContext();
+    const w = gl.drawingBufferWidth;
+    const h = gl.drawingBufferHeight;
+    const px = new Uint8Array(w * h * 4);
+    const lum: Float32Array[] = [];
+    for (let i = 0; i < frames; i++) {
+      const x = x0 + alongX * step * i;
+      const z = z0 + alongZ * step * i;
+      const y = heightAt(data.carved, x0, z0) + rideHeight;
+      this.car.mesh.position.set(x, y, z);
+      this.car.mesh.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), heading);
+      const t = chaseTarget({ x, y, z }, heading);
+      cam.position.set(t.position.x, t.position.y, t.position.z);
+      cam.lookAt(t.lookAt.x, t.lookAt.y, t.lookAt.z);
+      cam.updateMatrixWorld();
+      this.composer.render(0);
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      const l = new Float32Array(w * h);
+      for (let k = 0; k < w * h; k++) l[k] = (0.2126 * px[4 * k]! + 0.7152 * px[4 * k + 1]! + 0.0722 * px[4 * k + 2]!) / 255;
+      lum.push(l);
+    }
+
+    this.city.facadeSpecularAA.value = aa;
+    this.city.facadeSpecular.value = spec;
+    this.city.facadeMaterials.forEach((m, i) => {
+      m.normalScale.copy(look[i]!.normalScale);
+      m.metalness = look[i]!.metalness;
+      floorOf(m).value = look[i]!.roughnessFloor;
+    });
+    this.headlight.intensity = intensity;
+    hidden.forEach((o, i) => (o.visible = was[i]!));
+    if (ground) {
+      this.scene.remove(ground);
+      ground.geometry.dispose();
+      (ground.material as THREE.Material).dispose();
+    }
+    cam.position.copy(camPos);
+    cam.quaternion.copy(camQuat);
+    cam.updateMatrixWorld();
+    this.car.sync();
+
+    let flicker = 0;
+    for (let i = 1; i < frames - 1; i++) {
+      const a = lum[i - 1]!, b = lum[i]!, c = lum[i + 1]!;
+      for (let k = 0; k < w * h; k++) if (Math.abs(c[k]! - 2 * b[k]! + a[k]!) > 0.15) flicker++;
+    }
+    let litSum = 0;
+    let litCount = 0;
+    const first = lum[0]!;
+    for (let y = Math.floor(h / 4); y < Math.floor((3 * h) / 4); y++) {
+      for (let x = Math.floor(w / 4); x < Math.floor((3 * w) / 4); x++) {
+        litSum += first[y * w + x]!;
+        litCount++;
+      }
+    }
+    return { flicker: flicker / ((frames - 2) * w * h), litMean: litSum / litCount };
   }
 
   /**
