@@ -669,6 +669,12 @@ export class Game {
           const d = game.chase.camera.getWorldDirection(new THREE.Vector3());
           return { x: d.x, y: d.y, z: d.z };
         },
+        /** "cima" da câmera no mundo (`up` local pelo quaternion), para provar que a câmera inclina de fato */
+        get up() {
+          const q = game.chase.camera.getWorldQuaternion(new THREE.Quaternion());
+          const u = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+          return { x: u.x, y: u.y, z: u.z };
+        },
       },
       physics: {
         get timestep() {

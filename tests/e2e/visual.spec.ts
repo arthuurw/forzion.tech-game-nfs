@@ -314,6 +314,7 @@ test.describe('visual - S4 câmera (rodada 2)', () => {
         roll: g.camera.roll as number,
         bodyRoll: g.car.bodyRoll as number,
         direction: g.camera.direction as { x: number; y: number; z: number },
+        up: g.camera.up as { x: number; y: number; z: number },
         camera: g.camera.position as { x: number; y: number; z: number },
         car: g.car.position as { x: number; y: number; z: number },
       };
@@ -331,6 +332,23 @@ test.describe('visual - S4 câmera (rodada 2)', () => {
     const cos = (s.direction.x * lx + s.direction.y * ly + s.direction.z * lz) / (len * dLen);
     const angleDeg = (Math.acos(Math.min(1, cos)) * 180) / Math.PI;
     expect(angleDeg).toBeLessThan(0.5);
+    // a câmera do three inclina de fato: o "cima" dela, contra o de um lookAt sem inclinação
+    // (direita0 = direção × Y, cima0 = direita0 × direção), gira `roll` em torno da direção de visão
+    const d = { x: s.direction.x / dLen, y: s.direction.y / dLen, z: s.direction.z / dLen };
+    const rx = -d.z;
+    const rz = d.x; // direção × (0, 1, 0) = (−d.z, 0, d.x)
+    const rLen = Math.hypot(rx, rz);
+    const r0 = { x: rx / rLen, y: 0, z: rz / rLen };
+    const u0 = {
+      x: r0.y * d.z - r0.z * d.y,
+      y: r0.z * d.x - r0.x * d.z,
+      z: r0.x * d.y - r0.y * d.x,
+    };
+    const upRight = s.up.x * r0.x + s.up.y * r0.y + s.up.z * r0.z;
+    const upUp = s.up.x * u0.x + s.up.y * u0.y + s.up.z * u0.z;
+    expect(Math.sign(upRight)).toBe(Math.sign(s.bodyRoll));
+    const tilt = Math.atan2(upRight, upUp);
+    expect(Math.abs(tilt - s.roll)).toBeLessThanOrEqual((0.2 * Math.PI) / 180);
   });
 
   // C41 (AC 27): janelas acesas não cintilam com a câmera andando (reflexo da rua oculto: mede só as fachadas)

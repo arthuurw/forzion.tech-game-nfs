@@ -43,12 +43,14 @@ const WHEEL_Y = -0.2;
 /** caixa usada só para a inércia do chassi: largura, altura e comprimento (m) */
 const INERTIA_BOX = { x: 1.8, y: 0.9, z: 4.2 };
 const GRAVITY = 9.81;
+/** rigidez da mola antes da car-feel; só fixa a altura parada, a mola de verdade vem da ficha */
+const RIDE_HEIGHT_REF_STIFFNESS = 32;
 /**
  * comprimento da suspensão com o carro parado (m): o de antes da car-feel (mola 32).
  * O comprimento livre de cada mola sai daqui e da rigidez da ficha, para o chassi
  * ficar na mesma altura com qualquer mola.
  */
-const LOADED_SUSPENSION = WHEEL_REST - GRAVITY / (4 * 32);
+const LOADED_SUSPENSION = WHEEL_REST - GRAVITY / (4 * RIDE_HEIGHT_REF_STIFFNESS);
 /** fração da altura do contato em que o Rapier aplica a força lateral (medido: a rolagem saía 10 % da esperada) */
 const RAPIER_ROLL_INFLUENCE = 0.1;
 /** passos na janela da aceleração lateral (0.5 s) */

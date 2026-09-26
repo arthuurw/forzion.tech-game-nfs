@@ -118,7 +118,7 @@ describe('car feel - grip', () => {
     expect(Math.max(...g)).toBeGreaterThanOrEqual(0.75);
   });
 
-  // C10 (AC 10) - substitui car-handling C10; table-driven over the 8 cases
+  // C10 (AC 10) - substitui car-handling C10; table-driven over the 10 cases
   it('understeers without throttle or at speed', () => {
     const cases: Array<[number, boolean]> = [
       [60, false],
@@ -126,6 +126,8 @@ describe('car feel - grip', () => {
       [120, false],
       [150, false],
       [180, false],
+      [60, true],
+      [90, true],
       [120, true],
       [150, true],
       [180, true],
@@ -146,6 +148,6 @@ describe('car feel - grip', () => {
       expect(measured).toBeGreaterThan(0);
       run++;
     }
-    expect(run).toBe(8);
+    expect(run).toBe(10);
   });
 });
