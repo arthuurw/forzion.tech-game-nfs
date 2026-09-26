@@ -443,6 +443,50 @@ export class Game {
         get calls() {
           return game.drawCalls;
         },
+        /**
+         * só DEV/testes: cintilação com a câmera andando. Renderiza `frames` quadros
+         * avançando a câmera `step` m para a frente por quadro (chuva e partículas
+         * escondidas, cena parada) e devolve a fração de pixels cuja luminância tem
+         * segunda diferença no tempo acima de 0.15. Movimento suave dá ~0; um padrão
+         * que muda de pixel para pixel a cada quadro dá valores altos.
+         * `mirror: false` esconde o reflexo da rua para medir só as fachadas.
+         */
+        shimmer: (step: number, opts: { frames?: number; mirror?: boolean } = {}): number => {
+          const frames = opts.frames ?? 10;
+          const cam = game.chase.camera;
+          const hidden: THREE.Object3D[] = [game.rain.points, ...game.effects.objects];
+          if (opts.mirror === false && game.city.reflector) hidden.push(game.city.reflector);
+          const was = hidden.map((o) => o.visible);
+          hidden.forEach((o) => (o.visible = false));
+          const p0 = cam.position.clone();
+          const dir = new THREE.Vector3();
+          cam.getWorldDirection(dir);
+          dir.y = 0;
+          dir.normalize();
+          const gl = game.renderer.getContext();
+          const w = gl.drawingBufferWidth;
+          const h = gl.drawingBufferHeight;
+          const px = new Uint8Array(w * h * 4);
+          const lum: Float32Array[] = [];
+          for (let i = 0; i < frames; i++) {
+            cam.position.copy(p0).addScaledVector(dir, i * step);
+            cam.updateMatrixWorld();
+            game.composer.render(0);
+            gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+            const l = new Float32Array(w * h);
+            for (let k = 0; k < w * h; k++) l[k] = (0.2126 * px[4 * k]! + 0.7152 * px[4 * k + 1]! + 0.0722 * px[4 * k + 2]!) / 255;
+            lum.push(l);
+          }
+          cam.position.copy(p0);
+          cam.updateMatrixWorld();
+          hidden.forEach((o, i) => (o.visible = was[i]!));
+          let flicker = 0;
+          for (let i = 1; i < frames - 1; i++) {
+            const a = lum[i - 1]!, b = lum[i]!, c = lum[i + 1]!;
+            for (let k = 0; k < w * h; k++) if (Math.abs(c[k]! - 2 * b[k]! + a[k]!) > 0.15) flicker++;
+          }
+          return flicker / ((frames - 2) * w * h);
+        },
       },
       camera: {
         get fov() {

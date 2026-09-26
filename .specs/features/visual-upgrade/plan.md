@@ -103,6 +103,7 @@ Chuva, neon que pisca, cones de farol, marcas de pneu, fumaça no drift, faísca
 16. IF a `CollisionEvent` has `impulse` below 3000 N·s THEN the system SHALL spawn no sparks and SHALL not update `lastCollision`
 
 26. The system SHALL change each sign material's `emissiveIntensity` by at most 0.2 over any 0.5 s window, using breathing frequencies of 0.5 Hz or less - added 2026-09-25 at the user's request: "as luzes nas janelas estão piscando demais. coloque um ambiente um pouco mais low-cortisol"
+27. WHEN the camera moves forward 0.05 m per frame over 10 frames at spawn, with rain, particles and the road mirror hidden, the system SHALL keep the fraction of pixels whose luminance second difference in time exceeds 0.15 below 1 % - added 2026-09-25 at the user's request: "as luzes so estão piscando quando o carro esta em movimento. se está parado, fica bom."
 
 **Independent test:** dirigir na chuva, puxar o freio de mão a 60 km/h e ver marcas + fumaça, bater num prédio e ver faíscas; os letreiros respiram devagar, sem piscar.
 

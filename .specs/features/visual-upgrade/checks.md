@@ -5,7 +5,7 @@ Plan: `.specs/features/visual-upgrade/plan.md`
 
 ## Intent
 
-40 checks in 4 slices · 7 one-way doors · 0 open (C33-C39 adicionados na rodada 2 da verificação; C40 no ajuste "low-cortisol" pedido pelo usuário)
+41 checks in 4 slices · 7 one-way doors · 0 open (C33-C39 adicionados na rodada 2 da verificação; C40 no ajuste "low-cortisol" pedido pelo usuário; C41 na correção da cintilação em movimento)
 
 Comandos de prova: unitário `npx vitest run <arquivo> -t "<nome>"`; integração
 `npx playwright test <arquivo> -g "<nome>"` (chromium headless contra `vite dev`, lendo
@@ -165,6 +165,11 @@ Proof: `npx playwright test tests/e2e/visual.spec.ts -g "headlight cones"`
 **C40** - `BREATH_HZ` tem 4 frequências, todas ≤ 0.5 Hz, e para os 4 grupos × 400 amostras de `t` em `[0, 30]` s a variação `|flickerIntensity(t + 0.5, g) − flickerIntensity(t, g)|` é ≤ 0.2 (AC 26); C11 continua valendo (faixa [2.0, 3.2] e movimento > 0.05 em algum grupo)
 Proof: `npx vitest run tests/unit/flicker.test.ts -t "neon breathing is slow and never flashes"`
 
+### Cintilação em movimento (pedido do usuário após a rodada 3, AC 27)
+
+**C41** - no browser, com chuva, partículas e reflexo da rua ocultos, `__game.render.shimmer(0.05, { mirror: false })` (câmera avançando 0.05 m por quadro, 10 quadros, a partir do spawn após 1 s simulado) é < 0.01 e `shimmer(0, { mirror: false })` é exatamente 0 (AC 27)
+Proof: `npx playwright test tests/e2e/visual.spec.ts -g "lit windows stay stable while the camera moves"`
+
 ## Coverage
 
 | Set (size) | Member -> proof | Unproven |
@@ -192,6 +197,7 @@ Proof: `npx vitest run tests/unit/flicker.test.ts -t "neon breathing is slow and
 | surface to texture set (6) | facade 0 C37 · facade 1 C37 · facade 2 C37 · facade 3 C37 · road C37, C3 · sidewalk C37, C7 | - |
 | camera reactions in browser (4) | fov C17 · blur C34 · shake C19 · lateral to the left C33 | - |
 | flicker groups (4) | C11, C40, table-driven over all 4 | - |
+| window stability samples (2) | câmera parada C41 · câmera andando 0.05 m/quadro C41 | - |
 | landing doors (7) | 1 C1, C27, C28 · 2 C6 · 3 C4 · 4 C9, C13, C14 · 5 C24, C31 · 6 C15, C16 · 7 C21, C23 | - |
 | superseded free-roam-city checks (1) | ex-21 → C8 | - |
 | pure modules (14 files) | C26, table-driven over all 14 | - |
@@ -241,5 +247,6 @@ Cost: 15 provas unitárias em 7 arquivos e 27 provas Playwright em 3 arquivos. N
 - **Settled mid-build:** (autor, antes do código de C14) C14 dizia que `spawn(4)` levava o pool a 256; 4 × 48 passos de vida = 192, o teto nunca é atingido a essa taxa. O AC 14 (no máximo 256) continua certo; o check passou a provar o regime (184-192) e o teto com `spawn(8)`.
 - **Rodada 2 (após FAIL do Verifier):** C4 - o código usava `devicePixelRatio` no tamanho do render target do `Reflector`, divergindo do literal aprovado da door 3 (`innerWidth/innerHeight × 0.5`); o código passou a seguir a door e o teste afirma o literal. Mutante sobrevivente `SMOKE_LIFETIME_S` 0.8→2.0 agora morre por C38. Decisões de derrapagem e colisão extraídas para `effectsMath.ts` (C35, C36). C33 e C34 provam câmera lateral e blur no browser; C37 prova o mapeamento de texturas; C39 prova y do espelho e direção dos cones. Debug handle ganhou `car.setForwardSpeed` (só DEV) para as provas de velocidade.
 - **Rodada 3 (após FAIL da rodada 2):** C33 passou a afirmar o alvo real da câmera projetado no vetor esquerda (o sinal trocado agora falha); `CityScene` consome `ROAD_SET` e `SIDEWALK_SET` e C37 prova no browser que rua e calçada carregam esses sets; `Effects` usa `SKID_QUADS_PER_STEP`.
+- **Correção da cintilação em movimento (2026-09-25, após a rodada 3 PASS; pedido do usuário: "as luzes so estão piscando quando o carro esta em movimento"):** causa medida por ablação no browser: o hash das janelas amplifica `vSeedF` ~10^8 vezes e o varying interpolado variava no último bit de pixel para pixel, sorteando janelas diferentes a cada quadro; `flat varying` derruba a fração de pixels cintilando de 13 % para 0.28 % em 1280×720. Resíduo medido e **não** corrigido: o reflexo da rua (door 3, RT a meia viewport) ainda cintila com lâmpadas e janelas refletidas, forte em 640×360 (12 %) e pequeno em 1280×720 (0.2 %); mudar exige reabrir a door 3. AC 27 e C41 novos.
 - **Ajuste calmo (2026-09-25, pedido do usuário após testar: "luzes nas janelas estão piscando demais... low-cortisol"):** o neon perdeu o tremor de 9-16 Hz e respira a 0.22 Hz com amplitude 0.25 e fases escalonadas de 45° (frequências diferentes por grupo foram tentadas e descartadas: os 4 paravam no pico juntos e violavam C11) (faixa 2.05-2.55, dentro da AC 11); AC 26 e C40 novos. Janelas com bordas antialiasadas por `fwidth` (sem cintilar), menos janelas acesas, chuva com alfa 0.22 em vez de 0.38 - reversíveis, sem check próprio (só o olho decide).
 - S2 = 10k (Loader, CityGenerator, CityScene, Environment, script, assets); S3 = +10k (Rain, Effects, Car, Game) → 20k; S4 = +2k (chaseMath, ChaseCamera) → 22k; S5 = +4k (GradeShader, Game, quality) → 26k; testes ≈ +8k → 34k total, abaixo do budget de 150k - one builder

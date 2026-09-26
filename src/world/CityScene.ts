@@ -317,7 +317,7 @@ attribute vec2 aRepeat;
 attribute float aRepeatZ;
 attribute float aSeed;
 varying vec2 vCell;
-varying float vSeedF;
+flat varying float vSeedF;
 varying float vRoof;`,
       )
       .replace(
@@ -327,6 +327,8 @@ vec2 faceRepeat = aRepeat;
 if (abs(normal.x) > 0.5) faceRepeat = vec2(aRepeatZ, aRepeat.y);
 if (abs(normal.y) > 0.5) faceRepeat = vec2(aRepeat.x, aRepeatZ);
 vCell = uv * faceRepeat;
+// flat: o hash amplifica o seed ~10^8 vezes; interpolado, o erro de arredondamento
+// por pixel sorteava janelas diferentes a cada quadro e elas cintilavam com a câmera andando
 vSeedF = aSeed;
 vRoof = abs(normal.y);
 #ifdef USE_MAP
@@ -344,7 +346,7 @@ vRoughnessMapUv *= faceRepeat;
         '#include <common>',
         `#include <common>
 varying vec2 vCell;
-varying float vSeedF;
+flat varying float vSeedF;
 varying float vRoof;
 float windowHash(vec2 c, float s) { return fract(sin(dot(c + s * 97.0, vec2(12.9898, 78.233))) * 43758.5453); }`,
       )
