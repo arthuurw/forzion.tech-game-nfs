@@ -1,29 +1,34 @@
 # Car feel verification
 
-**Verdict**: FAIL
+**Verdict**: PASS
 **Profile**: standard
-**Diff range**: 2f99ff9..9e485a9 (85dd9ca, c42c59d, 75d8c43, e46c40a, dc41844 e o merge 9e485a9)
-**Round**: 1 - full
+**Diff range**: 2f99ff9..117bf84 (feature); correção em 9c9d043..117bf84 (137b255, 0aa602a, 04032b7 e o merge 117bf84)
+**Round**: 2 - scoped
 **Verifier**: independent sub-agent (author != verifier)
 
-Resumo: as 15 provas nomeadas rodaram e passaram em 9e485a9. Foram 108/108 no vitest e 33/33 no Playwright
-(`visual.spec.ts` inteiro, 31, mais 2 de `drive.spec.ts`) na porta 5193, sem timeout de boot. Os 7 testes da
-car-handling que foram apagados (C4-C10) têm substituto, e nenhum outro teste foi apagado ou enfraquecido.
+Resumo: as três lacunas da rodada 1 (verificada em 9e485a9) estão fechadas em 117bf84.
+1. **F1b** agora morre. O valor de prova da rigidez passou para 23, diferente dos 17 de `DEFAULT_CAR`
+   (`tests/physics/harness.test.ts:26`, `:31`).
+2. **F3** agora morre. C16 ganhou uma asserção sobre a orientação real da câmera do three, lida por
+   `__game.camera.up` (`tests/e2e/visual.spec.ts:335-351`, `src/core/Game.ts:673-677`). A troca de sinal e a
+   meia inclinação também morrem.
+3. **ch-10 60/90 km/h com acelerador** voltou ao AC 10 e à C10, que agora tem 10 casos
+   (`tests/physics/feel.test.ts:129-130`, `:151`). Uma falta que só afeta esses dois casos passa na C10 antiga,
+   de 8 casos, e morre na nova.
 
-O veredito é FAIL por dois mutantes que sobreviveram. Os dois são lacunas de precisão nos próprios checks:
-1. **F1b**: o `Car` pode ignorar `spec.suspensionStiffness` sem que nada falhe. O valor de prova de C13 (17) é
-   igual ao de `DEFAULT_CAR` (17), então uma rigidez fixa em 17 passa na suíte vitest inteira (108/108).
-2. **F3**: tirar `this.camera.rotateZ(-this.rollAngle)` de `ChaseCamera` não derruba C16. A prova lê
-   `__game.camera.roll`, que é o número guardado, e a direção de visão, que um giro em torno do eixo de visão não
-   muda. Nada afirma que a câmera do three de fato inclina.
+Todas as provas rodaram de novo por inteiro em 117bf84: vitest 108/108 e Playwright 33/33 na porta 5196, sem
+timeout de boot. Nenhuma asserção ficou mais fraca, e o refactor `RIDE_HEIGHT_REF_STIFFNESS` não muda o
+comportamento.
 
-Há também um membro sem prova: 2 dos 10 casos da car-handling C10 (60 e 90 km/h com acelerador) ficaram sem
-nenhuma prova depois que os AC 11/12 foram retirados.
+Escopo desta rodada: o diff da correção (`git diff 9c9d043 117bf84`, sem block-fill e `STATE.md`) toca
+`src/core/Game.ts`, `src/vehicle/Car.ts`, `tests/e2e/visual.spec.ts`, `tests/physics/feel.test.ts`,
+`tests/physics/harness.test.ts`, o `plan.md`/`checks.md` da car-feel e o `checks.md` da car-handling. Entre
+9e485a9 e 9c9d043 só entrou o relatório da rodada 1. Os commits de block-fill em main (e3478db, f5c3ade) só mexem
+em `.specs/`.
 
 ## Binding sources
 
-O plano não marca nenhuma fonte como binding (`Sources` só cita o usuário e a car-handling). Com profile `standard`,
-este passo não roda.
+Carried from 9e485a9. O plano não marca nenhuma fonte como binding, e a correção não mudou `Sources`.
 
 | Source | Opened | Contradiction | Uncovered |
 | --- | --- | --- | --- |
@@ -31,166 +36,138 @@ este passo não roda.
 
 ## Checks
 
-Verified at 9e485a9, no worktree do Verifier (junction de `node_modules`, `git status --porcelain` vazio antes):
-- `npx vitest run --reporter=verbose`: 29 arquivos, **108 passaram**, 0 falharam. Conferi na saída verbose cada
-  nome de `-t "..."` das provas vitest de C1-C15 e C17 (25 nomes): cada um aparece exatamente uma vez com ✓. A conta
-  fecha com o diff: 103 (car-handling round 4) − 5 testes apagados (C4, C5, C8, C9, C10) + 10 novos = 108. C6 e C7
-  foram renomeados no lugar.
-- `E2E_PORT=5193 npx playwright test tests/e2e/visual.spec.ts`: 31 passaram (6.1 min, exit 0). Isso inclui
-  "camera leans with the body" (C16, `:304`), "camera swings left while turning left" (C17, `:272`) e os 3 testes de
-  `facade-glint` (`:459`, `:470`, `:484`), que dependem da altura da câmera e, por ela, da altura do carro.
-- `E2E_PORT=5193 npx playwright test tests/e2e/drive.spec.ts -g "A turns left|game builds the car from the default spec"`:
-  2 passaram (exit 0). O segundo é o C35 da car-handling, cujo literal de campos mudou.
-- Antes da rodada, o `netstat` não mostrou nada escutando na 5193, e o log mostra o `vite --port 5193 --strictPort`
-  subindo pelo próprio run. Não houve timeout de boot.
+Verified at 117bf84, no worktree do Verifier. Antes de rodar, criei a junction de `node_modules`, e o
+`git status --porcelain` estava vazio.
+- `npx vitest run --reporter=verbose`: 29 arquivos, **108 passaram**, 0 falharam, exit 0.
+  - Os 13 nomes de teste das provas vitest de C1-C10 e C13-C15 aparecem cada um com ✓, e as provas de C5 e C17
+    (stability, grip, powertrain) também.
+  - A contagem é igual à da rodada 1, porque os 2 casos novos de C10 são linhas da tabela do mesmo `it`.
+- `E2E_PORT=5196 npx playwright test tests/e2e/visual.spec.ts`: **31 passaram** (6.6 min, exit 0). Isso inclui
+  "camera leans with the body" (`:304`), "camera swings left while turning left" (`:272`) e os 4 de
+  `facade-glint` (`:477`, `:488`, `:502`, `:513`, que se deslocaram 18 linhas com o C16 novo).
+- `E2E_PORT=5196 npx playwright test tests/e2e/drive.spec.ts -g "A turns left|game builds the car from the default spec"`:
+  **2 passaram** (exit 0).
+- Antes da rodada, o `netstat` não mostrou nada escutando na 5196, e o log mostra o `[WebServer] vite --port 5196
+  --strictPort` do próprio run. Não houve timeout de boot, então não precisei rodar de novo.
+  - O aviso "Falha ao carregar texturas de /textures/Concrete034/" aparece no log do servidor. Vem de assets fora
+    do git no worktree, cai na cor chapada e não afeta nenhuma prova.
+
+Para C1-C9, C14, C15 e C17, as provas rodaram de novo e passaram em 117bf84. As citações continuam as da rodada 1
+(carried from 9e485a9): a correção não tocou essas linhas. `feel.test.ts` só mudou depois de `:118`, e
+`visual.spec.ts` só depois de `:316`.
 
 | Check | Claim | Proof run | Evidence | Result |
 | --- | --- | --- | --- | --- |
-| C1 | média da rolagem 90-180 a 80 km/h: `steer +1` em [+3.5, +6], `steer −1` em [−6, −3.5] | vitest `body roll between 3.5 and 6 degrees` ✓ | `tests/physics/feel.test.ts:50-51` `left` ≥ 3.5, ≤ 6.0; `:53-54` `right` ≥ −6.0, ≤ −3.5; `:41` janela de 91 passos | PASS |
-| C2 | depois de soltar: menor rolagem em 60 passos em [−1.5, −0.3]; \|rolagem\| < 0.5° nos passos 150-240 | vitest `body roll swings back after the turn` ✓ | `tests/physics/feel.test.ts:67-68` `minFirstSecond` ≥ −1.5, ≤ −0.3; `:71` `Math.abs(after[i]) < 0.5` para `i` de 149 a 239 | PASS |
-| C3 | freio a 100 km/h: menor arfagem em 30 passos em [−5, −2] | vitest `nose dives 2 to 5 degrees under braking` ✓ | `tests/physics/feel.test.ts:85-86` | PASS |
-| C4 | acelerador parado: maior arfagem em 60 passos em [+1, +4] | vitest `nose lifts under full throttle` ✓ | `tests/physics/feel.test.ts:98-99` | PASS |
-| C5 | car-handling C2 e C3 verdes, sem mudança nas asserções | vitest `no rollover across the maneuver matrix` ✓; `all four wheels back on the ground after release` ✓ | `tests/physics/stability.test.ts:72` 54 casos, `:74` `maxTilt <= 15`; `:81`, `:83-84` `backOnGround` em [1, 60]. O diff de `stability.test.ts` só tira C4, C5 e imports: nenhuma linha desses dois testes mudou | PASS |
-| C6 | rampa 4/60 até 0.55 no passo 9; volta 5/60; troca ≤ 5/60; espelho | vitest `steering ramps at 4 and 5 rad per second` ✓ | `tests/unit/drivetrain.test.ts:39-40` `up = 4.0/60`, `down = 5.0/60`; `:46` passo exato; `:49-50` `a[7] < 0.55`, `a[8]` = 0.55; `:51`; `:59-60` volta; `:71` troca ≤ `down`; `:75`; `:84` espelho | PASS |
-| C7 | alvo `min(0.55, atan(43.3602/v²))`, 7 casos, ré −10 | vitest `steering target with 1.7 g` ✓ | `tests/unit/drivetrain.test.ts:100` sobre a tabela `:90-98` (inclui `[-10, atan(43.3602/100)]`); `:103` ré = frente; `:107` a rampa converge | PASS |
-| C8 | 60-180 km/h, janela ≤ 0.95 g em todo passo | vitest `lateral grip never exceeds 0.95 g` ✓ | `tests/physics/feel.test.ts:110` `toBeLessThanOrEqual(0.95)` sobre `:106` (5 velocidades); `:109` 180 passos | PASS |
-| C9 | 60 km/h: ≥ 0.75 g nos primeiros 120 passos | vitest `reaches at least 0.75 g at 60 kmh` ✓ | `tests/physics/feel.test.ts:117-118` | PASS |
-| C10 | 8 casos, sideslip ≤ 12° | vitest `understeers without throttle or at speed` ✓ | `tests/physics/feel.test.ts:144` `slip <= 12`; `:149` `run` 8, tabela `:123-132` | PASS |
-| C13 | 3 campos de suspensão finitos > 0; direção 4.0/5.0/1.7, `steerMaxRad` 0.55; harness lê 17/1.7/2.1 da ficha | vitest `default car spec values` ✓; `car reads suspension from its spec` ✓ | `tests/unit/carSpec.test.ts:54`, `:56-58`, `:61-62`, `:72-73`; `tests/physics/harness.test.ts:31-33` | FAIL - lacuna de precisão: a rigidez de prova (17) é igual à de `DEFAULT_CAR` (`src/vehicle/carSpec.ts:89`), então `:31` não separa "lê a ficha" de "usa 17 fixo". F1b sobrevive a 108/108. Compressão e extensão separam (F1a morre em `:32`) |
-| C14 | `cameraRoll`: 6 casos, ±4° de limite | vitest `camera roll follows body roll` ✓ | `tests/unit/chaseMath.test.ts:18` sobre a tabela `:9-16` | PASS |
-| C15 | `stepRoll` = suavização exponencial; 1 passo, 60 passos, ponto fixo | vitest `camera roll smoothing` ✓ | `tests/unit/chaseMath.test.ts:24`, `:26`, `:30`, `:37` | PASS |
-| C16 | browser: `camera.roll` com o sinal de `bodyRoll`, \|roll\| ≥ 1°; direção de visão a < 0.5° do `lookAt` | pw `camera leans with the body` ✓ | `tests/e2e/visual.spec.ts:306` roll inicial < 0.001; `:323` `Math.sign(s.roll)` = `Math.sign(s.bodyRoll)`; `:324` ≥ 0.01745; `:333` `angleDeg < 0.5` | FAIL - lacuna de precisão: as asserções leem o número guardado (`src/camera/ChaseCamera.ts:37-39`) e a direção de visão, que `rotateZ` não muda por construção. Nada observa a orientação da câmera (por exemplo o `up` do mundo ou o quaternion). F3, sem o `rotateZ`, sobrevive |
-| C17 | provas da car-handling e da visual/free-roam verdes, sem mudança nas asserções | vitest (4 de grip, 5 de powertrain) ✓; pw `camera swings left while turning left` ✓, `A turns left` ✓ | `tests/physics/grip.test.ts:25`, `:50`, `:55`, `:59`, `:91`, `:37`; `tests/physics/powertrain.test.ts:20-21`, `:38-40`, `:53-54`, `:71-72`, `:84`; `tests/e2e/visual.spec.ts:291-293`, `:299-300`; `tests/e2e/drive.spec.ts:60`. O diff de `grip.test.ts` só remove C8-C10, `SPEEDS`, `holdCorner` e o import de `LateralGWindow`. `powertrain.test.ts` não mudou. `visual.spec.ts` só ganhou linhas depois de `:300`, e `drive.spec.ts` só mudou `:143` | PASS |
+| C1 | rolagem média 90-180 a 80 km/h em [+3.5, +6] / [−6, −3.5] | vitest `body roll between 3.5 and 6 degrees` ✓ | `tests/physics/feel.test.ts:50-51`, `:53-54` (carried from 9e485a9) | PASS |
+| C2 | volta depois de soltar | vitest `body roll swings back after the turn` ✓ | `tests/physics/feel.test.ts:67-68`, `:71` (carried from 9e485a9) | PASS |
+| C3 | freio a 100 km/h, arfagem em [−5, −2] | vitest `nose dives 2 to 5 degrees under braking` ✓ | `tests/physics/feel.test.ts:85-86` (carried from 9e485a9) | PASS |
+| C4 | acelerador, arfagem em [+1, +4] | vitest `nose lifts under full throttle` ✓ | `tests/physics/feel.test.ts:98-99` (carried from 9e485a9) | PASS |
+| C5 | car-handling C2/C3 verdes, sem mudança | vitest `no rollover across the maneuver matrix` ✓, `all four wheels back on the ground after release` ✓ | `tests/physics/stability.test.ts:74`, `:83-84`. A correção não tocou `stability.test.ts` | PASS |
+| C6 | rampa 4/60, volta 5/60 | vitest `steering ramps at 4 and 5 rad per second` ✓ | `tests/unit/drivetrain.test.ts:39-40`, `:46`, `:49-50` (carried from 9e485a9) | PASS |
+| C7 | alvo com 1.7 g, 7 casos | vitest `steering target with 1.7 g` ✓ | `tests/unit/drivetrain.test.ts:90-100` (carried from 9e485a9) | PASS |
+| C8 | ≤ 0.95 g, 60-180 km/h | vitest `lateral grip never exceeds 0.95 g` ✓ | `tests/physics/feel.test.ts:110` (carried from 9e485a9) | PASS |
+| C9 | ≥ 0.75 g a 60 km/h | vitest `reaches at least 0.75 g at 60 kmh` ✓ | `tests/physics/feel.test.ts:117-118` (carried from 9e485a9) | PASS |
+| C10 | 10 casos, 60-180 km/h × {sem, com acelerador}, sideslip ≤ 12° | vitest `understeers without throttle or at speed` ✓ | Verified at 117bf84: tabela `tests/physics/feel.test.ts:123-134`, com os novos `[60, true]` `:129` e `[90, true]` `:130`; `:146` `slip <= 12` por passo; `:148` `measured > 0`; `:151` `run` = 10. Bate com o check (`checks.md` C10) e com o AC 10 (`plan.md`). A falta F7 prova que os casos novos pegam algo que os 8 antigos não pegam | PASS |
+| C13 | 3 campos de suspensão; direção 4.0/5.0/1.7; harness lê 23/1.7/2.1 da ficha | vitest `default car spec values` ✓, `car reads suspension from its spec` ✓ | Verified at 117bf84: `tests/physics/harness.test.ts:26` usa 23 / 1.7 / 2.1, os três diferentes de `DEFAULT_CAR` (17 / 2.7 / 0.8); `:31-33` com ± 1e-6 nas 4 rodas. `tests/unit/carSpec.test.ts` não mudou (carried from 9e485a9). F1a e F1b morrem | PASS |
+| C14 | `cameraRoll`, 6 casos | vitest `camera roll follows body roll` ✓ | `tests/unit/chaseMath.test.ts:18` (carried from 9e485a9) | PASS |
+| C15 | `stepRoll` suaviza | vitest `camera roll smoothing` ✓ | `tests/unit/chaseMath.test.ts:24-37` (carried from 9e485a9) | PASS |
+| C16 | `roll` com o sinal de `bodyRoll`, ≥ 1°; direção de visão < 0.5° do `lookAt`; `up` da câmera inclinado para o lado de `bodyRoll` e `atan2` a ≤ 0.2° de `roll` | pw `camera leans with the body` ✓ | Verified at 117bf84: `tests/e2e/visual.spec.ts:306`, `:324-325`, `:334`. Base sem inclinação em `:337-346`, com `d × Y` = `(−d.z, 0, d.x)` e `u0 = r0 × d`, que conferi à mão. Depois `:349` o sinal e `:351` a tolerância de 0.2°. O `up` vem de `src/core/Game.ts:673-677`, que aplica `(0,1,0)` ao `getWorldQuaternion`. F3, F6 e F8 morrem | PASS |
+| C17 | provas da car-handling e da visual/free-roam verdes, sem mudança | vitest (grip, powertrain) ✓; pw `camera swings left while turning left` ✓, `A turns left` ✓ | `tests/e2e/visual.spec.ts:291-293`, `:299-300`; `tests/e2e/drive.spec.ts:60`. `grip.test.ts`, `powertrain.test.ts` e `drive.spec.ts` não mudaram na correção (carried from 9e485a9) | PASS |
+
+Ferramentas de teste mudadas, conferidas pelo diff (`git diff 9c9d043 117bf84 -- tests`):
+- `harness.test.ts`: só troca o literal 17 por 23 em `:26` e `:31`, o que é mais forte.
+- `feel.test.ts`: acrescenta 2 linhas à tabela, troca `run` 8 por 10 e muda um comentário.
+- `visual.spec.ts`: só acrescenta linhas (`:317`, `:335-351`).
+
+Nenhum matcher ficou mais frouxo, nenhuma tolerância cresceu e nenhuma asserção sumiu.
 
 ## Coverage
 
-Verified at 9e485a9. Os membros saem do plano (ACs, door, Surface), do código (`src/vehicle/Car.ts`,
-`src/camera/*`, `src/core/Game.ts`) e do diff de `tests/` (`git diff 2f99ff9..9e485a9 -- tests`).
-
-Testes apagados e acrescentados, contados a partir das linhas `it(` / `test(` do diff:
-- **Apagados (7):** `lateral grip never exceeds 1.15 g`, `reaches at least 0.8 g at 60 kmh`,
-  `understeers instead of spinning`, `body roll leans out of the turn`, `nose dives under braking`,
-  `steering ramps toward the target`, `steering target shrinks with speed`. São exatamente car-handling C8, C9, C10,
-  C4, C5, C6 e C7. Nenhum outro teste saiu.
-- **Acrescentados (13):** 7 em `feel.test.ts`, 1 em `harness.test.ts`, 2 em `chaseMath.test.ts`, 2 renomeados no
-  lugar em `drivetrain.test.ts` e 1 e2e.
-- **Linhas trocadas fora dos testes apagados:** os 3 valores de direção de C28 (`carSpec.test.ts:56-58`, superados
-  por C13), `FIELDS.length` 26 → 29 (`:72`), e o literal 26 → 29 em `tests/e2e/drive.spec.ts:143`. O `toEqual`
-  campo a campo de `:144` continua igual. Nenhum matcher ficou mais frouxo, nenhuma tolerância cresceu, nenhuma
-  asserção sumiu de um teste que continua.
+Verified at 117bf84 nas linhas que a correção tocou. As outras são carried from 9e485a9, com os mesmos membros e
+as mesmas provas.
 
 | Set (size) | Recomputed from | Member -> proof | Unproven |
 | --- | --- | --- | --- |
-| plan ACs (13) | `plan.md` Criteria, AC 1-10 e 13-15 | 1 C1 · 2 C2 · 3 C3 · 4 C4 · 5 C5 · 6 C6, C13 · 7 C7, C13 · 8 C8 · 9 C9 · 10 C10 · 13 C14 · 14 C15 (unidade), C16 `:333` (o ponto de visão não muda) · 15 C16 `:323-324` | AC 14 "levar a inclinação da câmera ao alvo": nenhuma prova observa a câmera do three girando. `ChaseCamera.ts:92` (`rotateZ`) pode sumir ou trocar de sinal sem que nada falhe (F3) |
-| landing doors (1) | `plan.md` Landing | door 1: campos C13 `carSpec.test.ts:61-62`, `:73`; leitura pelo `Car` `harness.test.ts:31-33` | door 1, leitura da rigidez: o valor de prova é igual ao padrão (F1b) |
-| suspension fields (3) | `src/vehicle/carSpec.ts:48-52` e `src/vehicle/Car.ts:103`, `:141-143` | compression `harness.test.ts:32` (F1a morre) · relaxation `:33` · stiffness `:31`, que não separa | stiffness (F1b) |
-| roll directions (2) | AC 1 | esquerda C1 `feel.test.ts:50-51`, C2 · direita C1 `:53-54` | - |
-| understeer cases (8) | AC 10 | `feel.test.ts:123-132`, `:144`, `:149` | - |
-| steering target cases (7) | C7 | `drivetrain.test.ts:90-98` | - |
-| camera roll cases (6) | AC 13 | `chaseMath.test.ts:9-16` | - |
-| superseded car-handling checks (8) | diff de `tests/` (7 testes apagados) mais C28 | ch-4 → C1 · ch-5 → C3 · ch-6 → C6 · ch-7 → C7 · ch-8 → C8 · ch-9 → C9 · ch-10 → C10 (8 de 10 casos) · ch-28 direção → C13 | ch-10, 60 e 90 km/h com acelerador: saíram do AC 10 porque o AC 11 afirmava o oposto. O AC 11 foi retirado, e hoje nenhum check afirma nada nesses dois casos. Medi no rascunho: 1.47° e 0.72° de sideslip máximo, então o comportamento ainda vale, mas sem prova |
-| DEV fields do plano, Surface (2) | `plan.md` Surface; `src/core/Game.ts:664`, `:668` | `roll` C16 `:306`, `:323-324` · `direction` C16 `:333` | - |
-| startup config: car and camera (2 assemblies) | `src/core/Game.ts:159` (`new Car(..., DEFAULT_CAR)`), `:324` (`chase.update(..., this.car.bodyRoll)`); `tests/physics/harness.ts:72` | Game → car-handling C35 `tests/e2e/drive.spec.ts:143-144` (rodado, ✓) e C16 · harness → C13, C1-C10 | - |
+| plan ACs (13) | `plan.md` Criteria, AC 1-10 e 13-15 (AC 10 reescrito em 04032b7) | 1 C1 · 2 C2 · 3 C3 · 4 C4 · 5 C5 · 6 C6, C13 · 7 C7, C13 · 8 C8 · 9 C9 · 10 C10 (10 casos) · 13 C14 · 14 C15, C16 `:334` (o ponto de visão não muda) e `:349`, `:351` (a câmera gira) · 15 C16 `:324-325` | - |
+| landing doors (1) | `plan.md` Landing | door 1: campos `tests/unit/carSpec.test.ts:61-62`, `:73`; leitura pelo `Car` `tests/physics/harness.test.ts:31-33` com valores ≠ padrão | - |
+| suspension fields (3) | `src/vehicle/carSpec.ts` e `src/vehicle/Car.ts:105`, `:143-145` | stiffness `harness.test.ts:31` (F1b morre) · compression `:32` (F1a morre) · relaxation `:33` | - |
+| roll directions (2) | AC 1 (carried from 9e485a9) | esquerda C1, C2 · direita C1 | - |
+| understeer cases (10) | AC 10 em 117bf84: 5 velocidades × {sem, com acelerador} | `tests/physics/feel.test.ts:124-133`, um por linha, `:146`, `:151` | - |
+| steering target cases (7) | C7 (carried from 9e485a9) | `tests/unit/drivetrain.test.ts:90-98` | - |
+| camera roll cases (6) | AC 13 (carried from 9e485a9) | `tests/unit/chaseMath.test.ts:9-16` | - |
+| camera roll directions (2) | AC 14, lado da inclinação | só a esquerda (`A`) é exercida no browser, em `visual.spec.ts:309`, `:349`. A direita vem do sinal de `cameraRoll` na unidade (C14 `−0.05`, `−limite`) e de a mesma linha `ChaseCamera.ts:92` servir aos dois sentidos | - |
+| superseded car-handling checks (8) | diff de `tests/` 2f99ff9..117bf84 e `car-handling/checks.md:60` | ch-4 → C1 · ch-5 → C3 · ch-6 → C6 · ch-7 → C7 · ch-8 → C8 · ch-9 → C9 · ch-10 → C10, os 10 casos (os de 60 e 90 km/h com acelerador voltaram) · ch-28 direção → C13 | - |
+| DEV fields do plano, Surface (3) | `plan.md` Surface em 117bf84; `src/core/Game.ts:664`, `:668`, `:673` | `roll` C16 `:306`, `:324-325` · `direction` C16 `:334` · `up` C16 `:349`, `:351` | - |
+| startup config: car and camera (2 assemblies) | `src/core/Game.ts:159`, `:324`; `tests/physics/harness.ts:72` | Game → car-handling C35 `tests/e2e/drive.spec.ts:143-144` (rodado, ✓) e C16 · harness → C13, C1-C10 | - |
 
 ## Test policy rows
 
+Verified at 117bf84 para as duas linhas que não bateram na rodada 1 e para as que classificam arquivos tocados
+(`Car.ts`, `Game.ts`). A linha "Dados" é carried from 9e485a9.
+
 | Row | Files it classifies | Required proof | Expectation met |
 | --- | --- | --- | --- |
-| Decides, reached across a boundary | `src/camera/chaseMath.ts` (`cameraRoll`, `stepRoll`); `src/vehicle/drivetrain.ts` | própria C14, C15, C6, C7 · fronteira C16, C8-C10 | yes - uma linha por caso da tabela (C14 6 casos, C15 3 regras, C6 4 regras, C7 7 casos). Na fronteira, `cameraRoll` chega ao browser com sinal e magnitude (C16 `:323-324`) |
-| Car lê a ficha (evidence de checks.md: "Fronteira pelo harness") | `src/vehicle/Car.ts` | harness C13, C1-C4 | no - a leitura de `suspensionStiffness` (`Car.ts:103`, `:141`) não é afirmada de forma que separe (F1b) |
-| Dados | `src/vehicle/carSpec.ts` | C13 | yes - `carSpec.test.ts:54-62`, `:72-73` |
-| Instrumentation, pass-throughs | `src/camera/ChaseCamera.ts`, `src/core/Game.ts` | coberto pela prova do consumidor (C16) | no - `ChaseCamera.ts:92` decide que a câmera gira e para que lado, e C16 não observa isso (F3 sobrevive). `Game.ts:324` passar `bodyRoll` fica provado por `:323-324`: sem ele, `roll` ficaria 0 |
+| Decides, reached across a boundary | `src/camera/chaseMath.ts`; `src/vehicle/drivetrain.ts` | própria C14, C15, C6, C7 · fronteira C16, C8-C10 | yes. Um caso por linha da tabela nas unidades. Na fronteira, C16 `:324-325` e agora `:349-351` levam `cameraRoll` até a orientação da câmera; C10 cobre as 10 linhas |
+| Car lê a ficha ("Fronteira pelo harness") | `src/vehicle/Car.ts` | harness C13, C1-C4 | yes. `harness.test.ts:31-33` separa "lê a ficha" de "usa constante" nos 3 campos (F1a e F1b morrem). O refactor em `Car.ts:47`, `:53` é neutro (ver Deviations) |
+| Dados | `src/vehicle/carSpec.ts` | C13 | yes. `carSpec.test.ts:54-62`, `:72-73` (carried from 9e485a9) |
+| Instrumentation, pass-throughs | `src/camera/ChaseCamera.ts`, `src/core/Game.ts` | coberto pela prova do consumidor (C16) | yes. A decisão de `ChaseCamera.ts:92` (se gira, para que lado e quanto) é afirmada por `visual.spec.ts:349`, `:351`: F3, F6 e F8 morrem. O getter `up` de `Game.ts:673-677` só existe em DEV e é lido pela mesma prova. Passar `bodyRoll` em `Game.ts:324` continua provado por `:324-325` |
 
 ## Faults injected
 
-Verified at 9e485a9. Tudo rodou num worktree isolado: `git worktree add --detach <scratchpad>/faults HEAD`, com
-junction de `node_modules`, nunca `git stash`. Cada mutação partiu da cópia original do arquivo, e conferi o `diff`
-antes de rodar. Entre uma falta e outra, `cmp` (ignorando CR) confirmou o arquivo restaurado. F3 rodou na porta
-5193 depois que a rodada principal terminou: o `netstat` estava vazio, e o log mostra o `[WebServer]` do próprio
-rascunho subindo. Então o servidor era do código mutado, e não um reaproveitado.
-
-Baseline do `git status --porcelain` do worktree do Verifier: vazio. Depois de apagar a junction do rascunho
-(`.Delete()`) e rodar `git worktree remove`, continuou vazio antes de este relatório ser escrito, e `git worktree list`
-não mostra mais o rascunho.
+Verified at 117bf84. Tudo rodou num worktree de rascunho separado
+(`git worktree add --detach <scratchpad>/faults HEAD`, junction de `node_modules`), nunca com `git stash`.
+- Cada mutação partiu de uma cópia do arquivo original. Conferi o `git diff` de cada uma antes de rodar e restaurei
+  a cópia entre uma falta e outra. Depois de restaurar, o `git status --porcelain` do rascunho estava vazio.
+- As faltas de câmera rodaram uma por vez na porta 5196, depois de a rodada principal terminar. Antes de cada uma,
+  o `netstat` estava vazio na 5196, e o log mostra o `[WebServer]` do próprio rascunho subindo. Então o servidor
+  servia o código mutado.
+- No fim apaguei a junction do rascunho (`.Delete()`) e rodei `git worktree remove`. O `git worktree list` não
+  mostra mais o rascunho, e o `git status --porcelain` do worktree do Verifier estava vazio antes e depois.
 
 | Mutation | Location | Killed |
 | --- | --- | --- |
-| F1a `Car` ignora a suspensão da ficha: `setWheelSuspension{Stiffness,Compression,Relaxation}(i, spec.…)` → constantes 17 / 2.7 / 0.8 | `src/vehicle/Car.ts:141-143` | yes - C13 `tests/physics/harness.test.ts:32` "wheel 0 compression: expected 1.00000004… to be ≤ 0.000001" |
-| F1b só a rigidez fixa: `setWheelSuspensionStiffness(i, 17)` e `restLength` com `4 * 17` | `src/vehicle/Car.ts:103`, `:141` | no - survived. Rodei a suíte vitest inteira: 108/108. A prova de C13 usa 17, que é o valor de `DEFAULT_CAR` |
-| F2 sem limite: `cameraRoll` → `bodyRoll * ROLL_GAIN` | `src/camera/chaseMath.ts:86` | yes - C14 `tests/unit/chaseMath.test.ts:18` "bodyRoll 0.2: expected 0.0502 to be ≤ 1e-9" |
-| F3 a câmera nunca gira: remove `this.camera.rotateZ(-this.rollAngle)` | `src/camera/ChaseCamera.ts:92` | no - survived. `E2E_PORT=5193 npx playwright test tests/e2e/visual.spec.ts -g "camera leans with the body"` passou (1 passed) |
-| F4 volante de volta a 2.5: `steerRateRadS: 4.0` → `2.5` | `src/vehicle/carSpec.ts:87` | yes - C6 `tests/unit/drivetrain.test.ts:46` "step 1: expected 0.025 to be less than 1e-12" |
-| F5 aderência de volta: `tireGrip: 0.86` → `1.05` | `src/vehicle/carSpec.ts:82` | yes - C8 `tests/physics/feel.test.ts:110` "90 km/h step 55: expected 0.9553 ≤ 0.95". Morre por pouco (0.5 % acima do teto) |
+| F1b (reinjetada) a rigidez fica fixa: `setWheelSuspensionStiffness(i, 17)` e `restLength` com `4 * 17` | `src/vehicle/Car.ts:105`, `:143` | yes. C13 `tests/physics/harness.test.ts:31` "wheel 0 stiffness: expected 6 to be ≤ 0.000001". Só esse teste falhou (1 failed / 107 passed) |
+| F3 (reinjetada) a câmera nunca gira: remove `this.camera.rotateZ(-this.rollAngle)` | `src/camera/ChaseCamera.ts:92` | yes. C16 `tests/e2e/visual.spec.ts:351` "expected ≤ 0.00349, received 0.0415". O sinal de `:349` não pegou: sem giro, `upRight` fica ~0 e o sinal sai do ruído de ponto flutuante. Quem mata é a tolerância de `:351` |
+| F6 inclinação invertida: `rotateZ(this.rollAngle)` | `src/camera/ChaseCamera.ts:92` | yes. C16 `tests/e2e/visual.spec.ts:349` "Expected: 1, Received: -1" |
+| F7 traseira escapa no acelerador abaixo de 27 m/s: o `frictionSlip` traseiro × 0.3 quando `input.throttle && speedMs < 27` | `src/vehicle/Car.ts:168` | yes. C10 `tests/physics/feel.test.ts:146` "60 km/h throttle true step 45: expected 12.32 ≤ 12", ou seja, um caso novo. A C10 antiga de 8 casos (`feel.test.ts` de 9c9d043), rodada contra a mesma falta, passou (1 passed). Os casos novos são o que pega a falta dentro da C10. C1, C4, C8 e duas de powertrain também caíram |
+| F8 meia inclinação: `rotateZ(-0.5 * this.rollAngle)` | `src/camera/ChaseCamera.ts:92` | yes. C16 `tests/e2e/visual.spec.ts:351` "expected ≤ 0.00349, received 0.0208" (metade de `roll`) |
 
-F1a e F1b atacam a mesma superfície (a leitura da ficha pelo `Car`). F1b foi a segunda sonda, porque F1a morria só
-por causa da compressão. Por isso são 6 mutações em 5 superfícies. `stepRoll` (C15) não recebeu falta própria por
-causa do teto de 5.
+As faltas F2, F4 e F5 da rodada 1 atacam superfícies que a correção não tocou (`chaseMath.ts:86`,
+`carSpec.ts:82`, `:87`), por isso são carried from 9e485a9: todas morreram lá. F1a também é carried from 9e485a9
+(morria em `harness.test.ts:32`, linha que não mudou).
 
 ## Swept existing
 
-Verified at 9e485a9:
-- **idempotency**: existing. O teste `drivetrain step is pure` (car-handling C26) passou na saída verbose.
-  `cameraRoll` e `stepRoll` (`src/camera/chaseMath.ts:85-92`) não guardam estado. Confere.
-- **dependency failure**: existing. `Car` lê `assets.placeholder` (`src/vehicle/Car.ts:94`), e o harness usa
-  `PLACEHOLDER_ASSETS` (`tests/physics/harness.ts:72`), então as provas de física já rodam no caminho sem GLB com a
-  mesma física. O teste de free-roam-city C33 (`hud.spec.ts`) não foi rodado aqui, e o diff não toca o Loader. Confere.
-- **Observable, teclado**: `steerAxis` devolve 0 com os dois lados apertados (`src/core/input.ts:49-51`). O plano cita
-  `:52`, o que é só um deslize de linha.
-- **Observable, áudio**: `isSkidding` existe (`src/vehicle/effectsMath.ts:97`), e `skidding from real lateral slip`
-  passou. Confere.
+Carried from 9e485a9 (idempotency, dependency failure, teclado, áudio). A correção só toca a observability: o
+`__game.camera.up` novo é só de DEV, está no bloco de `exposeDebug` (`src/core/Game.ts:673`) e é lido por C16.
+Confere. O plano agora cita `src/core/input.ts:49`, que é a linha certa.
 
 ## Deviations judged
 
-1. **Ride height** (`src/vehicle/Car.ts:51`, `:103-104`, commit 75d8c43):
-   - **O que ficou igual.** `rideHeight` = `-WHEEL_Y + LOADED_SUSPENSION + r`, com
-     `LOADED_SUSPENSION = 0.35 − 9.81/128`. Isso é algebricamente a fórmula de antes com a mola 32. A altura parada
-     e o offset do centro de massa (`:113`) ficaram iguais, então car-handling C1, C29 e o `facade-glint` seguem
-     verdes.
-   - **O que mudou.** O comprimento livre da mola passou de 0.35 m para 0.2734 + 9.81/68 = 0.4176 m. A roda
-     descarregada (a de dentro da curva, ou no ar) desce 6.8 cm a mais antes de perder o chão, dentro do curso de 0.3.
-     Isso muda o comportamento da rolagem e do contato, e é parte do ajuste medido por C1-C5 (C3 da car-handling
-     continua verde).
-   - **Veredito.** Não é uma door: é uma constante interna, reversível, sem forma exposta nem dado persistido, e cabe
-     em "Números de ajuste ... são do build" do Handoff. Mas cria um acoplamento que o plano não registra: na ficha,
-     `suspensionStiffness` também decide o comprimento livre (semântica de pré-carga, altura fixa com qualquer mola).
-     O sub-projeto 4 deveria saber disso. Recomendo registrar no plano ou no STATE. O literal 32 ficou dentro de
-     `LOADED_SUSPENSION` como número mágico. Nada disso muda o veredito.
-2. **Contagem de campos 26 → 29**: é forçada pela door 1. Em `tests/unit/carSpec.test.ts`, os 3 nomes entraram em
-   `FIELDS` e `:73` compara as chaves ordenadas, o que é mais forte, não mais fraco. Em `tests/e2e/drive.spec.ts:143`
-   só o literal mudou, e `:144` `toEqual` campo a campo continua. C35 rodou e passou. Aceito.
-3. **`__game.camera.direction`**: não é um campo extra. O `plan.md` Surface já declarava `roll` e `direction` desde
-   2f99ff9, e o diff do plano no range só mexe no texto de dc41844. Os campos são só de DEV (`exposeDebug`,
-   `src/main.ts:42`). Aceito.
-4. **Flow e Impact do plano**:
-   - O Flow continua verdadeiro. Os passos 1-6 batem com o diff: `Game.ts:324` passa `bodyRoll`, e
-     `ChaseCamera.ts:64`, `:92` suaviza e gira.
-   - O Impact está desatualizado numa linha. Ele diz que "a parte 'com acelerador' do AC 10" da car-handling fica
-     superada pelos ACs daqui. Depois de dc41844, os casos 60 e 90 km/h com acelerador não são superados por nada:
-     é o membro sem prova da Coverage.
-   - O `checks.md` da car-handling continua citando provas que não existem mais (por exemplo
-     `-t "body roll leans out of the turn"`, `checks.md:67`), sem nota de que foram superadas. É um resíduo de
-     documentação.
+1. **Refactor `RIDE_HEIGHT_REF_STIFFNESS`** (0aa602a, `src/vehicle/Car.ts:47`, `:53`) - verified at 117bf84.
+   - É só dar nome a um literal: `GRAVITY / (4 * 32)` virou `GRAVITY / (4 * RIDE_HEIGHT_REF_STIFFNESS)`, com a
+     constante `= 32`. É a mesma expressão, com o mesmo resultado em ponto flutuante.
+   - Nenhum outro uso de 32 mudou. O `grep` em 9e485a9 e em 117bf84 só acha essa conta e o comentário de `:49`.
+   - As provas que dependem da altura parada continuaram verdes: C1-C4, car-handling C29 e os 4 `facade-glint`.
+   - Comportamento neutro. Aceito.
+2. **Acoplamento stiffness → comprimento livre**: foi registrado no `plan.md` Impact (linha "domain", acoplamento),
+   como a rodada 1 recomendou. Bate com `Car.ts:105-106`. Aceito.
+3. **Resíduo da car-handling**: `car-handling/checks.md:60` agora diz que C4-C10 foram superados pela car-feel e
+   que as provas deles não existem mais. Fechado.
+4. **Desvios 2-4 da rodada 1** (contagem de campos 26 → 29, `camera.direction`, Flow): carried from 9e485a9. A
+   linha do Impact que estava desatualizada (a parte "com acelerador" do AC 10) foi corrigida em 04032b7 e agora
+   bate com o AC 10 de 10 casos.
 
 ## Gate
 
-`npx vitest run` - 108 passed, 0 failed · `E2E_PORT=5193 npx playwright test tests/e2e/visual.spec.ts` - 31 passed, 0 failed · `E2E_PORT=5193 npx playwright test tests/e2e/drive.spec.ts -g "A turns left|game builds the car from the default spec"` - 2 passed, 0 failed
+`npx vitest run` - 108 passed, 0 failed · `E2E_PORT=5196 npx playwright test tests/e2e/visual.spec.ts` - 31 passed, 0 failed · `E2E_PORT=5196 npx playwright test tests/e2e/drive.spec.ts -g "A turns left|game builds the car from the default spec"` - 2 passed, 0 failed
 
 ## Ranked gaps
 
-1. **F3 sobrevive: nada prova que a câmera inclina de fato.** Afeta C16 e AC 14 (`src/camera/ChaseCamera.ts:92`,
-   `tests/e2e/visual.spec.ts:323-333`). Precisa de uma asserção sobre a orientação da câmera. Por exemplo: o `up` do
-   mundo da câmera, `(0,1,0)` aplicado ao quaternion, deve estar inclinado de `roll` em torno da direção de visão,
-   no sentido da carroceria. Hoje nem a remoção nem a troca de sinal do `rotateZ` falham.
-2. **F1b sobrevive: a leitura da rigidez não é provada.** Afeta C13 e a door 1 (`tests/physics/harness.test.ts:26`,
-   `:31`). Os valores de prova precisam ser diferentes dos de `DEFAULT_CAR` (por exemplo `suspensionStiffness: 23`),
-   no check e no teste.
-3. **ch-10: 60 e 90 km/h com acelerador sem prova.** Afeta a Coverage "superseded" e o AC 10 (`plan.md` Impact).
-   Os casos ficaram órfãos quando os AC 11/12 saíram. Ou voltam ao AC 10 e a C10 (hoje medem 1.47° e 0.72°), ou o
-   plano registra que ficam sem prova.
-
-Resíduos que não mudam o veredito:
-- F5 morre por pouco: com `tireGrip` 1.05, o pico é 0.955 g contra o teto de 0.95. O teto quase não separa o valor
-  antigo do novo.
-- O acoplamento stiffness → comprimento livre (desvio 1) não está no plano.
-- O `checks.md` da car-handling não marca C4-C10 como superados.
-- O plano cita `src/core/input.ts:52`, mas a função está em `:49`.
+Nenhuma lacuna que mude o veredito. Resíduos:
+1. **Sinal de `visual.spec.ts:349` sensível a ruído.** Se não há giro, `Math.sign(upRight)` de um valor ~1e-17
+   pode bater com o sinal de `bodyRoll` por acaso. Foi o que aconteceu com F3. A falta morre de qualquer jeito por
+   `:351`, que mede a magnitude, então não há lacuna. Mas `:349` sozinho não prova que a câmera gira.
+2. **F5 morre por pouco** (carried from 9e485a9): com `tireGrip` 1.05, o pico é 0.955 g contra o teto de 0.95.
+3. **Direita no browser.** C16 só dirige para a esquerda. Com `rotateZ` linear em `roll`, o lado direito fica
+   coberto pela unidade (C14) e pela mesma linha de código. Não é membro sem prova, só uma prova indireta.

@@ -86,6 +86,18 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: round3 F5 drivetrain.ts:181 (vehicle)
 - last seen: 2026-09-26T19:11:40Z
 
+### L-013 - A test proving a value is read from config must use a probe value that differs from the default; equal values cannot tell reading from hardcoding.
+- signal: `surviving_mutant` · recurrence: 1 feature(s) · scope: `vehicle` · harmful: 0
+- features: car-feel
+- evidence: round1 F1b harness.test.ts:31 (vehicle)
+- last seen: 2026-09-26T21:47:45Z
+
+### L-014 - Assert the rendered object's real transform, not the stored number that feeds it; a DEV getter of the input survives deleting the transform.
+- signal: `surviving_mutant` · recurrence: 1 feature(s) · scope: `camera` · harmful: 0
+- features: car-feel
+- evidence: round1 F3 ChaseCamera.ts:92 (camera)
+- last seen: 2026-09-26T21:47:45Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.

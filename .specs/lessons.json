@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 13,
+  "next_id": 15,
   "lessons": [
     {
       "id": "L-001",
@@ -221,6 +221,42 @@
       ],
       "created": "2026-09-26T19:11:40Z",
       "last_seen": "2026-09-26T19:11:40Z"
+    },
+    {
+      "id": "L-013",
+      "key": "surviving_mutant::a test proving a value is read from config must use a probe value that differs from the default equal values cannot tell reading from hardcoding",
+      "text": "A test proving a value is read from config must use a probe value that differs from the default; equal values cannot tell reading from hardcoding.",
+      "signal": "surviving_mutant",
+      "scope": "vehicle",
+      "status": "candidate",
+      "features": [
+        "car-feel"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "round1 F1b harness.test.ts:31 (vehicle)"
+      ],
+      "created": "2026-09-26T21:47:45Z",
+      "last_seen": "2026-09-26T21:47:45Z"
+    },
+    {
+      "id": "L-014",
+      "key": "surviving_mutant::assert the rendered object s real transform not the stored number that feeds it a dev getter of the input survives deleting the transform",
+      "text": "Assert the rendered object's real transform, not the stored number that feeds it; a DEV getter of the input survives deleting the transform.",
+      "signal": "surviving_mutant",
+      "scope": "camera",
+      "status": "candidate",
+      "features": [
+        "car-feel"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "round1 F3 ChaseCamera.ts:92 (camera)"
+      ],
+      "created": "2026-09-26T21:47:45Z",
+      "last_seen": "2026-09-26T21:47:45Z"
     }
   ]
 }
