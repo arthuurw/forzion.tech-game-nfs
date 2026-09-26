@@ -342,3 +342,50 @@ test.describe('block-fill - árvores', () => {
     expect(low).toBeLessThanOrEqual(300);
   });
 });
+
+test.describe('block-fill - obras', () => {
+  // C27 (AC 25) - parte browser
+  test('construction crane turns', async ({ page }) => {
+    await gotoGame(page);
+    const sites = await page.evaluate(() => (window as any).__game.world.interiors.summary().sites as number);
+    expect(sites).toBeGreaterThanOrEqual(1);
+    const yaw = () => page.evaluate(() => (window as any).__game.world.interiors.jibYaw(0) as number);
+    const a = await yaw();
+    await advanceSim(page, 1);
+    const b = await yaw();
+    expect(Math.abs(Math.atan2(Math.sin(b - a), Math.cos(b - a)))).toBeGreaterThan(0);
+  });
+
+  // C28 (AC 26) - parte browser
+  test('crane beacon blinks', async ({ page }) => {
+    await gotoGame(page);
+    const seen = { on: 0, off: 0 };
+    const start = await simTime(page);
+    while ((seen.on === 0 || seen.off === 0) && (await simTime(page)) < start + 10) {
+      const r = await page.evaluate(async () => {
+        const m = await import('/src/world/interiors/interiorMotion.ts' as string);
+        const b = (window as any).__game.world.interiors.beacon;
+        return { intensity: b.intensity as number, on: m.beaconOn(b.time) as boolean };
+      });
+      if (r.on) {
+        expect(r.intensity).toBeGreaterThan(0);
+        seen.on++;
+      } else {
+        expect(r.intensity).toBe(0);
+        seen.off++;
+      }
+    }
+    expect(seen.on).toBeGreaterThan(0);
+    expect(seen.off).toBeGreaterThan(0);
+  });
+
+  // C29 (AC 27) - parte browser
+  test('construction floodlight lights the ground', async ({ page }) => {
+    await gotoGame(page);
+    await advanceSim(page, 1);
+    const r = await page.evaluate(() => (window as any).__game.world.interiors.beamProbe(0));
+    console.log(`C29 beam ${r.beam.toFixed(4)} outside ${r.outside.toFixed(4)}`);
+    expect(r.outside).toBeGreaterThan(0);
+    expect(r.beam).toBeGreaterThan(1.5 * r.outside);
+  });
+});

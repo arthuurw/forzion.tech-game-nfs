@@ -46,3 +46,16 @@ describe('interior colliders', () => {
     });
   });
 });
+
+describe('crane colliders', () => {
+  // C30 (AC 28)
+  it('one collider per crane tower', () => {
+    expect(props.sites.length).toBeGreaterThan(0);
+    expect(physics.cranes.length).toBe(props.sites.length);
+    props.sites.forEach((s, i) => {
+      const p = physics.cranes[i]!.translation();
+      expect(Math.abs(p.x - s.x)).toBeLessThanOrEqual(0.01);
+      expect(Math.abs(p.z - s.z)).toBeLessThanOrEqual(0.01);
+    });
+  });
+});

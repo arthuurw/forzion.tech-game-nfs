@@ -169,4 +169,59 @@ describe('interior props', () => {
     expect(props.trees.some((t) => t.height < 6)).toBe(true);
     expect(props.trees.some((t) => t.height > 9)).toBe(true);
   });
+
+  // C26 (AC 24, door 2)
+  it('construction sites in the largest downtown zones', () => {
+    const big = bi.zones
+      .filter((z) => z.kind === 'downtown' && z.areaM2 >= 1500)
+      .sort((a, b) => b.areaM2 - a.areaM2)
+      .slice(0, 6);
+    expect(props.sites.length).toBe(big.length);
+    expect(props.sites.length).toBeGreaterThan(0);
+    props.sites.forEach((s, i) => {
+      const zone = big[i]!;
+      // mesma zona, na ordem de área decrescente (empates podem trocar de lugar)
+      expect(bi.zones[s.zoneId]!.areaM2).toBe(zone.areaM2);
+      expect(bi.zones[s.zoneId]!.kind).toBe('downtown');
+      const z = bi.zones[s.zoneId]!;
+      if (zoneAt(bi, z.centroid.x, z.centroid.z) === z.id) {
+        expect(s.x).toBeCloseTo(z.centroid.x, 9);
+        expect(s.z).toBeCloseTo(z.centroid.z, 9);
+      } else {
+        let best = Infinity;
+        for (let k = 0; k < bi.zoneOf.length; k++) {
+          if (bi.zoneOf[k] !== z.id) continue;
+          const x = bi.origin + (k % bi.size) * bi.spacing;
+          const zz = bi.origin + Math.floor(k / bi.size) * bi.spacing;
+          best = Math.min(best, Math.hypot(x - z.centroid.x, zz - z.centroid.z));
+        }
+        expect(zoneAt(bi, s.x, s.z)).toBe(z.id);
+        expect(Math.hypot(s.x - z.centroid.x, s.z - z.centroid.z)).toBeCloseTo(best, 9);
+      }
+    });
+    expect(new Set(props.sites.map((s) => s.zoneId)).size).toBe(props.sites.length);
+
+    // mapa sintético: 8 zonas do centro de 1600 m² (10 × 10 vértices), o resto é água → 6 canteiros
+    const size = 101;
+    const origin = -200;
+    const islands: Array<[number, number]> = [];
+    for (let a = 0; a < 4; a++) for (let b = 0; b < 2; b++) islands.push([-180 + a * 90, -120 + b * 150]);
+    const heights = new Float32Array(size * size);
+    for (let iz = 0; iz < size; iz++) {
+      for (let ix = 0; ix < size; ix++) {
+        const x = origin + ix * 4;
+        const z = origin + iz * 4;
+        const dry = islands.some(([ax, az]) => x >= ax && x < ax + 40 && z >= az && z < az + 40);
+        heights[iz * size + ix] = dry ? 0 : -5;
+      }
+    }
+    const hm = { size, spacing: 4, origin, heights };
+    const synth = findBlockInteriors(hm, { roads: [] }, []);
+    expect(synth.zones.length).toBe(8);
+    for (const z of synth.zones) {
+      expect(z.areaM2).toBe(1600);
+      expect(z.kind).toBe('downtown');
+    }
+    expect(placeInteriorProps(1337, synth, [], hm).sites.length).toBe(6);
+  });
 });

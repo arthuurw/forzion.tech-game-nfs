@@ -138,21 +138,21 @@ Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "fireflies within bud
 
 ### S5 - Obras no centro · 7 files · 63 KB · ~16k
 
-**C26** - Onde há obra (AC 24): no seed 1337, os canteiros são exatamente as zonas `downtown` com `areaM2` ≥ 1500, em ordem de área decrescente, cortadas em 6; cada canteiro fica no centroide da zona se ele cai num vértice interior da zona, senão no vértice interior da zona mais próximo do centroide. Em mapa sintético com 8 zonas `downtown` de 1600 m², há 6 canteiros.
+**C26** - ✅ Onde há obra (AC 24): no seed 1337, os canteiros são exatamente as zonas `downtown` com `areaM2` ≥ 1500, em ordem de área decrescente, cortadas em 6; cada canteiro fica no centroide da zona se ele cai num vértice interior da zona, senão no vértice interior da zona mais próximo do centroide. Em mapa sintético com 8 zonas `downtown` de 1600 m², há 6 canteiros.
 Proof: `npx vitest run tests/unit/interiorProps.test.ts -t "construction sites in the largest downtown zones"`
 
-**C27** - Guindaste (AC 25): todo canteiro tem `towerHeight` em [40, 60] e `jibLength` 30; `jibAngle(t, period)` completa 2π em `period`, com o `period` de cada canteiro em [90, 150] s, e é contínuo (passo de 1/60 muda no máximo 2π/90/60 + 1e-9). No browser, com pelo menos 1 canteiro, a rotação da lança lida da cena muda entre dois quadros separados por 1 s.
+**C27** - ✅ Guindaste (AC 25): todo canteiro tem `towerHeight` em [40, 60] e `jibLength` 30; `jibAngle(t, period)` completa 2π em `period`, com o `period` de cada canteiro em [90, 150] s, e é contínuo (passo de 1/60 muda no máximo 2π/90/60 + 1e-9). No browser, com pelo menos 1 canteiro, a rotação da lança lida da cena muda entre dois quadros separados por 1 s.
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "crane jib turns slowly"`
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "construction crane turns"`
 
-**C28** - Farol do guindaste (AC 26): `beaconOn(t)` é true se e só se `t mod 1` < 0.2 (casos 0, 0.19, 0.2, 0.5, 1.1, 1.25). No browser, o `emissiveIntensity` da luz vermelha é > 0 com `beaconOn` true e 0 com false, lido em dois instantes.
+**C28** - ✅ Farol do guindaste (AC 26): `beaconOn(t)` é true se e só se `t mod 1` < 0.2 (casos 0, 0.19, 0.2, 0.5, 1.1, 1.25). No browser, o `emissiveIntensity` da luz vermelha é > 0 com `beaconOn` true e 0 com false, lido em dois instantes.
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "crane beacon blinks at 1 Hz"`
 
-**C29** - Holofotes (AC 27): todo canteiro tem 2 holofotes; `floodSweep(t, base)` fica em [base − 30°, base + 30°] e repete a cada 20 s (± 1e-9). No browser, `beamProbe(0)`: luminância no facho > 1.5 × a luminância fora dele.
+**C29** - ✅ Holofotes (AC 27): todo canteiro tem 2 holofotes; `floodSweep(t, base)` fica em [base − 30°, base + 30°] e repete a cada 20 s (± 1e-9). No browser, `beamProbe(0)`: luminância no facho > 1.5 × a luminância fora dele.
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "floodlights sweep 30 degrees in 20 s"`
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "construction floodlight lights the ground"`
 
-**C30** - Collider da torre (AC 28): no `WorldPhysics` do seed 1337, há um collider por canteiro (`physics.cranes.length`), centrado na base da torre (± 0.01 em x e z).
+**C30** - ✅ Collider da torre (AC 28): no `WorldPhysics` do seed 1337, há um collider por canteiro (`physics.cranes.length`), centrado na base da torre (± 0.01 em x e z).
 Proof: `npx vitest run tests/physics/interiors.test.ts -t "one collider per crane tower"`
 
 ### S6 - Pedestres · 6 files · 90 KB · ~23k

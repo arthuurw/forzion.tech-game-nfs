@@ -216,7 +216,7 @@ export function jibAngle(t: number, period: number, phase = 0): number {
 
 /** Farol vermelho no topo da torre: 1 Hz, aceso 0.2 s de cada segundo. */
 export function beaconOn(t: number): boolean {
-  return ((t % 1) + 1) % 1 < 0.2;
+  return t - Math.floor(t) < 0.2;
 }
 
 export const FLOOD_SWEEP = Math.PI / 6;

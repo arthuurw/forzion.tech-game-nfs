@@ -9,17 +9,33 @@ import {
   FIREFLIES_HIGH,
   FIREFLIES_LOW,
   POOL_FLOW,
+  beaconOn,
   bulbSway,
+  cranePeriod,
+  floodSweep,
+  jibAngle,
   crownSwayParams,
   fireflyMotion,
   zoneLight,
 } from './interiorMotion';
-import { YARD_LAMP_HEIGHT } from './InteriorProps';
+import { FLOOD_REACH, YARD_LAMP_HEIGHT } from './InteriorProps';
 
 /** cor da luz rebatida das janelas (a mesma luz quente das fachadas) */
 const BOUNCE_COLOR = new THREE.Color('#ffb877');
 /** força da luz rebatida no chão colado ao prédio com a zona em 1.0 */
 const BOUNCE_STRENGTH = 1.5;
+/** luz dos holofotes das obras no chão */
+const FLOOD_COLOR = new THREE.Color('#fff4e0');
+const FLOOD_STRENGTH = 2.5;
+/** holofotes no shader do terreno (6 obras × 2) */
+const MAX_FLOODS = 12;
+/** meias medidas da mancha do facho no chão: ao longo e de través (m) */
+const FLOOD_ALONG = 7;
+const FLOOD_ACROSS = 4.5;
+/** intensidade do farol vermelho aceso */
+const BEACON_ON = 4;
+/** comprimento da contra-lança (m) */
+const COUNTER_JIB = 9;
 
 /**
  * Render do miolo das quadras (block-fill): o que o terreno precisa para a luz
@@ -37,7 +53,22 @@ export class InteriorScene {
     uZoneTex: { value: null as THREE.DataTexture | null },
     uBounce: { value: 1 },
     uBounceColor: { value: BOUNCE_COLOR.clone().multiplyScalar(BOUNCE_STRENGTH) },
+    /** por holofote: centro da mancha no chão (x, z) e direção do facho (x, z) */
+    uFlood: { value: Array.from({ length: MAX_FLOODS }, () => new THREE.Vector4()) },
+    uFloodCount: { value: 0 },
+    uFloodColor: { value: FLOOD_COLOR.clone().multiplyScalar(FLOOD_STRENGTH) },
   };
+  /** só DEV (sonda `beamProbe`): holofotes parados no meio da varredura */
+  floodsFrozen = false;
+  readonly towers: THREE.InstancedMesh;
+  readonly jibs: THREE.InstancedMesh;
+  readonly beacons: THREE.InstancedMesh;
+  readonly beaconMaterial: THREE.MeshStandardMaterial;
+  readonly floodHeads: THREE.InstancedMesh;
+  /** heading atual de cada holofote (na ordem site × 2) */
+  readonly floodHeadings: number[] = [];
+  /** fase de cada lança (rad) */
+  private readonly jibPhases: number[];
   time = 0;
   /** `uTime` dos materiais que balançam no vertex shader (lâmpadas, copas), em s de física */
   readonly swayTime = { value: 0 };
@@ -107,7 +138,21 @@ export class InteriorScene {
     this.fireflyCount = quality.level === 'low' ? FIREFLIES_LOW : FIREFLIES_HIGH;
     this.fireflyMaterial = fireflyMaterial(this.swayTime);
     this.fireflies = this.buildFireflies();
-    this.group.add(this.yardLamps, this.bulbs, this.pools, this.trees, this.fireflies);
+    // --- obras: torre, lança girando, farol vermelho e holofotes ---
+    const sites = this.props.sites;
+    this.jibPhases = sites.map((s) => ((s.x * 0.013 + s.z * 0.029) % 1) * Math.PI * 2);
+    const steel = new THREE.MeshStandardMaterial({ color: '#8a6d24', roughness: 0.7, metalness: 0.3 });
+    this.towers = this.buildTowers(steel);
+    this.jibs = this.buildJibs(steel);
+    this.beaconMaterial = new THREE.MeshStandardMaterial({ color: '#200000', emissive: '#ff2a1a', emissiveIntensity: BEACON_ON });
+    this.beacons = this.instanced(new THREE.SphereGeometry(0.35, 8, 6), this.beaconMaterial, sites.length, 'crane-beacons');
+    sites.forEach((s, i) => this.beacons.setMatrixAt(i, new THREE.Matrix4().makeTranslation(s.x, s.y + s.towerHeight + 3, s.z)));
+    const headMaterial = new THREE.MeshStandardMaterial({ color: '#222222', emissive: '#fff4e0', emissiveIntensity: 3 });
+    const head = new THREE.BoxGeometry(0.9, 0.6, 0.5);
+    this.floodHeads = this.instanced(head, headMaterial, sites.length * 2, 'flood-heads');
+    this.terrainUniforms.uFloodCount.value = Math.min(MAX_FLOODS, sites.length * 2);
+    this.group.add(this.yardLamps, this.bulbs, this.pools, this.trees, this.fireflies, this.towers, this.jibs, this.beacons, this.floodHeads);
+    this.setSiteBounds();
     this.update(0);
   }
 
@@ -169,6 +214,97 @@ export class InteriorScene {
     mesh.name = 'pools';
     mesh.computeBoundingSphere();
     return mesh;
+  }
+
+  private instanced(geometry: THREE.BufferGeometry, material: THREE.Material, count: number, name: string): THREE.InstancedMesh {
+    const mesh = new THREE.InstancedMesh(geometry, material, Math.max(1, count));
+    mesh.count = count;
+    mesh.name = name;
+    return mesh;
+  }
+
+  private buildTowers(material: THREE.Material): THREE.InstancedMesh {
+    const sites = this.props.sites;
+    const geometry = new THREE.BoxGeometry(1.6, 1, 1.6);
+    geometry.translate(0, 0.5, 0);
+    const mesh = this.instanced(geometry, material, sites.length, 'crane-towers');
+    const m = new THREE.Matrix4();
+    sites.forEach((s, i) => mesh.setMatrixAt(i, m.compose(new THREE.Vector3(s.x, s.y, s.z), new THREE.Quaternion(), new THREE.Vector3(1, s.towerHeight, 1))));
+    return mesh;
+  }
+
+  private buildJibs(material: THREE.Material): THREE.InstancedMesh {
+    // lança ao longo de +z (heading 0) com contra-lança e contrapeso; a lança tem `jibLength` (30 m)
+    const jib = new THREE.BoxGeometry(1.1, 1.1, 1);
+    jib.scale(1, 1, this.props.sites[0]?.jibLength ?? 30);
+    jib.translate(0, 0.8, (this.props.sites[0]?.jibLength ?? 30) / 2);
+    const counter = new THREE.BoxGeometry(1.1, 1.1, COUNTER_JIB);
+    counter.translate(0, 0.8, -COUNTER_JIB / 2);
+    const weight = new THREE.BoxGeometry(2.2, 2.4, 2.5);
+    weight.translate(0, 0.2, -COUNTER_JIB + 1.5);
+    const cab = new THREE.BoxGeometry(2, 2, 2);
+    cab.translate(0, -0.8, 1.6);
+    const geometry = mergeWithGlow([
+      [jib, 0],
+      [counter, 0],
+      [weight, 0],
+      [cab, 0],
+    ]);
+    return this.instanced(geometry, material, this.props.sites.length, 'crane-jibs');
+  }
+
+  /** Esfera de culling cobrindo as obras com a lança girando (os holofotes e a lança mudam de matriz). */
+  private setSiteBounds(): void {
+    const sites = this.props.sites;
+    if (sites.length === 0) return;
+    const c = new THREE.Vector3();
+    for (const s of sites) c.add(new THREE.Vector3(s.x, s.y + s.towerHeight / 2, s.z));
+    c.divideScalar(sites.length);
+    let r = 0;
+    for (const s of sites) r = Math.max(r, c.distanceTo(new THREE.Vector3(s.x, s.y + s.towerHeight / 2, s.z)) + s.towerHeight / 2 + s.jibLength + 10);
+    for (const mesh of [this.towers, this.jibs, this.beacons, this.floodHeads]) {
+      mesh.boundingSphere = new THREE.Sphere(c.clone(), r);
+    }
+  }
+
+  /** Lança, farol e holofotes no instante `time`. */
+  private updateSites(time: number): void {
+    const sites = this.props.sites;
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0);
+    const one = new THREE.Vector3(1, 1, 1);
+    this.floodHeadings.length = 0;
+    sites.forEach((s, i) => {
+      q.setFromAxisAngle(up, jibAngle(time, cranePeriod(s.x, s.z), this.jibPhases[i]!));
+      this.jibs.setMatrixAt(i, m.compose(new THREE.Vector3(s.x, s.y + s.towerHeight, s.z), q, one));
+      s.floodlights.forEach((f, k) => {
+        const heading = this.floodsFrozen ? f.heading : floodSweep(time, f.heading);
+        const j = i * 2 + k;
+        this.floodHeadings[j] = heading;
+        // a cabeça olha para o centro da mancha no chão
+        const dirX = Math.sin(heading);
+        const dirZ = Math.cos(heading);
+        const tilt = Math.atan2(f.y - s.y, FLOOD_REACH);
+        q.setFromEuler(new THREE.Euler(tilt, heading, 0, 'YXZ'));
+        this.floodHeads.setMatrixAt(j, m.compose(new THREE.Vector3(f.x, f.y, f.z), q, one));
+        if (j < MAX_FLOODS) {
+          this.terrainUniforms.uFlood.value[j]!.set(f.x + dirX * FLOOD_REACH, f.z + dirZ * FLOOD_REACH, dirX, dirZ);
+        }
+      });
+    });
+    this.jibs.instanceMatrix.needsUpdate = true;
+    this.floodHeads.instanceMatrix.needsUpdate = true;
+    this.beaconMaterial.emissiveIntensity = beaconOn(time) ? BEACON_ON : 0;
+  }
+
+  /** Yaw (rad) da lança do canteiro `i`, lido da matriz da instância. */
+  jibYaw(i: number): number {
+    const m = new THREE.Matrix4();
+    this.jibs.getMatrixAt(i, m);
+    const e = m.elements;
+    // coluna z da matriz = direção +z local no mundo = (sin yaw, 0, cos yaw)
+    return Math.atan2(e[8]!, e[10]!);
   }
 
   private buildTrees(): THREE.InstancedMesh {
@@ -271,13 +407,15 @@ export class InteriorScene {
 attribute float aBounce;
 attribute float aZone;
 uniform sampler2D uZoneTex;
-varying float vBounce;`,
+varying float vBounce;
+varying vec2 vGroundXZ;`,
         )
         .replace(
           '#include <begin_vertex>',
           `#include <begin_vertex>
 float zoneLevel = aZone >= 0.0 ? texelFetch(uZoneTex, ivec2(int(aZone + 0.5), 0), 0).r : 0.0;
-vBounce = aBounce * zoneLevel;`,
+vBounce = aBounce * zoneLevel;
+vGroundXZ = (modelMatrix * vec4(transformed, 1.0)).xz;`,
         );
       shader.fragmentShader = shader.fragmentShader
         .replace(
@@ -285,12 +423,27 @@ vBounce = aBounce * zoneLevel;`,
           `#include <common>
 uniform float uBounce;
 uniform vec3 uBounceColor;
-varying float vBounce;`,
+uniform vec4 uFlood[12];
+uniform int uFloodCount;
+uniform vec3 uFloodColor;
+varying float vBounce;
+varying vec2 vGroundXZ;`,
         )
         .replace(
           '#include <emissivemap_fragment>',
           `#include <emissivemap_fragment>
-totalEmissiveRadiance += diffuseColor.rgb * uBounceColor * vBounce * uBounce;`,
+totalEmissiveRadiance += diffuseColor.rgb * uBounceColor * vBounce * uBounce;
+// holofotes das obras: mancha elíptica no chão, alongada ao longo do facho
+float floodLight = 0.0;
+for (int i = 0; i < ${MAX_FLOODS}; i++) {
+  if (i >= uFloodCount) break;
+  vec2 d = vGroundXZ - uFlood[i].xy;
+  vec2 dir = uFlood[i].zw;
+  float along = dot(d, dir) / ${FLOOD_ALONG.toFixed(1)};
+  float across = dot(d, vec2(dir.y, -dir.x)) / ${FLOOD_ACROSS.toFixed(1)};
+  floodLight += 1.0 - smoothstep(0.55, 1.0, length(vec2(along, across)));
+}
+totalEmissiveRadiance += diffuseColor.rgb * uFloodColor * min(floodLight, 1.5);`,
         );
     };
     material.customProgramCacheKey = () => 'terrain-interiors';
@@ -304,6 +457,7 @@ totalEmissiveRadiance += diffuseColor.rgb * uBounceColor * vBounce * uBounce;`,
     this.zoneTexture.needsUpdate = true;
     this.swayTime.value = time;
     this.poolMaterial.normalMap!.offset.set((time * POOL_FLOW[0]) % 1, (time * POOL_FLOW[1]) % 1);
+    if (this.towers) this.updateSites(time);
   }
 
   /** Objetos do miolo (o espelho da rua e a sonda do chão os escondem). */

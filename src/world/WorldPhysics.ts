@@ -22,6 +22,8 @@ export class WorldPhysics {
   rails = 0;
   /** colliders dos troncos das árvores do miolo, na ordem de `props.trees` (block-fill) */
   readonly trees: RAPIER.Collider[] = [];
+  /** colliders das torres dos guindastes, na ordem de `props.sites` (block-fill) */
+  readonly cranes: RAPIER.Collider[] = [];
 
   constructor(
     private readonly world: RAPIER.World,
@@ -82,6 +84,17 @@ export class WorldPhysics {
       const half = (t.y + t.height * 0.5 - bottom) / 2;
       this.trees.push(
         world.createCollider(RAPIER.ColliderDesc.cylinder(half, TRUNK_RADIUS).setTranslation(t.x, bottom + half, t.z), this.body),
+      );
+    }
+
+    // block-fill: base da torre do guindaste, 1.6 × 1.6 m, do chão até o topo
+    for (const s of props?.sites ?? []) {
+      const half = (s.towerHeight + TRUNK_SINK) / 2;
+      this.cranes.push(
+        world.createCollider(
+          RAPIER.ColliderDesc.cuboid(0.8, half, 0.8).setTranslation(s.x, s.y - TRUNK_SINK + half, s.z),
+          this.body,
+        ),
       );
     }
 

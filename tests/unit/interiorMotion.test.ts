@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { findBlockInteriors } from '../../src/world/interiors/BlockInteriors';
 import { placeInteriorProps } from '../../src/world/interiors/InteriorProps';
 import {
+  beaconOn,
   bounceWeight,
   bulbOffset,
+  cranePeriod,
+  floodSweep,
+  jibAngle,
   bulbSway,
   crownSway,
   fireflyMotion,
@@ -210,6 +214,53 @@ describe('interior motion', () => {
       const pulse = crossings / 120;
       expect(pulse, `firefly ${i}`).toBeGreaterThanOrEqual(0.3 - 1 / 120);
       expect(pulse, `firefly ${i}`).toBeLessThanOrEqual(0.6 + 1 / 120);
+    }
+  });
+
+  // C27 (AC 25) - parte pura
+  it('crane jib turns slowly', () => {
+    expect(props.sites.length).toBeGreaterThan(0);
+    for (const s of props.sites) {
+      expect(s.towerHeight).toBeGreaterThanOrEqual(40);
+      expect(s.towerHeight).toBeLessThanOrEqual(60);
+      expect(s.jibLength).toBe(30);
+      const period = cranePeriod(s.x, s.z);
+      expect(period).toBeGreaterThanOrEqual(90);
+      expect(period).toBeLessThanOrEqual(150);
+      expect(jibAngle(period, period) - jibAngle(0, period)).toBeCloseTo(2 * Math.PI, 9);
+      let worst = 0;
+      for (let i = 1; i <= 200 * 60; i++) worst = Math.max(worst, Math.abs(jibAngle(i * DT, period) - jibAngle((i - 1) * DT, period)));
+      expect(worst).toBeLessThanOrEqual((2 * Math.PI) / 90 / 60 + 1e-9);
+    }
+  });
+
+  // C28 (AC 26) - parte pura
+  it('crane beacon blinks at 1 Hz', () => {
+    expect(beaconOn(0)).toBe(true);
+    expect(beaconOn(0.19)).toBe(true);
+    expect(beaconOn(0.2)).toBe(false);
+    expect(beaconOn(0.5)).toBe(false);
+    expect(beaconOn(1.1)).toBe(true);
+    expect(beaconOn(1.25)).toBe(false);
+  });
+
+  // C29 (AC 27) - parte pura
+  it('floodlights sweep 30 degrees in 20 s', () => {
+    for (const s of props.sites) expect(s.floodlights.length).toBe(2);
+    const deg30 = Math.PI / 6;
+    for (const base of [0, 1, -2.5, Math.PI]) {
+      let lo = Infinity;
+      let hi = -Infinity;
+      for (let i = 0; i <= 60 * 60; i++) {
+        const t = i * DT;
+        const h = floodSweep(t, base);
+        lo = Math.min(lo, h);
+        hi = Math.max(hi, h);
+        expect(Math.abs(floodSweep(t + 20, base) - h)).toBeLessThanOrEqual(1e-9);
+      }
+      expect(lo).toBeGreaterThanOrEqual(base - deg30 - 1e-12);
+      expect(hi).toBeLessThanOrEqual(base + deg30 + 1e-12);
+      expect(hi - lo).toBeGreaterThan(deg30);
     }
   });
 });

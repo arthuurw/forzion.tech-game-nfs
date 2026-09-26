@@ -29,7 +29,7 @@ import { carveRoads } from '../world/terrain/carveRoads';
 import { generateTerrain, heightAt, riverCenterX } from '../world/terrain/TerrainGenerator';
 import { WorldPhysics } from '../world/WorldPhysics';
 import { findBlockInteriors } from '../world/interiors/BlockInteriors';
-import { placeInteriorProps } from '../world/interiors/InteriorProps';
+import { FLOOD_REACH, placeInteriorProps } from '../world/interiors/InteriorProps';
 import { WORLD_HALF, nearestRoadPoint, needsWaterReset } from '../world/worldMath';
 import { addNightLights, createNightEnvironment } from '../world/Environment';
 import { GameLoop } from './GameLoop';
@@ -920,6 +920,14 @@ export class Game {
         return out;
       },
       trees: props.trees.map((t) => ({ ...t })),
+      sites: props.sites.map((s) => ({ ...s, floodlights: s.floodlights.map((f) => ({ ...f })) })),
+      /** yaw (rad) da lança do canteiro `i`, lido da matriz da instância na cena */
+      jibYaw: (i: number) => scene.jibYaw(i),
+      /** intensidade do farol vermelho agora e o tempo com que foi calculada */
+      get beacon() {
+        return { intensity: scene.beaconMaterial.emissiveIntensity, time: scene.time };
+      },
+      beamProbe: (siteIndex: number) => game.probeBeam(siteIndex),
       /** posição da lâmpada `i` lida da malha: matriz da instância + balanço com o `uTime` aplicado */
       bulbPosition: (i: number) => scene.bulbPosition(i),
     };
@@ -984,6 +992,78 @@ export class Game {
     cam.quaternion.copy(camQuat);
     cam.updateMatrixWorld();
     return lum;
+  }
+
+  /**
+   * Só DEV/testes (block-fill C29): com o holofote 0 do canteiro `siteIndex`
+   * parado no meio da varredura, vista ortográfica de cima (carro, chuva,
+   * partículas, espelho e objetos do miolo ocultos) renderizada direto no
+   * canvas e lida com `readPixels`. Devolve a luminância média de 9 × 9 px no
+   * centro do facho no chão e a de um ponto do mesmo canteiro (vértice da
+   * mesma zona) a 12 m do centro do facho, de través a ele e fora dele.
+   */
+  probeBeam(siteIndex: number): { beam: number; outside: number; beamPoint: { x: number; z: number }; outsidePoint: { x: number; z: number } } {
+    const it = this.city.interiors;
+    const data = this.city.data;
+    const site = data.props.sites[siteIndex]!;
+    const f = site.floodlights[0]!;
+    const bi = data.interiors;
+    it.floodsFrozen = true;
+    it.update(this.simTime);
+    const dir = { x: Math.sin(f.heading), z: Math.cos(f.heading) };
+    const beam = { x: f.x + dir.x * FLOOD_REACH, z: f.z + dir.z * FLOOD_REACH };
+    // 12 m de través (dos dois lados) ou mais para frente/trás; o primeiro que cai na zona do canteiro
+    const zoneAt = (x: number, z: number) =>
+      bi.zoneOf[Math.round((z - bi.origin) / bi.spacing) * bi.size + Math.round((x - bi.origin) / bi.spacing)]!;
+    let outside = { x: beam.x + dir.z * 12, z: beam.z - dir.x * 12 };
+    for (let k = 0; k < 16; k++) {
+      const a = Math.PI / 2 + (k % 2 ? 1 : -1) * Math.floor((k + 1) / 2) * (Math.PI / 8);
+      const c = { x: beam.x + (dir.x * Math.cos(a) + dir.z * Math.sin(a)) * 12, z: beam.z + (dir.z * Math.cos(a) - dir.x * Math.sin(a)) * 12 };
+      if (zoneAt(c.x, c.z) === site.zoneId) {
+        outside = c;
+        break;
+      }
+    }
+    const span = 40;
+    const gl = this.renderer.getContext();
+    const W = gl.drawingBufferWidth;
+    const H = gl.drawingBufferHeight;
+    const aspect = W / H;
+    const cx = (beam.x + outside.x) / 2;
+    const cz = (beam.z + outside.z) / 2;
+    const y0 = heightAt(data.carved, cx, cz);
+    const cam = new THREE.OrthographicCamera((-span / 2) * aspect, (span / 2) * aspect, span / 2, -span / 2, 1, 400);
+    cam.position.set(cx, y0 + 150, cz);
+    cam.up.set(0, 0, -1);
+    cam.lookAt(cx, y0, cz);
+    cam.updateMatrixWorld();
+    const hidden: THREE.Object3D[] = [this.rain.points, ...this.effects.objects, this.car.mesh, ...it.objects()];
+    if (this.city.reflector) hidden.push(this.city.reflector);
+    const was = hidden.map((o) => o.visible);
+    hidden.forEach((o) => (o.visible = false));
+    this.renderer.setRenderTarget(null);
+    this.renderer.render(this.scene, cam);
+    const buf = new Uint8Array(W * H * 4);
+    gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    hidden.forEach((o, i) => (o.visible = was[i]!));
+    it.floodsFrozen = false;
+    it.update(this.simTime);
+    const lum = (x: number, z: number): number => {
+      const v = new THREE.Vector3(x, heightAt(data.carved, x, z), z).project(cam);
+      const px = Math.round(((v.x + 1) / 2) * (W - 1));
+      const py = Math.round(((v.y + 1) / 2) * (H - 1));
+      let sum = 0;
+      let count = 0;
+      for (let dy = -4; dy <= 4; dy++) {
+        for (let dx = -4; dx <= 4; dx++) {
+          const k = (Math.min(H - 1, Math.max(0, py + dy)) * W + Math.min(W - 1, Math.max(0, px + dx))) * 4;
+          sum += (0.2126 * buf[k]! + 0.7152 * buf[k + 1]! + 0.0722 * buf[k + 2]!) / 255;
+          count++;
+        }
+      }
+      return sum / count;
+    };
+    return { beam: lum(beam.x, beam.z), outside: lum(outside.x, outside.z), beamPoint: beam, outsidePoint: outside };
   }
 
   /**
