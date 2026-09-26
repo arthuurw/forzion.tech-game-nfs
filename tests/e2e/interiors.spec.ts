@@ -126,8 +126,8 @@ test.describe('block-fill - chão', () => {
       let tries = 0;
       // 50 sorteados no chunk do spawn, 25 deles no miolo
       while (out.length < 50 && tries++ < 100000) {
-        const ix = ix0 + Math.floor(rand() * (cells + 1));
-        const iz = iz0 + Math.floor(rand() * (cells + 1));
+        const ix = ix0 + Math.floor(rand() * cells);
+        const iz = iz0 + Math.floor(rand() * cells);
         const c = it.cell(ix, iz);
         if (c.zoneOf >= 0 ? interior >= 25 : out.length - interior >= 25) continue;
         if (c.zoneOf >= 0) interior++;
@@ -199,20 +199,31 @@ test.describe('block-fill - chão', () => {
 
   // C14 (AC 13) - parte browser
   test('ground light changes over time', async ({ page }) => {
-    test.setTimeout(300_000);
+    // 60 s simulados no SwiftShader levam minutos de relógio
+    test.setTimeout(600_000);
     await gotoGame(page);
     const v = await downtownProbeVertex(page);
-    const t0 = await simTime(page);
-    const levels: number[] = [];
-    let t = t0;
-    while (t < t0 + 60.5) {
-      levels.push(await page.evaluate((id) => (window as any).__game.world.interiors.zoneLevel(id) as number, v.zone));
-      await advanceSim(page, 0.5);
-      t = await simTime(page);
-    }
-    levels.push(await page.evaluate((id) => (window as any).__game.world.interiors.zoneLevel(id) as number, v.zone));
-    expect(levels.length).toBeGreaterThan(10);
-    expect(Math.max(...levels) - Math.min(...levels)).toBeGreaterThan(0);
+    // o browser acompanha o nível que o shader recebe a cada quadro, de t0 até t0 + 60 s
+    const r = await page.evaluate(
+      (zone) =>
+        new Promise<{ first: number; last: number; changed: boolean; t0: number; t1: number }>((resolve) => {
+          const g = (window as any).__game;
+          const it = g.world.interiors;
+          const t0 = g.simTime;
+          const first = it.zoneLevel(zone);
+          let changed = false;
+          const tick = () => {
+            const level = it.zoneLevel(zone);
+            if (level !== first) changed = true;
+            if (g.simTime >= t0 + 60) resolve({ first, last: level, changed, t0, t1: g.simTime });
+            else requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        }),
+      v.zone,
+    );
+    expect(r.t1 - r.t0).toBeGreaterThanOrEqual(60);
+    expect(r.changed || r.last !== r.first).toBe(true);
   });
 });
 
@@ -482,5 +493,19 @@ test.describe('block-fill - pedestres', () => {
     const b = await read();
     expect(b.s.walkersActive).toBeGreaterThan(0);
     expect(b.c.total).toBe(a.c.total);
+  });
+});
+
+test.describe('block-fill - montagem', () => {
+  // C37 (doors 1 e 2, startup config)
+  test('game builds the interiors from the world seed', async ({ page }) => {
+    test.setTimeout(180_000);
+    await gotoGame(page);
+    const expected = await seedCounts(page);
+    const summary = await page.evaluate(() => (window as any).__game.world.interiors.summary());
+    expect(expected.zones).toBeGreaterThan(0);
+    for (const key of ['zones', 'downtown', 'outer', 'yards', 'pools', 'trees', 'sites'] as const) {
+      expect(summary[key], key).toBe(expected[key]);
+    }
   });
 });

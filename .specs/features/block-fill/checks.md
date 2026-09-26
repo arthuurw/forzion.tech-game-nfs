@@ -176,17 +176,17 @@ Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "walkers have no coll
 
 ### S7 - Leve como antes · 4 files · 18 KB · ~5k
 
-**C36** - Continuam verdes, sem mudar asserções, com o miolo preenchido (AC 34, AC 35):
+**C36** - ✅ Continuam verdes, sem mudar asserções, com o miolo preenchido (AC 34, AC 35):
 - city-terrain C38, draw calls ≤ 220 nos 5 lugares;
 - city-terrain C39, `ready` em até 30 s em high.
 
 Proof: `npx playwright test tests/e2e/render.spec.ts -g "draw calls at most 220 across the world"`
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "ready within 30 s at high quality"`
 
-**C37** - O `Game` monta o miolo do mesmo seed: no browser, `summary()` tem `zones`, `downtown`, `outer`, `yards`, `pools`, `trees` e `sites` iguais aos de `findBlockInteriors` + `placeInteriorProps` do seed 1337 calculados no teste (módulos importados pelo `page.evaluate` do servidor Vite) (door 1, door 2, startup config).
+**C37** - ✅ O `Game` monta o miolo do mesmo seed: no browser, `summary()` tem `zones`, `downtown`, `outer`, `yards`, `pools`, `trees` e `sites` iguais aos de `findBlockInteriors` + `placeInteriorProps` do seed 1337 calculados no teste (módulos importados pelo `page.evaluate` do servidor Vite) (door 1, door 2, startup config).
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "game builds the interiors from the world seed"`
 
-**C38** - Continuam verdes, sem mudar asserções, as provas que olham telas e chão que esta feature muda:
+**C38** - ✅ Continuam verdes, sem mudar asserções, as provas que olham telas e chão que esta feature muda:
 - city-terrain C7 "car rests on the terrain heightfield" e C8 "heightfield orientation matches the heightmap";
 - visual-upgrade "lit windows stay stable while the camera moves";
 - facade-glint "headlight adds no facade glint", "probe detects glint without specular antialiasing" e "headlight still lights the facade".
