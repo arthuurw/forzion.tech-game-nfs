@@ -10,19 +10,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
  */
 export const CAR_MODEL_URL = '/models/car.glb';
 
-/** Sets CC0 do ambientCG em public/textures/<Set>/ (door 1 do visual-upgrade). */
-export const TEXTURE_SETS = [
-  'Asphalt012',
-  'PavingStones070',
-  'Concrete034',
-  'MetalPlates006',
-  'Bricks059',
-  'PaintedPlaster017',
-] as const;
-export type TextureSetName = (typeof TEXTURE_SETS)[number];
+import { FACADE_SETS, TEXTURE_SETS, type TextureSetName } from './textureSets';
 
-/** Fachadas por `facadeType` 0..3. */
-export const FACADE_SETS: readonly TextureSetName[] = ['Concrete034', 'MetalPlates006', 'Bricks059', 'PaintedPlaster017'];
+export { FACADE_SETS, TEXTURE_SETS, type TextureSetName };
 
 export interface PbrSet {
   map: THREE.Texture;

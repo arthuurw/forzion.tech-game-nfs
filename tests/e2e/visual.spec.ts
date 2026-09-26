@@ -59,10 +59,11 @@ test.describe('visual - S2 materiais', () => {
       r: (window as any).__game.scene.reflector,
       w: window.innerWidth,
       h: window.innerHeight,
-      pr: Math.min(window.devicePixelRatio, 2),
     }));
     expect(high.r.present).toBe(true);
-    expect(high.r.size).toEqual([Math.floor(high.w * high.pr * 0.5), Math.floor(high.h * high.pr * 0.5)]);
+    expect(high.r.size).toEqual([Math.floor(high.w * 0.5), Math.floor(high.h * 0.5)]);
+    // C39: plano do espelho em y = 0
+    expect(high.r.y).toBe(0);
     await open(page, '?quality=low');
     const low = await page.evaluate(() => (window as any).__game.scene.reflector);
     expect(low.present).toBe(false);
@@ -80,6 +81,9 @@ test.describe('visual - S2 materiais', () => {
     const first = meshes[0];
     expect(first.firstRepeat[0]).toBeCloseTo(first.firstBuilding.width / 4, 3);
     expect(first.firstRepeat[1]).toBeCloseTo(first.firstBuilding.height / 4, 3);
+    // C37: cada tipo usa a textura do seu set
+    const expectedSets = ['Concrete034', 'MetalPlates006', 'Bricks059', 'PaintedPlaster017'];
+    meshes.forEach((m: any, i: number) => expect(m.mapSrc, `facade ${i}`).toContain(`/textures/${expectedSets[i]}/`));
   });
 
   // C7 (AC 7)
@@ -142,6 +146,9 @@ test.describe('visual - S3 movimento', () => {
       expect(c.transparent).toBe(true);
       expect(c.opacity).toBeCloseTo(0.12, 6);
       expect(c.additive).toBe(true);
+      // C39: o feixe começa no farol e abre para +Z local
+      expect(c.minZ).toBeCloseTo(0, 3);
+      expect(c.maxZ).toBeGreaterThan(10);
     }
   });
 
@@ -160,6 +167,33 @@ test.describe('visual - S3 movimento', () => {
     expect(fx.skidCount).toBeLessThanOrEqual(400);
     expect(mid.smokeAlive).toBeGreaterThan(0);
     expect(mid.smokeAlive).toBeLessThanOrEqual(256);
+  });
+
+  // C36 (AC 13) - um quad por roda traseira por passo
+  test('two skid quads per fixed step', async ({ page }) => {
+    await open(page);
+    await page.evaluate(() => (window as any).__game.car.setForwardSpeed(20));
+    await page.keyboard.down('Space');
+    await advanceSim(page, 0.1);
+    const a = await page.evaluate(() => ({ n: (window as any).__game.effects.skidCount, t: (window as any).__game.simTime }));
+    await advanceSim(page, 0.2);
+    const b = await page.evaluate(() => ({
+      n: (window as any).__game.effects.skidCount,
+      t: (window as any).__game.simTime,
+      kmh: (window as any).__game.car.speedKmh,
+    }));
+    await page.keyboard.up('Space');
+    expect(b.kmh).toBeGreaterThan(20);
+    const steps = Math.round((b.t - a.t) * 60);
+    expect(steps).toBeGreaterThan(0);
+    expect(b.n - a.n).toBe(2 * steps);
+  });
+
+  // C38 - pools do browser com as constantes do módulo
+  test('effect pools use the configured limits', async ({ page }) => {
+    await open(page);
+    const c = await page.evaluate(() => (window as any).__game.effects.config);
+    expect(c).toEqual({ smokeCap: 256, smokeLifetime: 0.8, sparkCap: 128, sparkLifetime: 0.4, skidCap: 400 });
   });
 
   test('tire smoke while skidding', async ({ page }) => {
@@ -228,6 +262,42 @@ test.describe('visual - S4 câmera', () => {
     const expected = 62 + 16 * Math.min(1, Math.max(0, Math.abs(s.kmh) / 220));
     expect(Math.abs(s.fov - expected)).toBeLessThan(0.5);
     expect(s.fov).toBeGreaterThan(62.5);
+  });
+});
+
+test.describe('visual - S4 câmera (rodada 2)', () => {
+  // C33 (AC 20) - câmera desloca para a esquerda do carro virando à esquerda
+  test('camera swings left while turning left', async ({ page }) => {
+    await open(page);
+    expect(await page.evaluate(() => (window as any).__game.camera.lateral)).toBeCloseTo(0, 3);
+    await page.evaluate(() => (window as any).__game.car.setForwardSpeed(15));
+    await page.keyboard.down('KeyW');
+    await page.keyboard.down('KeyA');
+    await advanceSim(page, 1);
+    const s = await page.evaluate(() => ({
+      lateral: (window as any).__game.camera.lateral as number,
+      yaw: (window as any).__game.car.angvel.y as number,
+    }));
+    await page.keyboard.up('KeyA');
+    await page.keyboard.up('KeyW');
+    expect(s.yaw).toBeGreaterThan(0.2);
+    expect(s.lateral).toBeGreaterThan(0.1);
+    expect(s.lateral).toBeLessThanOrEqual(1.2);
+  });
+
+  // C34 (AC 18) - blur ligado à velocidade no browser
+  test('radial blur follows speed above 120 kmh', async ({ page }) => {
+    await open(page);
+    await page.evaluate(() => (window as any).__game.car.setForwardSpeed(170 / 3.6));
+    await advanceSim(page, 0.05);
+    const s = await page.evaluate(() => ({
+      blur: (window as any).__game.post.uBlur as number,
+      kmh: (window as any).__game.car.speedKmh as number,
+    }));
+    const expected = 0.6 * Math.min(1, Math.max(0, (Math.abs(s.kmh) - 120) / 100));
+    expect(s.kmh).toBeGreaterThan(130);
+    expect(s.blur).toBeGreaterThan(0.05);
+    expect(Math.abs(s.blur - expected)).toBeLessThan(0.05);
   });
 });
 

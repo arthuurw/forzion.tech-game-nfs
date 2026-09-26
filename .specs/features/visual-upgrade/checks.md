@@ -5,7 +5,7 @@ Plan: `.specs/features/visual-upgrade/plan.md`
 
 ## Intent
 
-32 checks in 4 slices · 7 one-way doors · 0 open
+39 checks in 4 slices · 7 one-way doors · 0 open (C33-C39 adicionados na rodada 2 da verificação)
 
 Comandos de prova: unitário `npx vitest run <arquivo> -t "<nome>"`; integração
 `npx playwright test <arquivo> -g "<nome>"` (chromium headless contra `vite dev`, lendo
@@ -131,6 +131,33 @@ Proof: `npx playwright test tests/e2e/visual.spec.ts -g "low quality profile end
 **C32** - `__game.post.gtaoClipBox` reporta um `Box3` que contém a cidade inteira (`min` ≤ −202 em x/z e `max` ≥ 202, `max.y` ≥ 60) — `setSceneClipBox` configurado (AC 22)
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "gtao at half resolution"`
 
+### Rodada 2 - lacunas apontadas pelo Verifier
+
+**C33** - Virando à esquerda (velocidade inicial 15 m/s, `W` + `A` por 1 s sim), `__game.car.angvel.y` > 0.2 e `__game.camera.lateral` está entre 0.1 e 1.2 m (para a esquerda do carro); parado, `lateral` ≈ 0 (AC 20, consumidor de `ChaseCamera`)
+Proof: `npx playwright test tests/e2e/visual.spec.ts -g "camera swings left while turning left"`
+
+**C34** - Com o carro posto a 170 km/h, `__game.post.uBlur` > 0.05 e a menos de 0.05 de `blurFor(__game.car.speedKmh)` lido no mesmo `evaluate` (AC 18, ligação do `Game` ao uniform)
+Proof: `npx playwright test tests/e2e/visual.spec.ts -g "radial blur follows speed above 120 kmh"`
+
+**C35** - `CollisionTracker.record`: 2999 → 0 faíscas e `last` continua `null`; 5000 → 40 e `last` = o evento; 100 depois disso → 0 e `last` inalterado; 3000 → 40 (AC 15, AC 16)
+Proof: `npx vitest run tests/unit/effectsMath.test.ts -t "collision tracker ignores impacts below 3000"`
+
+**C36** - `isSkidding(handbrake, kmh)`: `(true, 21)` true, `(true, 20)` false, `(true, 5)` false, `(false, 100)` false; no browser, derrapando acima de 20 km/h, `skidCount` cresce exatamente 2 × o número de passos fixos no intervalo (um quad por roda traseira por passo) (AC 13)
+Proof: `npx vitest run tests/unit/effectsMath.test.ts -t "skidding needs handbrake above 20 kmh"`
+Proof: `npx playwright test tests/e2e/visual.spec.ts -g "two skid quads per fixed step"`
+
+**C37** - `FACADE_SETS` = `[Concrete034, MetalPlates006, Bricks059, PaintedPlaster017]` para `facadeType` 0..3, rua = `Asphalt012`, calçada = `PavingStones070` (módulo puro `src/core/textureSets.ts`); no browser o `map` de cada malha de fachada `i` vem de `/textures/<FACADE_SETS[i]>/` (AC 6, door 1)
+Proof: `npx vitest run tests/unit/assets.test.ts -t "texture set mapping by surface"`
+Proof: `npx playwright test tests/e2e/visual.spec.ts -g "four facade meshes with per-instance repeat"`
+
+**C38** - Constantes dos efeitos: `SMOKE_PER_STEP` 4, `SMOKE_LIFETIME_S` 0.8, `SMOKE_CAP` 256, `SKID_CAP` 400, `SKID_MIN_KMH` 20, `SKID_QUADS_PER_STEP` 2, `SPARK_CAP` 128, `SPARK_LIFETIME_S` 0.4, `SPARK_BURST` 40, `SPARK_IMPULSE_THRESHOLD` 3000; no browser os pools reportam `smokeCap` 256, `smokeLifetime` 0.8, `sparkCap` 128, `sparkLifetime` 0.4, `skidCap` 400 (AC 13-15)
+Proof: `npx vitest run tests/unit/effectsMath.test.ts -t "effect constants"`
+Proof: `npx playwright test tests/e2e/visual.spec.ts -g "effect pools use the configured limits"`
+
+**C39** - O `Reflector` está em y = 0 (AC 4) e cada cone de farol tem geometria com `min.z` = 0 e `max.z` > 10 em coordenadas locais, abrindo para +Z (AC 12)
+Proof: `npx playwright test tests/e2e/visual.spec.ts -g "reflector present only in high quality"`
+Proof: `npx playwright test tests/e2e/visual.spec.ts -g "headlight cones"`
+
 ## Coverage
 
 | Set (size) | Member -> proof | Unproven |
@@ -151,14 +178,19 @@ Proof: `npx playwright test tests/e2e/visual.spec.ts -g "gtao at half resolution
 | rain samples (4) | (30,0) C10 · (30,1) C10 · (5,1) C10 · (5,10) C10 | - |
 | particle systems (3) | rain C9, C10 · smoke C14 · sparks C15 | - |
 | skid buffer edges (2) | below cap C13 · overflow C13 | - |
-| collision threshold (4) | 0 C15 · 2999 C15 · 3000 C15 · 50000 C15 | - |
+| collision threshold (4) | 0 C15 · 2999 C15, C35 · 3000 C15, C35 · 50000 C15 | - |
+| collision tracker outcomes (3) | below threshold keeps last C35 · above sets last C35, C15 · burst count C35, C15 | - |
+| skid decision (4) | handbrake above 20 C36 · at 20 C36 · below 20 C36 · no handbrake C36 | - |
+| effect constants (10) | smoke per step C38 · smoke lifetime C38 · smoke cap C38 · skid cap C38 · skid min kmh C38, C36 · quads per step C38, C36 · spark cap C38 · spark lifetime C38 · spark burst C38 · spark threshold C38 | - |
+| surface to texture set (6) | facade 0 C37 · facade 1 C37 · facade 2 C37 · facade 3 C37 · road C37, C3 · sidewalk C37, C7 | - |
+| camera reactions in browser (4) | fov C17 · blur C34 · shake C19 · lateral C33 | - |
 | flicker groups (4) | C11, table-driven over all 4 | - |
 | landing doors (7) | 1 C1, C27, C28 · 2 C6 · 3 C4 · 4 C9, C13, C14 · 5 C24, C31 · 6 C15, C16 · 7 C21, C23 | - |
 | superseded free-roam-city checks (1) | ex-21 → C8 | - |
-| pure modules (13 files) | C26, table-driven over all 13 | - |
+| pure modules (14 files) | C26, table-driven over all 14 | - |
 | startup config: quality (1 assembly) | `src/main.ts` C24 | - |
 
-- Claims cruzando a fronteira browser (Playwright): C1-C4, C6-C9, C10-C19 (parte browser), C21-C25, C29-C32
+- Claims cruzando a fronteira browser (Playwright): C1-C4, C6-C9, C10-C19 (parte browser), C21-C25, C29-C34, C36-C39 (parte browser)
 - Nenhum outro check afirma mais do que o caso único que sua prova exercita
 
 ## Test policy
@@ -177,12 +209,13 @@ Evidence (forma prevista; recontada pelo Verifier sobre o diff):
 - `src/camera/chaseMath.ts`: 4 fórmulas com clamp (fov, blur, shake, lateral) → decides; C17-C20 na própria camada, C17-C19 na fronteira
 - `src/world/CityGenerator.ts`: atribuição de `facadeType` (4 valores) e `laneMarks` → decides; C5
 - `src/world/rainMath.ts`, `src/world/flicker.ts`: mapeamentos com módulo/clamp → decides; C10, C11
-- `src/vehicle/effectsMath.ts`: ring buffer (2 ramos), pool (cap + expiração), limiar de faíscas → decides; C13-C15
+- `src/vehicle/effectsMath.ts`: ring buffer (2 ramos), pool (cap + expiração), limiar de faíscas, `CollisionTracker` (2 ramos), `isSkidding` (2 condições) → decides; C13-C15, C35, C36, C38
 - `src/core/quality.ts`: parse com default (3 entradas) → decides, reached across a boundary (URL); C24 nas duas camadas
+- `src/core/textureSets.ts`: tabela superfície → set (6 linhas) → decides, reached across a boundary; C37 nas duas camadas
 - `src/core/Loader.ts`: 2 desfechos por set (ok, falha) → decides, reached across a boundary; C1, C2
 - `src/world/CityScene.ts`, `src/world/Rain.ts`, `src/vehicle/Effects.ts`, `src/post/GradeShader.ts`, `src/core/Game.ts`, `src/camera/ChaseCamera.ts`: montam objetos three/Rapier e encaminham valores → instrumentation; cobertos pelas provas Playwright dos consumidores (C3, C4, C6-C9, C12-C16, C21-C23, C29-C32)
 
-Cost: 11 provas unitárias em 7 arquivos e 23 provas Playwright em 3 arquivos.
+Cost: 15 provas unitárias em 7 arquivos e 27 provas Playwright em 3 arquivos. Na rodada 2 as decisões que estavam dentro de `Car.ts` (limiar de derrapagem) e `Effects.ts` (colisão abaixo do limiar) foram movidas para `effectsMath.ts`, de modo que os dois arquivos voltaram a ser instrumentação.
 
 ## Swept
 
@@ -199,4 +232,5 @@ Cost: 11 provas unitárias em 7 arquivos e 23 provas Playwright em 3 arquivos.
 ## Handoff
 
 - **Settled mid-build:** (autor, antes do código de C14) C14 dizia que `spawn(4)` levava o pool a 256; 4 × 48 passos de vida = 192, o teto nunca é atingido a essa taxa. O AC 14 (no máximo 256) continua certo; o check passou a provar o regime (184-192) e o teto com `spawn(8)`.
+- **Rodada 2 (após FAIL do Verifier):** C4 - o código usava `devicePixelRatio` no tamanho do render target do `Reflector`, divergindo do literal aprovado da door 3 (`innerWidth/innerHeight × 0.5`); o código passou a seguir a door e o teste afirma o literal. Mutante sobrevivente `SMOKE_LIFETIME_S` 0.8→2.0 agora morre por C38. Decisões de derrapagem e colisão extraídas para `effectsMath.ts` (C35, C36). C33 e C34 provam câmera lateral e blur no browser; C37 prova o mapeamento de texturas; C39 prova y do espelho e direção dos cones. Debug handle ganhou `car.setForwardSpeed` (só DEV) para as provas de velocidade.
 - S2 = 10k (Loader, CityGenerator, CityScene, Environment, script, assets); S3 = +10k (Rain, Effects, Car, Game) → 20k; S4 = +2k (chaseMath, ChaseCamera) → 22k; S5 = +4k (GradeShader, Game, quality) → 26k; testes ≈ +8k → 34k total, abaixo do budget de 150k - one builder

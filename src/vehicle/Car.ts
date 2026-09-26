@@ -1,7 +1,7 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import type { Assets } from '../core/Loader';
-import { SKID_MIN_KMH } from './effectsMath';
+import { isSkidding } from './effectsMath';
 import { computeDrive, gearFor, rpmFor, type DriveInput } from './drivetrain';
 
 /**
@@ -120,7 +120,7 @@ export class Car {
   /** Um passo fixo de física: aplica o input e integra o veículo. */
   fixedUpdate(input: DriveInput, dt: number): void {
     const kmh = this.speedKmh();
-    this.skidding = input.handbrake && kmh > SKID_MIN_KMH;
+    this.skidding = isSkidding(input.handbrake, kmh);
     const cmd = computeDrive(input, kmh);
     for (const i of REAR) {
       this.controller.setWheelEngineForce(i, cmd.engineForce);

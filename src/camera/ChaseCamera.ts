@@ -21,6 +21,11 @@ export class ChaseCamera {
     this.camera = new THREE.PerspectiveCamera(62, aspect, 0.1, 600);
   }
 
+  /** Deslocamento lateral atual (m), positivo = esquerda do carro (AC 20). */
+  get lateralOffset(): number {
+    return this.lateral;
+  }
+
   /** Amplitude atual do shake (m), para debug e provas. */
   get shake(): number {
     return shakeAt(this.shakeT, this.shakeAmp);

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-// free-roam-city C39 (door 1) + visual-upgrade C26 - table-driven over the 13 pure modules
+// free-roam-city C39 (door 1) + visual-upgrade C26 - table-driven over the 14 pure modules
 const PURE_MODULES = [
   'src/world/CityGenerator.ts',
   'src/vehicle/drivetrain.ts',
@@ -17,6 +17,7 @@ const PURE_MODULES = [
   'src/world/flicker.ts',
   'src/vehicle/effectsMath.ts',
   'src/core/quality.ts',
+  'src/core/textureSets.ts',
 ];
 
 // cobre `import x from 'three'`, `import 'three'`, `import('three')` e `require('three')`
@@ -24,7 +25,7 @@ const FORBIDDEN = /(from\s+|import\s+|import\s*\(\s*|require\s*\(\s*)['"](three|
 
 describe('pure modules', () => {
   it('pure modules do not import three or rapier', () => {
-    expect(PURE_MODULES.length).toBe(13);
+    expect(PURE_MODULES.length).toBe(14);
     for (const rel of PURE_MODULES) {
       const source = readFileSync(resolve(process.cwd(), rel), 'utf8');
       expect(FORBIDDEN.test(source), rel).toBe(false);

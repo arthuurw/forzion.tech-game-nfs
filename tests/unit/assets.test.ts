@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { FACADE_SETS, ROAD_SET, SIDEWALK_SET, TEXTURE_SETS } from '../../src/core/textureSets';
 
 const ROOT = process.cwd();
 const SETS = ['Asphalt012', 'PavingStones070', 'Concrete034', 'MetalPlates006', 'Bricks059', 'PaintedPlaster017'];
@@ -14,6 +15,14 @@ describe('texture assets', () => {
     expect(pkg.scripts['fetch:textures']).toContain('scripts/fetch-textures.mjs');
     const license = readFileSync(resolve(ROOT, 'public/textures/LICENSE-ambientcg.txt'), 'utf8');
     expect(license).toContain('CC0');
+  });
+
+  // visual-upgrade C37 - qual set veste cada superfície
+  it('texture set mapping by surface', () => {
+    expect([...TEXTURE_SETS]).toEqual(SETS);
+    expect([...FACADE_SETS]).toEqual(['Concrete034', 'MetalPlates006', 'Bricks059', 'PaintedPlaster017']);
+    expect(ROAD_SET).toBe('Asphalt012');
+    expect(SIDEWALK_SET).toBe('PavingStones070');
   });
 
   // visual-upgrade C28 (assunção do plano: ≤ 15 MB)

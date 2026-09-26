@@ -7,8 +7,8 @@ import {
   SMOKE_PER_STEP,
   SPARK_CAP,
   SPARK_LIFETIME_S,
+  CollisionTracker,
   SkidBuffer,
-  sparkBurstFor,
   type Particle,
 } from './effectsMath';
 
@@ -31,7 +31,7 @@ export class Effects {
   readonly skids = new SkidBuffer(SKID_CAP);
   readonly smoke = new ParticlePool(SMOKE_CAP, SMOKE_LIFETIME_S);
   readonly sparks = new ParticlePool(SPARK_CAP, SPARK_LIFETIME_S);
-  lastCollision: CollisionEvent | null = null;
+  readonly collisions = new CollisionTracker();
   sparksSpawned = 0;
 
   private readonly skidMesh: THREE.Mesh;
@@ -82,6 +82,10 @@ export class Effects {
     return [this.skidMesh, this.smokePoints, this.sparkPoints];
   }
 
+  get lastCollision(): CollisionEvent | null {
+    return this.collisions.last;
+  }
+
   get skidCount(): number {
     return this.skids.count;
   }
@@ -112,9 +116,8 @@ export class Effects {
 
   /** Evento de colisão drenado do Rapier (AC 15, AC 16). */
   collide(event: CollisionEvent): void {
-    const n = sparkBurstFor(event.impulse);
+    const n = this.collisions.record(event);
     if (n === 0) return;
-    this.lastCollision = { ...event };
     this.sparksSpawned = this.sparks.spawn(n, () => {
       const a = this.rng() * Math.PI * 2;
       const s = 3 + this.rng() * 6;

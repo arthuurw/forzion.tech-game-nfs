@@ -284,6 +284,11 @@ export class Game {
               aSeedItemSize: aSeed?.itemSize ?? 0,
               firstRepeat: aRepeat ? [aRepeat.getX(0), aRepeat.getY(0)] : null,
               firstBuilding: b ? { width: b.width, height: b.height } : null,
+              mapSrc: (() => {
+                const map = (mesh.material as THREE.MeshStandardMaterial).map;
+                const img = map?.image as { src?: string; currentSrc?: string } | undefined;
+                return img?.currentSrc ?? img?.src ?? null;
+              })(),
             };
           });
         },
@@ -316,7 +321,15 @@ export class Game {
         get headlightCones() {
           return game.headlightCones.map((c) => {
             const m = c.material as THREE.MeshBasicMaterial;
-            return { transparent: m.transparent, opacity: m.opacity, additive: m.blending === THREE.AdditiveBlending };
+            c.geometry.computeBoundingBox();
+            const box = c.geometry.boundingBox!;
+            return {
+              transparent: m.transparent,
+              opacity: m.opacity,
+              additive: m.blending === THREE.AdditiveBlending,
+              minZ: box.min.z,
+              maxZ: box.max.z,
+            };
           });
         },
         get skidCount() {
@@ -327,6 +340,15 @@ export class Game {
         },
         get sparksSpawned() {
           return game.effects.sparksSpawned;
+        },
+        get config() {
+          return {
+            smokeCap: game.effects.smoke.capacity,
+            smokeLifetime: game.effects.smoke.lifetime,
+            sparkCap: game.effects.sparks.capacity,
+            sparkLifetime: game.effects.sparks.lifetime,
+            skidCap: game.effects.skids.capacity,
+          };
         },
         get lastCollision() {
           return game.effects.lastCollision;
@@ -410,6 +432,11 @@ export class Game {
           };
         },
         teleport: (x: number, y: number, z: number, heading: number) => game.car.teleport(x, y, z, heading),
+        /** só DEV/testes: velocidade ao longo da frente do carro (m/s) */
+        setForwardSpeed: (ms: number) => {
+          const h = game.car.heading();
+          game.car.body.setLinvel({ x: Math.sin(h) * ms, y: 0, z: Math.cos(h) * ms }, true);
+        },
         setRotation: (q: { x: number; y: number; z: number; w: number }) => game.car.setRotation(q),
       },
       render: {
@@ -423,6 +450,9 @@ export class Game {
         },
         get shake() {
           return game.chase.shake;
+        },
+        get lateral() {
+          return game.chase.lateralOffset;
         },
         get position() {
           return { x: game.chase.camera.position.x, y: game.chase.camera.position.y, z: game.chase.camera.position.z };
@@ -469,9 +499,9 @@ export class Game {
         },
         get reflector() {
           const r = game.city.reflector;
-          if (!r) return { present: false, size: null };
+          if (!r) return { present: false, size: null, y: null };
           const rt = r.getRenderTarget();
-          return { present: game.scene.getObjectById(r.id) !== undefined, size: [rt.width, rt.height] };
+          return { present: game.scene.getObjectById(r.id) !== undefined, size: [rt.width, rt.height], y: r.position.y };
         },
       },
       composer: {

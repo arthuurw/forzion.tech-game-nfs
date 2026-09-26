@@ -87,6 +87,37 @@ export const SPARK_LIFETIME_S = 0.4;
 export const SKID_CAP = 400;
 export const SKID_MIN_KMH = 20;
 
+/** Derrapagem visível: freio de mão acima de 20 km/h (AC 13). */
+export function isSkidding(handbrake: boolean, speedKmh: number): boolean {
+  return handbrake && speedKmh > SKID_MIN_KMH;
+}
+
+/** Um quad de marca por roda traseira por passo fixo (AC 13). */
+export const SKID_QUADS_PER_STEP = 2;
+
+export interface ImpactEvent {
+  impulse: number;
+  x: number;
+  y: number;
+  z: number;
+}
+
+/**
+ * Decide o que uma colisão drenada faz (AC 15, AC 16): a partir de 3000 N·s
+ * registra `last` e pede 40 faíscas; abaixo disso não muda nada.
+ */
+export class CollisionTracker {
+  last: ImpactEvent | null = null;
+
+  /** Devolve quantas faíscas pedir (0 abaixo do limiar). */
+  record(event: ImpactEvent): number {
+    const burst = sparkBurstFor(event.impulse);
+    if (burst === 0) return 0;
+    this.last = { ...event };
+    return burst;
+  }
+}
+
 /** 40 faíscas a partir de 3000 N·s; nada abaixo. */
 export function sparkBurstFor(impulse: number): number {
   return impulse >= SPARK_IMPULSE_THRESHOLD ? SPARK_BURST : 0;

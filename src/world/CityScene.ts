@@ -1,7 +1,8 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import { Reflector } from 'three/addons/objects/Reflector.js';
-import { FACADE_SETS, type Assets, type PbrSet } from '../core/Loader';
+import type { Assets, PbrSet } from '../core/Loader';
+import { FACADE_SETS } from '../core/textureSets';
 import type { QualityPreset } from '../core/quality';
 import { FACADE_TYPES, NEON_PALETTE, type Building, type CityLayout } from './CityGenerator';
 
@@ -44,11 +45,11 @@ export class CityScene {
 
     // --- rua: reflector + asfalto PBR semitransparente por cima ---
     if (quality.reflector) {
-      const pr = Math.min(window.devicePixelRatio, 2);
+      // door 3: render target = metade da viewport em pixels CSS (sem devicePixelRatio)
       this.reflector = new Reflector(new THREE.PlaneGeometry(size, size), {
         clipBias: 0.003,
-        textureWidth: Math.floor(window.innerWidth * pr * 0.5),
-        textureHeight: Math.floor(window.innerHeight * pr * 0.5),
+        textureWidth: Math.floor(window.innerWidth * 0.5),
+        textureHeight: Math.floor(window.innerHeight * 0.5),
         color: 0x8a8f9a,
       });
       this.reflector.rotation.x = -Math.PI / 2;

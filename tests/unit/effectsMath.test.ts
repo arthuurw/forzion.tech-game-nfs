@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { ParticlePool, SkidBuffer, sparkBurstFor } from '../../src/vehicle/effectsMath';
+import {
+  CollisionTracker,
+  ParticlePool,
+  SKID_CAP,
+  SKID_MIN_KMH,
+  SKID_QUADS_PER_STEP,
+  SMOKE_CAP,
+  SMOKE_LIFETIME_S,
+  SMOKE_PER_STEP,
+  SPARK_BURST,
+  SPARK_CAP,
+  SPARK_IMPULSE_THRESHOLD,
+  SPARK_LIFETIME_S,
+  SkidBuffer,
+  isSkidding,
+  sparkBurstFor,
+} from '../../src/vehicle/effectsMath';
 
 describe('effects math', () => {
   // visual-upgrade C13 (AC 13)
@@ -43,6 +59,41 @@ describe('effects math', () => {
     // sem spawn, tudo expira em 49 passos (0.8 s + arredondamento)
     for (let i = 0; i < 49; i++) pool.step(dt);
     expect(pool.alive).toBe(0);
+  });
+
+  // visual-upgrade C38 - constantes dos efeitos (AC 13, 14, 15)
+  it('effect constants', () => {
+    expect(SMOKE_PER_STEP).toBe(4);
+    expect(SMOKE_LIFETIME_S).toBeCloseTo(0.8, 9);
+    expect(SMOKE_CAP).toBe(256);
+    expect(SKID_CAP).toBe(400);
+    expect(SKID_MIN_KMH).toBe(20);
+    expect(SKID_QUADS_PER_STEP).toBe(2);
+    expect(SPARK_CAP).toBe(128);
+    expect(SPARK_LIFETIME_S).toBeCloseTo(0.4, 9);
+    expect(SPARK_BURST).toBe(40);
+    expect(SPARK_IMPULSE_THRESHOLD).toBe(3000);
+  });
+
+  // visual-upgrade C36 (AC 13) - limiar de derrapagem
+  it('skidding needs handbrake above 20 kmh', () => {
+    expect(isSkidding(true, 21)).toBe(true);
+    expect(isSkidding(true, 20)).toBe(false);
+    expect(isSkidding(true, 5)).toBe(false);
+    expect(isSkidding(false, 100)).toBe(false);
+  });
+
+  // visual-upgrade C35 (AC 15, AC 16) - colisão abaixo do limiar não muda lastCollision
+  it('collision tracker ignores impacts below 3000', () => {
+    const t = new CollisionTracker();
+    expect(t.record({ impulse: 2999, x: 0, y: 0, z: 0 })).toBe(0);
+    expect(t.last).toBeNull();
+    expect(t.record({ impulse: 5000, x: 1, y: 2, z: 3 })).toBe(40);
+    expect(t.last).toEqual({ impulse: 5000, x: 1, y: 2, z: 3 });
+    expect(t.record({ impulse: 100, x: 9, y: 9, z: 9 })).toBe(0);
+    expect(t.last).toEqual({ impulse: 5000, x: 1, y: 2, z: 3 });
+    expect(t.record({ impulse: 3000, x: 4, y: 5, z: 6 })).toBe(40);
+    expect(t.last?.impulse).toBe(3000);
   });
 
   // visual-upgrade C15 (AC 15, AC 16)
