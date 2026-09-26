@@ -1,4 +1,6 @@
+import RAPIER from '@dimforge/rapier3d-compat';
 import { describe, expect, it } from 'vitest';
+import { WorldPhysics } from '../../src/world/WorldPhysics';
 import { generateTerrain, heightAt, riverCenterX, type Heightmap } from '../../src/world/terrain/TerrainGenerator';
 import { generateRoads, markBridges } from '../../src/world/roads/RoadGenerator';
 import { bridgeMeshes, bridgeParts, pillarBox, PILLAR_SIZE } from '../../src/world/roads/bridges';
@@ -68,7 +70,7 @@ describe('bridges', () => {
   });
 
   // C27 (AC 21, door 6)
-  it('deck rails and pillars', () => {
+  it('deck rails and pillars', async () => {
     let checked = 0;
     for (const r of net.roads) {
       for (const range of r.bridges) {
@@ -136,7 +138,29 @@ describe('bridges', () => {
       }
     }
     expect(checked).toBeGreaterThan(10);
-    // o collider do pilar (`WorldPhysics`) é um cuboide de meia-extensão PILLAR_SIZE / 2 em x e z
     expect(PILLAR_SIZE).toBe(1.5);
+
+    // o collider de física de cada pilar, lido do Rapier: cuboide 1.5 × 1.5 de `bottom` a `top`, girado pelo heading
+    await RAPIER.init();
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+    const physics = new WorldPhysics(world, hm, hm, net, []);
+    const expected = net.roads.flatMap((r) => r.bridges.flatMap((range) => bridgeParts(r, range, hm).pillars));
+    expect(physics.pillars.length).toBe(expected.length);
+    expected.forEach((pl, k) => {
+      const c = physics.pillars[k]!;
+      const he = c.halfExtents()!;
+      expect(he.x).toBeCloseTo(0.75, 4);
+      expect(he.z).toBeCloseTo(0.75, 4);
+      expect(he.y).toBeCloseTo((pl.top - pl.bottom) / 2, 4);
+      const t = c.translation();
+      expect(t.x).toBeCloseTo(pl.x, 3);
+      expect(t.y).toBeCloseTo((pl.top + pl.bottom) / 2, 3);
+      expect(t.z).toBeCloseTo(pl.z, 3);
+      const q = c.rotation();
+      expect(Math.abs(q.x) + Math.abs(q.z)).toBeLessThan(1e-6);
+      const yawErr = Math.atan2(Math.sin(2 * Math.atan2(q.y, q.w) - pl.heading), Math.cos(2 * Math.atan2(q.y, q.w) - pl.heading));
+      expect(Math.abs(yawErr)).toBeLessThan(1e-4);
+    });
+    world.free();
   });
 });
