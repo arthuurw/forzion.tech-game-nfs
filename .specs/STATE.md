@@ -9,9 +9,9 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 1. `free-roam-city` - carro dirigível, cidade noturna procedural, HUD, som (concluída)
    - 1.1 `engine-sound` - motor sintetizado mais baixo e menos irritante (concluída)
    - 1.2 `visual-upgrade` - PBR CC0, chuva, neon calmo, marcas, fumaça, faíscas, câmera de velocidade, pós moderno (concluída)
-   - 1.3 `city-terrain` - cidade de 3 km com morros, rio, baía, rodovia em anel, pontes e streaming por chunks (verificação round 1 FAIL por lacunas de teste; corrigindo)
-   - 1.4 `car-handling` - mecânica do carro: não capota, aderência, direção, câmbio, freios e motor de carro real (em plano)
-   - 1.5 `facade-glint` - farol não faz fachada piscar (antialiasing de especular no shader da fachada) (checks escritos, aguardando ok)
+   - 1.3 `city-terrain` - cidade de 3 km com morros, rio, baía, rodovia em anel, pontes e streaming por chunks (concluída)
+   - 1.4 `car-handling` - mecânica do carro: não capota, aderência, direção, câmbio, freios e motor de carro real (concluída)
+   - 1.5 `facade-glint` - farol não faz fachada piscar (antialiasing de especular no shader da fachada, metal e tijolo mais foscos) (concluída)
 2. corridas - checkpoints, cronômetro, sprint/circuito, IA oponente por waypoints
 3. garagem + tuning visual - pintura, rodas, vinil, body kit, underglow
 4. tuning de performance - motor, turbo, pneus alterando parâmetros do Rapier
@@ -36,12 +36,13 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 
 ## Handoff
 
-**Feature**: city-terrain - build em andamento no worktree `../Jogo-terrain` (branch `city-terrain`)
-**Where**: tudo commitado no branch `city-terrain` e juntado em `main`; 68/68 e2e e 74/74 unitários verdes
-**In progress**: Verifier da city-terrain sobre o merge
-**Next step**: depois do PASS, usuário testa o mapa novo; então sub-projeto 2 (corridas) em `.specs/features/races/`, lendo o `RoadNetwork`
+**Feature**: nenhuma em andamento - city-terrain, car-handling e facade-glint concluídas e juntadas em `main`
+**Where**: `main` com as três features; 103/103 unitários (vitest, com `tests/physics`) e 75/75 e2e verdes em 2026-09-26
+**In progress**: nada
+**Next step**: usuário testa o mapa, a direção nova e as fachadas; então sub-projeto 2 (corridas) em `.specs/features/races/`, lendo o `RoadNetwork` e o `CarSpec`
 **Blockers**: none
-**Branch**: city-terrain (worktree); `main` com visual-upgrade (rodada 4 PASS) e free-roam-city (rodada 4 PASS)
+**Branch**: `main`
 
-Concluídas: free-roam-city (PASS rodada 4, escopada ao espaçamento de 40 m dos postes), engine-sound (PASS rodada 3), visual-upgrade (PASS rodada 4, escopada à cintilação das janelas).
-Resíduos conhecidos: o reflexo da rua (door 3 da visual-upgrade, render target a meia viewport) ainda cintila um pouco com a câmera andando; mudar exige reabrir a door 3.
+Concluídas: free-roam-city (PASS rodada 4), engine-sound (PASS rodada 3), visual-upgrade (PASS rodada 4), city-terrain (PASS rodada 3, escopada ao collider do pilar), car-handling (PASS rodada 4, escopada ao freio-motor da ré; a rodada 4 foi autorizada pelo usuário depois de escalar), facade-glint (PASS rodada 1).
+Decisões do usuário no build (2026-09-26): C1 da facade-glint isola o especular; metal com `metalness` 0.05 e `normalScale` 0.2, tijolo com `normalScale` 0.25 e piso de rugosidade 0.6; C4 da car-handling com sinal corrigido e C29 com velocidade horizontal; freio de mão com acelerador mantém o motor (power slide); freio-motor na ré.
+Resíduos conhecidos: o reflexo da rua (door 3 da visual-upgrade) ainda cintila um pouco com a câmera andando; tijolo passa o C1 da facade-glint com margem curta (0.00074 de 0.0010); o "R" da ré no HUD não tem prova no browser; o literal "23 módulos puros" do C45 da city-terrain virou 24 com o `carSpec.ts`.
