@@ -2,7 +2,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import type { Assets, PbrSet } from '../core/Loader';
-import { FACADE_SETS } from '../core/textureSets';
+import { FACADE_SETS, ROAD_SET, SIDEWALK_SET } from '../core/textureSets';
 import type { QualityPreset } from '../core/quality';
 import { FACADE_TYPES, NEON_PALETTE, type Building, type CityLayout } from './CityGenerator';
 
@@ -62,7 +62,7 @@ export class CityScene {
       this.group.add(under);
     }
 
-    const asphalt = assets.textures.Asphalt012;
+    const asphalt = assets.textures[ROAD_SET];
     this.roadMaterial = new THREE.MeshStandardMaterial({
       color: asphalt ? '#ffffff' : '#0c0d14',
       roughness: 0.2,
@@ -80,7 +80,7 @@ export class CityScene {
     this.group.add(road);
 
     // --- calçadas ---
-    const paving = assets.textures.PavingStones070;
+    const paving = assets.textures[SIDEWALK_SET];
     this.sidewalkMaterial = new THREE.MeshStandardMaterial({ color: paving ? '#8a8c94' : '#1c1d26', roughness: 0.85 });
     if (paving) this.applySet(this.sidewalkMaterial, paving, layout.blockSize / TILE_M);
     this.group.add(this.buildSidewalks(layout));

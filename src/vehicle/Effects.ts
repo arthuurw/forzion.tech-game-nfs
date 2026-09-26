@@ -8,6 +8,7 @@ import {
   SPARK_CAP,
   SPARK_LIFETIME_S,
   CollisionTracker,
+  SKID_QUADS_PER_STEP,
   SkidBuffer,
   type Particle,
 } from './effectsMath';
@@ -93,7 +94,7 @@ export class Effects {
   /** Um passo fixo: marcas e fumaça sob as rodas traseiras enquanto derrapa. */
   step(dt: number, skidding: boolean, rearWheels: Array<{ x: number; z: number }>, heading: number): void {
     if (skidding) {
-      for (const w of rearWheels) {
+      for (const w of rearWheels.slice(0, SKID_QUADS_PER_STEP)) {
         const idx = this.skids.push({ x: w.x, z: w.z, heading });
         this.writeSkidQuad(idx, w.x, w.z, heading);
       }

@@ -50,6 +50,8 @@ test.describe('visual - S2 materiais', () => {
     expect(road.transparent).toBe(true);
     expect(road.opacity).toBeCloseTo(0.65, 6);
     expect(road.repeat).toBeCloseTo(111, 6);
+    // C37: a rua usa o set Asphalt012
+    expect(road.mapSrc).toContain('/textures/Asphalt012/');
   });
 
   // C4 (AC 4, door 3)
@@ -95,6 +97,8 @@ test.describe('visual - S2 materiais', () => {
     }));
     expect(info.sidewalk.hasMap).toBe(true);
     expect(info.sidewalk.hasNormalMap).toBe(true);
+    // C37: a calçada usa o set PavingStones070
+    expect(info.sidewalk.mapSrc).toContain('/textures/PavingStones070/');
     expect(info.lanes).toBe(938);
   });
 });
@@ -274,15 +278,28 @@ test.describe('visual - S4 câmera (rodada 2)', () => {
     await page.keyboard.down('KeyW');
     await page.keyboard.down('KeyA');
     await advanceSim(page, 1);
-    const s = await page.evaluate(() => ({
-      lateral: (window as any).__game.camera.lateral as number,
-      yaw: (window as any).__game.car.angvel.y as number,
-    }));
+    const s = await page.evaluate(() => {
+      const g = (window as any).__game;
+      return {
+        lateral: g.camera.lateral as number,
+        target: g.camera.target as { x: number; y: number; z: number },
+        car: g.car.position as { x: number; y: number; z: number },
+        heading: g.car.heading as number,
+        yaw: g.car.angvel.y as number,
+      };
+    });
     await page.keyboard.up('KeyA');
     await page.keyboard.up('KeyW');
     expect(s.yaw).toBeGreaterThan(0.2);
     expect(s.lateral).toBeGreaterThan(0.1);
     expect(s.lateral).toBeLessThanOrEqual(1.2);
+    // o alvo REAL da câmera está deslocado para a esquerda do carro: (alvo - ponto 6 m atrás) · esquerda
+    // o alvo é calculado no último frame; o carro pode ter girado um pouco desde então (tolerância 0.15 m)
+    const behindX = s.car.x - Math.sin(s.heading) * 6;
+    const behindZ = s.car.z - Math.cos(s.heading) * 6;
+    const leftDisp = (s.target.x - behindX) * Math.cos(s.heading) + (s.target.z - behindZ) * -Math.sin(s.heading);
+    expect(leftDisp).toBeGreaterThan(0.1);
+    expect(Math.abs(leftDisp - s.lateral)).toBeLessThan(0.15);
   });
 
   // C34 (AC 18) - blur ligado à velocidade no browser

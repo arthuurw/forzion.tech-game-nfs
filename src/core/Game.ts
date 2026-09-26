@@ -454,6 +454,9 @@ export class Game {
         get lateral() {
           return game.chase.lateralOffset;
         },
+        get target() {
+          return game.chase.targetPosition;
+        },
         get position() {
           return { x: game.chase.camera.position.x, y: game.chase.camera.position.y, z: game.chase.camera.position.z };
         },
@@ -480,11 +483,14 @@ export class Game {
             transparent: m.transparent,
             opacity: m.opacity,
             repeat: m.map ? m.map.repeat.x : null,
+            mapSrc: ((m.map?.image as { currentSrc?: string; src?: string } | undefined)?.currentSrc ??
+              (m.map?.image as { src?: string } | undefined)?.src ?? null),
           };
         },
         get sidewalk() {
           const m = game.city.sidewalkMaterial;
-          return { hasMap: m.map !== null, hasNormalMap: m.normalMap !== null };
+          const img = m.map?.image as { currentSrc?: string; src?: string } | undefined;
+          return { hasMap: m.map !== null, hasNormalMap: m.normalMap !== null, mapSrc: img?.currentSrc ?? img?.src ?? null };
         },
         get signEmissiveIntensities() {
           return game.city.signMaterials.map((m) => m.emissiveIntensity);

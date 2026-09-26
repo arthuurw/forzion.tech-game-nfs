@@ -21,6 +21,11 @@ export class ChaseCamera {
     this.camera = new THREE.PerspectiveCamera(62, aspect, 0.1, 600);
   }
 
+  /** Alvo da câmera neste frame (com o deslocamento lateral, antes da suavização e do shake). */
+  get targetPosition(): { x: number; y: number; z: number } {
+    return { x: this.target.x, y: this.target.y, z: this.target.z };
+  }
+
   /** Deslocamento lateral atual (m), positivo = esquerda do carro (AC 20). */
   get lateralOffset(): number {
     return this.lateral;
