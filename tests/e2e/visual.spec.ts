@@ -302,7 +302,6 @@ test.describe('visual - S4 câmera (rodada 2)', () => {
     expect(Math.abs(leftDisp - s.lateral)).toBeLessThan(0.15);
   });
 
-  // C34 (AC 18) - blur ligado à velocidade no browser
   // C41 (AC 27): janelas acesas não cintilam com a câmera andando (reflexo da rua oculto: mede só as fachadas)
   test('lit windows stay stable while the camera moves', async ({ page }) => {
     await open(page);
@@ -313,6 +312,7 @@ test.describe('visual - S4 câmera (rodada 2)', () => {
     expect(moving).toBeLessThan(0.01);
   });
 
+  // C34 (AC 18) - blur ligado à velocidade no browser
   test('radial blur follows speed above 120 kmh', async ({ page }) => {
     await open(page);
     await page.evaluate(() => (window as any).__game.car.setForwardSpeed(170 / 3.6));

@@ -75,8 +75,8 @@ Proof: `npx vitest run tests/unit/cityGenerator.test.ts -t "buildings per block 
 **C19** - Cada quarteirão tem pelo menos 1 letreiro e toda cor de letreiro pertence à paleta `#ff2d95 #00e5ff #b026ff #ffd400`; a paleta exportada tem exatamente 4 entradas (AC 15)
 Proof: `npx vitest run tests/unit/cityGenerator.test.ts -t "neon signs use the 4-color palette"`
 
-**C20** - Ao longo de cada rua os postes estão espaçados de 20 m (± 0.01) nos dois lados, e a contagem total bate com `2 lados × ruas × floor(comprimento / 20)` (AC 16)
-Proof: `npx vitest run tests/unit/cityGenerator.test.ts -t "lamp posts every 20 m on both sides"`
+**C20** - Ao longo de cada rua os postes estão espaçados de 40 m (± 0.01) nos dois lados, e a contagem total bate com `2 lados × ruas × floor(comprimento / 40)` (AC 16; espaçamento mudado de 20 para 40 m a pedido do usuário em 2026-09-25)
+Proof: `npx vitest run tests/unit/cityGenerator.test.ts -t "lamp posts every 40 m on both sides"`
 
 **C21** - Após o primeiro frame, `renderer.info.render.calls` é 60 ou menos com a cidade e o carro na cena (AC 17)
 Proof: `npx playwright test tests/e2e/render.spec.ts -g "draw calls at most 60"`
@@ -231,6 +231,8 @@ Playwright atravessa.
 - observability: C33 - `console.warn` no fallback; `__game` (C34) é a superfície de observação em DEV; sem métricas em produção por decisão do plano
 
 ## Handoff
+
+- **Ajuste pedido pelo usuário (2026-09-25):** "pode diminuir a quantidade de postes na via" - C20 passou de 20 m para 40 m (AC 16 e o plano falavam em 20 m; o pedido do usuário substitui o valor). Janelas acesas 30 % menos claras no shader (`WINDOW_BRIGHTNESS` 0.7); a intensidade emissiva de C22 continua 2.2.
 
 - S1 = 11k (core, vehicle, camera); S2 = +8k (world) → 19k; S3 = +6k (hud) → 25k; S4 = +3k (audio) → 28k; config e testes ≈ +8k → 36k total, abaixo do budget de 150k - one builder
 

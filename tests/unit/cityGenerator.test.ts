@@ -86,11 +86,11 @@ describe('CityGenerator', () => {
   });
 
   // C20 (AC 16)
-  it('lamp posts every 20 m on both sides', () => {
+  it('lamp posts every 40 m on both sides', () => {
     const city = generateCity(1337);
     const streetsPerAxis = 7;
     const streetLength = 404;
-    const expected = 2 * (2 * streetsPerAxis) * Math.floor(streetLength / 20);
+    const expected = 2 * (2 * streetsPerAxis) * Math.floor(streetLength / 40);
     expect(city.lamps.length).toBe(expected);
 
     // group by street (axis + lateral coordinate) and check spacing along the street
@@ -103,9 +103,9 @@ describe('CityGenerator', () => {
     expect(groups.size).toBe(2 * 2 * streetsPerAxis);
     for (const [key, coords] of groups) {
       coords.sort((a, b) => a - b);
-      expect(coords.length, key).toBe(Math.floor(streetLength / 20));
+      expect(coords.length, key).toBe(Math.floor(streetLength / 40));
       for (let i = 1; i < coords.length; i++) {
-        expect(coords[i]! - coords[i - 1]!, key).toBeCloseTo(20, 2);
+        expect(coords[i]! - coords[i - 1]!, key).toBeCloseTo(40, 2);
       }
     }
   });

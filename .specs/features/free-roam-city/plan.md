@@ -105,7 +105,7 @@ Uma cidade em grid gerada por seed, noturna, com neon que brilha e asfalto que r
 13. The system SHALL gerar 64 quarteirões (8×8) de 40 m × 40 m separados por ruas de 12 m, centrados na origem
 14. The system SHALL colocar em cada quarteirão de 1 a 4 prédios, cada um com altura entre 10 m e 60 m e base inteiramente dentro do quarteirão
 15. The system SHALL colocar em cada quarteirão pelo menos 1 letreiro neon com cor tirada de uma paleta de exatamente 4 cores (`#ff2d95`, `#00e5ff`, `#b026ff`, `#ffd400`)
-16. The system SHALL colocar postes de luz a cada 20 m ao longo dos dois lados de cada rua
+16. The system SHALL colocar postes de luz a cada 40 m ao longo dos dois lados de cada rua (era 20 m; mudado a pedido do usuário em 2026-09-25: "pode diminuir a quantidade de postes na via")
 17. The system SHALL renderizar prédios, postes e letreiros com emissive de intensidade 2.0 ou mais nos elementos neon e janelas, e a cena inteira com no máximo 60 draw calls por frame
 18. The system SHALL usar material de rua com `roughness` 0.25 ou menos e `scene.environment` não nulo, de modo que as luzes neon apareçam refletidas no asfalto
 19. The system SHALL renderizar através de `EffectComposer` com `UnrealBloomPass` ativo e `renderer.toneMapping` igual a `ACESFilmicToneMapping`

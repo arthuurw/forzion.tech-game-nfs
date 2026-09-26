@@ -11,7 +11,7 @@ export const BLOCK_SIZE = 40;
 export const STREET_WIDTH = 12;
 export const PITCH = BLOCK_SIZE + STREET_WIDTH; // 52
 export const CITY_EXTENT = (GRID_SIZE * BLOCK_SIZE + (GRID_SIZE - 1) * STREET_WIDTH) / 2; // 202
-export const LAMP_SPACING = 20;
+export const LAMP_SPACING = 40;
 export const DEFAULT_SEED = 1337;
 export const FACADE_TYPES = 4;
 export const LANE_MARK_SPACING = 6;
@@ -177,11 +177,11 @@ function streetsFor(): Street[] {
   return streets;
 }
 
-/** Postes a cada 20 m nos dois lados de cada rua, começando 10 m depois da borda. */
+/** Postes a cada 40 m nos dois lados de cada rua, começando 20 m depois da borda. */
 function lampsFor(streets: Street[]): Lamp[] {
   const lamps: Lamp[] = [];
   const length = 2 * CITY_EXTENT; // 404
-  const count = Math.floor(length / LAMP_SPACING); // 20
+  const count = Math.floor(length / LAMP_SPACING); // 10
   const side = STREET_WIDTH / 2 - 0.6; // no meio-fio
   for (const street of streets) {
     for (let i = 0; i < count; i++) {

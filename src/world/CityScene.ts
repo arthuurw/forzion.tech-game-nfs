@@ -18,6 +18,8 @@ import { FACADE_TYPES, NEON_PALETTE, type Building, type CityLayout } from './Ci
  */
 export const TILE_M = 4;
 const WINDOW_COLOR = new THREE.Color('#ffd9a0');
+/** brilho percebido das janelas acesas (pedido do usuário: um pouco menos claras); a intensidade emissiva continua 2.2 para o bloom */
+const WINDOW_BRIGHTNESS = 0.7;
 
 export class CityScene {
   readonly roadMaterial: THREE.MeshStandardMaterial;
@@ -374,7 +376,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.03, 0.035, 0.05), glass);`,
       .replace(
         '#include <emissivemap_fragment>',
         `#include <emissivemap_fragment>
-float warm = mix(0.8, 0.5 + 0.5 * windowHash(cellId + 3.1, vSeedF), detail);
+float warm = ${WINDOW_BRIGHTNESS.toFixed(2)} * mix(0.8, 0.5 + 0.5 * windowHash(cellId + 3.1, vSeedF), detail);
 totalEmissiveRadiance *= lit * warm;`,
       )
       .replace(
