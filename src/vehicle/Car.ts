@@ -1,6 +1,7 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import type { Assets } from '../core/Loader';
+import { SKID_MIN_KMH } from './effectsMath';
 import { computeDrive, gearFor, rpmFor, type DriveInput } from './drivetrain';
 
 /**
@@ -38,6 +39,8 @@ const BASE_FRICTION_SLIP = 10;
 const MODEL_SCALE = 1.8;
 const FRONT = [0, 1];
 const REAR = [2, 3];
+/** limiar de força de contato do chassi para gerar eventos (door 6 do visual-upgrade) */
+export const CONTACT_FORCE_THRESHOLD = 2000;
 
 export class Car {
   readonly body: RAPIER.RigidBody;
@@ -45,6 +48,9 @@ export class Car {
   readonly mesh = new THREE.Group();
   readonly placeholder: boolean;
   lastReset: ResetSnapshot | null = null;
+  readonly chassisCollider: RAPIER.Collider;
+  /** freio de mão acima de 20 km/h (visual-upgrade AC 13) */
+  skidding = false;
 
   private readonly wheelMeshes: THREE.Object3D[] = [];
   private wheelSpin = 0;
@@ -69,10 +75,12 @@ export class Car {
     // Casco leve + lastro pesado e baixo: desce o centro de massa para o carro
     // não empinar ao acelerar nem tombar em curva (o Rapier aplica a força do
     // motor no ponto de contato da roda, abaixo do centro do chassi).
-    world.createCollider(
+    this.chassisCollider = world.createCollider(
       RAPIER.ColliderDesc.cuboid(CHASSIS_HALF.x, CHASSIS_HALF.y, CHASSIS_HALF.z)
         .setMass(CHASSIS_MASS * 0.3)
-        .setFriction(0.4),
+        .setFriction(0.4)
+        .setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS)
+        .setContactForceEventThreshold(CONTACT_FORCE_THRESHOLD),
       this.body,
     );
     world.createCollider(
@@ -111,7 +119,9 @@ export class Car {
 
   /** Um passo fixo de física: aplica o input e integra o veículo. */
   fixedUpdate(input: DriveInput, dt: number): void {
-    const cmd = computeDrive(input, this.speedKmh());
+    const kmh = this.speedKmh();
+    this.skidding = input.handbrake && kmh > SKID_MIN_KMH;
+    const cmd = computeDrive(input, kmh);
     for (const i of REAR) {
       this.controller.setWheelEngineForce(i, cmd.engineForce);
       this.controller.setWheelBrake(i, cmd.brakeRear);
@@ -124,6 +134,25 @@ export class Car {
     }
     this.controller.updateVehicle(dt);
     this.wheelSpin += (this.speedMs() * dt) / WHEEL_RADIUS;
+  }
+
+  /** Posição no mundo (x, z) dos pontos de contato das rodas traseiras. */
+  rearWheelPositions(): Array<{ x: number; z: number }> {
+    const t = this.body.translation();
+    const r = this.body.rotation();
+    this.quat.set(r.x, r.y, r.z, r.w);
+    return [
+      { x: WHEEL_X, z: -WHEEL_Z },
+      { x: -WHEEL_X, z: -WHEEL_Z },
+    ].map((w) => {
+      const v = new THREE.Vector3(w.x, 0, w.z).applyQuaternion(this.quat);
+      return { x: t.x + v.x, z: t.z + v.z };
+    });
+  }
+
+  /** Velocidade angular em Y (rad/s): positiva = virando à esquerda. */
+  yawRate(): number {
+    return this.body.angvel().y;
   }
 
   /** Copia a pose física para o mesh (uma vez por frame renderizado). */

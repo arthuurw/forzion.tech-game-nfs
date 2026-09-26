@@ -1,17 +1,45 @@
 import RAPIER from '@dimforge/rapier3d-compat';
-import type { Group } from 'three';
+import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 /**
- * Carrega o que precisa existir antes do primeiro frame: o WASM do Rapier e
- * o modelo do carro. Se o modelo falhar (arquivo ausente, rede), o jogo segue
- * com um chassi placeholder em vez de quebrar (door 7).
+ * Carrega o que precisa existir antes do primeiro frame: o WASM do Rapier, o
+ * modelo do carro e os sets de textura PBR. Se o modelo falhar, o jogo segue
+ * com um chassi placeholder (door 7 da free-roam-city); se um set de textura
+ * falhar, aquele material vira cor chapada (AC 2 do visual-upgrade).
  */
 export const CAR_MODEL_URL = '/models/car.glb';
 
+/** Sets CC0 do ambientCG em public/textures/<Set>/ (door 1 do visual-upgrade). */
+export const TEXTURE_SETS = [
+  'Asphalt012',
+  'PavingStones070',
+  'Concrete034',
+  'MetalPlates006',
+  'Bricks059',
+  'PaintedPlaster017',
+] as const;
+export type TextureSetName = (typeof TEXTURE_SETS)[number];
+
+/** Fachadas por `facadeType` 0..3. */
+export const FACADE_SETS: readonly TextureSetName[] = ['Concrete034', 'MetalPlates006', 'Bricks059', 'PaintedPlaster017'];
+
+export interface PbrSet {
+  map: THREE.Texture;
+  normalMap: THREE.Texture;
+  roughnessMap: THREE.Texture;
+}
+
 export interface Assets {
-  carModel: Group | null;
+  carModel: THREE.Group | null;
   placeholder: boolean;
+  textures: Partial<Record<TextureSetName, PbrSet>>;
+  loadedSets: TextureSetName[];
+  failedSets: TextureSetName[];
+}
+
+export function textureUrl(set: TextureSetName, kind: 'Color' | 'NormalGL' | 'Roughness'): string {
+  return `/textures/${set}/${set}_1K-JPG_${kind}.jpg`;
 }
 
 export function hasWebGL2(): boolean {
@@ -23,16 +51,53 @@ export function hasWebGL2(): boolean {
   }
 }
 
+async function loadSet(loader: THREE.TextureLoader, set: TextureSetName): Promise<PbrSet> {
+  const [map, normalMap, roughnessMap] = await Promise.all([
+    loader.loadAsync(textureUrl(set, 'Color')),
+    loader.loadAsync(textureUrl(set, 'NormalGL')),
+    loader.loadAsync(textureUrl(set, 'Roughness')),
+  ]);
+  map.colorSpace = THREE.SRGBColorSpace;
+  for (const t of [map, normalMap, roughnessMap]) {
+    t.wrapS = THREE.RepeatWrapping;
+    t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = 8;
+  }
+  return { map, normalMap, roughnessMap };
+}
+
 export async function loadAssets(onProgress: (message: string) => void = () => {}): Promise<Assets> {
   onProgress('Carregando física...');
   await RAPIER.init();
 
+  onProgress('Carregando texturas...');
+  const loader = new THREE.TextureLoader();
+  const textures: Partial<Record<TextureSetName, PbrSet>> = {};
+  const loadedSets: TextureSetName[] = [];
+  const failedSets: TextureSetName[] = [];
+  await Promise.all(
+    TEXTURE_SETS.map(async (set) => {
+      try {
+        textures[set] = await loadSet(loader, set);
+        loadedSets.push(set);
+      } catch (error) {
+        console.warn(`Falha ao carregar texturas de /textures/${set}/; usando cor chapada`, error);
+        failedSets.push(set);
+      }
+    }),
+  );
+  loadedSets.sort();
+  failedSets.sort();
+
   onProgress('Carregando carro...');
+  let carModel: THREE.Group | null = null;
+  let placeholder = false;
   try {
     const gltf = await new GLTFLoader().loadAsync(CAR_MODEL_URL);
-    return { carModel: gltf.scene, placeholder: false };
+    carModel = gltf.scene;
   } catch (error) {
     console.warn(`Falha ao carregar ${CAR_MODEL_URL}; usando chassi placeholder`, error);
-    return { carModel: null, placeholder: true };
+    placeholder = true;
   }
+  return { carModel, placeholder, textures, loadedSets, failedSets };
 }

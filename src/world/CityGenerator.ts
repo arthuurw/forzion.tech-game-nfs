@@ -13,6 +13,8 @@ export const PITCH = BLOCK_SIZE + STREET_WIDTH; // 52
 export const CITY_EXTENT = (GRID_SIZE * BLOCK_SIZE + (GRID_SIZE - 1) * STREET_WIDTH) / 2; // 202
 export const LAMP_SPACING = 20;
 export const DEFAULT_SEED = 1337;
+export const FACADE_TYPES = 4;
+export const LANE_MARK_SPACING = 6;
 
 export const NEON_PALETTE = ['#ff2d95', '#00e5ff', '#b026ff', '#ffd400'] as const;
 export type NeonColor = (typeof NEON_PALETTE)[number];
@@ -23,6 +25,8 @@ export interface Building {
   width: number;
   depth: number;
   height: number;
+  /** 0 concreto, 1 metal, 2 tijolo, 3 reboco (visual-upgrade AC 5) */
+  facadeType: number;
 }
 
 export interface Sign {
@@ -54,6 +58,8 @@ export interface Street {
   axis: 'x' | 'z';
   /** coordenada lateral do centro da rua (z para ruas ao longo de x, x para ruas ao longo de z) */
   at: number;
+  /** posições ao longo da rua dos traços da faixa central, a cada 6 m */
+  laneMarks: number[];
 }
 
 export interface CityLayout {
@@ -115,6 +121,7 @@ function buildingsFor(block: { x: number; z: number }, rng: () => number): Build
     width: lot.w - gap,
     depth: lot.d - gap,
     height: 10 + rng() * 50,
+    facadeType: 0, // atribuído depois por um PRNG próprio, sem mudar o layout
   }));
 }
 
@@ -151,12 +158,21 @@ function signsFor(buildings: Building[], rng: () => number): Sign[] {
   return signs;
 }
 
+/** Traços da faixa central: um a cada 6 m, começando 3 m depois da borda. */
+function laneMarksFor(): number[] {
+  const length = 2 * CITY_EXTENT; // 404
+  const count = Math.floor(length / LANE_MARK_SPACING); // 67
+  const marks: number[] = [];
+  for (let i = 0; i < count; i++) marks.push(-CITY_EXTENT + LANE_MARK_SPACING / 2 + i * LANE_MARK_SPACING);
+  return marks;
+}
+
 function streetsFor(): Street[] {
   const streets: Street[] = [];
   for (let i = 0; i < GRID_SIZE - 1; i++) {
     const at = blockCenter(i) + PITCH / 2; // meio da rua entre o quarteirão i e i+1
-    streets.push({ axis: 'x', at });
-    streets.push({ axis: 'z', at });
+    streets.push({ axis: 'x', at, laneMarks: laneMarksFor() });
+    streets.push({ axis: 'z', at, laneMarks: laneMarksFor() });
   }
   return streets;
 }
@@ -192,6 +208,11 @@ export function generateCity(seed: number = DEFAULT_SEED): CityLayout {
       const signs = signsFor(buildings, rng);
       blocks.push({ ...center, buildings, signs });
     }
+  }
+  // fachadas com um PRNG separado: o layout de prédios de um seed continua o mesmo de antes
+  const facadeRng = mulberry32(seed ^ 0x5bd1e995);
+  for (const block of blocks) {
+    for (const b of block.buildings) b.facadeType = Math.floor(facadeRng() * FACADE_TYPES);
   }
   const streets = streetsFor();
   return {

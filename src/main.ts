@@ -2,6 +2,7 @@ import './style.css';
 import { exposeDebug } from './core/exposeDebug';
 import { Game } from './core/Game';
 import { hasWebGL2, loadAssets } from './core/Loader';
+import { parseQuality, qualityPreset } from './core/quality';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const hudRoot = document.querySelector<HTMLElement>('#hud')!;
@@ -27,7 +28,8 @@ async function boot(): Promise<void> {
     const assets = await loadAssets((msg) => {
       loadingText.textContent = msg;
     });
-    game = new Game(canvas, hudRoot, assets, () => {
+    const quality = qualityPreset(parseQuality(window.location.search));
+    game = new Game(canvas, hudRoot, assets, quality, () => {
       loading.style.display = 'none';
       hudRoot.style.display = 'block';
     });

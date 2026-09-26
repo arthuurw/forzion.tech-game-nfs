@@ -1,0 +1,2 @@
+Texturas de https://ambientcg.com - licença CC0 1.0 Universal (domínio público).
+Sets: Asphalt012, PavingStones070, Concrete034, MetalPlates006, Bricks059, PaintedPlaster017 (1K JPG: Color, NormalGL, Roughness).

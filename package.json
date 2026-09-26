@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "fetch:textures": "node scripts/fetch-textures.mjs"
   },
   "keywords": [],
   "type": "module",
