@@ -2,20 +2,27 @@
 
 **Verdict**: FAIL
 **Profile**: standard
-**Diff range**: db836b8..202999a (commits só de car-handling; o round 1 foi em a46591b; o fix é f7adc7a, merge em 02b484b). Os commits de city-terrain que o `main` também traz ficam fora: entre a46591b e 202999a eles só mexem em `src/world/WorldPhysics.ts` (guarda as referências dos colliders de pilar, sem mudar comportamento) e `tests/unit/bridges.test.ts`, e nenhuma prova de car-handling passa por eles (o harness não importa `WorldPhysics`, `tests/physics/harness.ts:1-6`)
-**Round**: 2 - scoped
+**Diff range**: db836b8..83c78fa (commits só de car-handling). O round 2 foi em 202999a. O fix é f80e5dc, com merge em ecbd070. Entre 202999a e 83c78fa o código só mudou em dois arquivos: `src/vehicle/drivetrain.ts` (+4 linhas) e `tests/unit/drivetrain.test.ts` (+17). O resto é `.specs/` (plan, checks, relatórios, lessons), e a parte de city-terrain em 83c78fa só mexe em `.specs/features/city-terrain/verification.md`
+**Round**: 3 - scoped
 **Verifier**: independent sub-agent (author != verifier)
 
-Resumo: as duas lacunas do round 1 estão fechadas. O freio de mão com acelerador agora é uma decisão registrada
-(linha "freio de mão com acelerador" em Assumptions do `plan.md`), o código segue a decisão
-(`src/vehicle/drivetrain.ts:193`) e C36 a prova nas duas camadas. O freio de serviço em R tem caso próprio (C37). As
-37 provas nomeadas passam em 202999a (102/102 vitest, 12/12 Playwright), e os 5 mutantes no fix morreram.
+Resumo: a lacuna do round 2 fechou pela metade. A regra de R sem entrada agora é uma decisão registrada
+(`plan.md:162`: "de ré sem input, freio-motor contra o sentido em que o carro rola"), e o código a implementa em
+`src/vehicle/drivetrain.ts:178-181`. C38 prova o caso **rolando para trás**. As 38 provas nomeadas passam em
+83c78fa (103/103 vitest, 12/12 Playwright na porta 5188), e 4 dos 5 mutantes no fix morreram.
 
-O FAIL vem de uma linha nova no recálculo da tabela de decisão, que o round 1 não contou: **R engatada sem
-nenhuma entrada** (`src/vehicle/drivetrain.ts:172-178`, o `else` vazio do ramo da ré). Em marcha para frente, soltar
-tudo dá freio-motor (`:183-187`, C15, C21). Em R, soltar tudo dá força 0 e freio 0: o carro desce livre, sem
-freio-motor. Nenhum teste afirma isso. É o mesmo tipo de lacuna do round 1: uma saída da tabela sem caso afirmado e
-sem registro no plano. É pequena, e um caso em `tests/unit/drivetrain.test.ts` ao lado de C37 fecha.
+O FAIL vem de um mutante que **sobreviveu à suíte inteira**. A regra decide o sentido da força com
+`-Math.sign(wheelSpeedMs)` (`src/vehicle/drivetrain.ts:181`). Quando o carro **rola para frente com a ré engatada**
+e sem entrada, o código dá força negativa, contra o movimento, como a decisão pede. Mas nenhum teste afirma isso.
+Tirando o `-Math.sign(wheelSpeedMs) *`, a força fica sempre positiva: o motor empurra para frente o carro que já
+desce para frente. Os 103 testes continuam verdes. O caso é alcançável: a R engata com S a ≤ 1 km/h (`:135`), só
+sai com W (`:140`), e o câmbio automático não mexe na R (`:145`). Numa descida, o carro parado em R e sem entrada
+rola para frente e passa de ~8.7 km/h, onde o giro de roda na R passa de `idleRpm` (1000) e `t` deixa de ser 0.
+O próprio C37 já trata "R andando para frente" como caso real (`tests/unit/drivetrain.test.ts:312`).
+
+É pequeno: um caso a +20 km/h em R, ao lado de `tests/unit/drivetrain.test.ts:319`, fecha. Também há uma lacuna de
+precisão em C38: a "mesma lei" (`engineForce` na ré = −(`engineForce` na 1ª) × `reverseRatio` / `gearRatios[0]`) não
+tem sinal de sentido, e o mutante que sobreviveu a satisfaz em qualquer velocidade.
 
 ## Binding sources
 
@@ -24,36 +31,38 @@ Carried from a46591b. O plano não marca nenhuma fonte como binding, e o fix nã
 
 ## Checks
 
-Verified at 202999a. Todas as provas rodaram de novo, completas, no worktree do Verifier (junction de `node_modules`):
-- `npx vitest run --reporter=verbose`: 27 arquivos, **102 passaram**, 0 falharam. São 99 do round 1 mais os 3 novos. Cada
-  teste nomeado aparece com ✓ na saída verbose, inclusive `handbrake with throttle keeps engine force`,
-  `service brake while in reverse gear` e `throttle keeps pushing with the handbrake pulled`.
-- `E2E_PORT=5187 npx playwright test tests/e2e/drive.spec.ts tests/e2e/hud.spec.ts tests/e2e/audio.spec.ts tests/e2e/visual.spec.ts -g "<os 12 nomes de C32-C35>"`:
-  bateu exatamente 12 testes, e os 12 passaram. A porta 5187 estava livre antes (`netstat`), então o
-  `reuseExistingServer` não reaproveitou o servidor de outro worktree. Não houve timeout de boot.
+Verified at 83c78fa. Todas as provas rodaram de novo, completas, no worktree do Verifier (junction de `node_modules`):
+- `npx vitest run --reporter=verbose`: 27 arquivos, **103 passaram**, 0 falharam. São os 102 do round 2 mais C38.
+  Conferi os 37 nomes de `vitest` do `checks.md` um por um na saída verbose, e cada um aparece uma vez com ✓,
+  inclusive `engine braking in reverse with no input`.
+- `E2E_PORT=5188 npx playwright test tests/e2e/drive.spec.ts tests/e2e/hud.spec.ts tests/e2e/audio.spec.ts tests/e2e/visual.spec.ts -g "<os 12 nomes de C32-C35>"`:
+  bateu exatamente 12 testes, e os 12 passaram. Isso inclui `reverse drives backward up to 30 kmh`
+  (`tests/e2e/drive.spec.ts:39`), que o brief pediu porque o comportamento da ré mudou. Antes, o `netstat` mostrou a
+  porta 5188 livre, e o log mostra `vite --port 5188 --strictPort` subindo pelo próprio run. Não houve timeout de boot.
 
-Citações: as de `tests/unit/drivetrain.test.ts` e `tests/physics/grip.test.ts`, os arquivos que o fix tocou, foram
-refeitas em 202999a. O fix só acrescentou linhas nesses dois arquivos (`git show f7adc7a -- tests` não tem linha
-`-`), então as asserções de C11, C12, C25 e C2 continuam idênticas. As demais citações vêm de arquivos que não
-mudaram desde a46591b e estão carried from a46591b.
+Citações: as de `tests/unit/drivetrain.test.ts`, o único arquivo de teste que o fix tocou, foram refeitas em 83c78fa.
+O fix só acrescentou linhas (`git show f80e5dc -- tests` não tem nenhuma linha `-`), então as linhas até `:316`
+continuam iguais, e C26 andou +17. As citações dos outros arquivos de teste vêm de arquivos que não mudaram desde
+202999a (`git diff --stat 202999a..HEAD` só lista `drivetrain.ts` e `drivetrain.test.ts` fora de `.specs/`). Elas
+estão carried from 202999a ou, quando o round 2 já as herdava, carried from a46591b.
 
 | Check | Claim | Proof run | Evidence | Result |
 | --- | --- | --- | --- | --- |
 | C1 | massa [1249, 1251], `worldCom().y` ≤ 0.50, track/(2h) ≥ 1.6 | vitest `mass and low center of mass` ✓ | `tests/physics/stability.test.ts:61-62`, `:65`, `:66` (carried from a46591b) | PASS |
-| C2 | 54 casos, inclinação ≤ 15° em todo passo | vitest `no rollover across the maneuver matrix` ✓ | `tests/physics/stability.test.ts:72` `results.length` 54; `:74` `maxTilt <= 15` (carried from a46591b). A manobra "+ freio de mão" não usa acelerador, então o fix não muda o caminho dela | PASS |
+| C2 | 54 casos, inclinação ≤ 15° em todo passo | vitest `no rollover across the maneuver matrix` ✓ | `tests/physics/stability.test.ts:72` `results.length` 54; `:74` `maxTilt <= 15` (carried from a46591b) | PASS |
 | C3 | 54 casos, 4 rodas no chão em ≤ 60 passos após soltar | vitest `all four wheels back on the ground after release` ✓ | `tests/physics/stability.test.ts:83-84` (carried from a46591b) | PASS |
 | C4 | média de rolagem 90-180: `steer +1` em [+1, +6], `steer −1` em [−6, −1] | vitest `body roll leans out of the turn` ✓ | `tests/physics/stability.test.ts:107-108`, `:110-111` (carried from a46591b) | PASS |
 | C5 | menor arfagem em 30 passos de freio em [−4, −0.5] | vitest `nose dives under braking` ✓ | `tests/physics/stability.test.ts:124-125` (carried from a46591b) | PASS |
-| C6 | rampa do volante, volta, troca de lado, espelho | vitest `steering ramps toward the target` ✓ | `tests/unit/drivetrain.test.ts:46`, `:49-51`, `:60`, `:65`, `:71`, `:75`, `:84` (linhas antes do trecho acrescentado, sem mudança) | PASS |
+| C6 | rampa do volante, volta, troca de lado, espelho | vitest `steering ramps toward the target` ✓ | `tests/unit/drivetrain.test.ts:46`, `:49-51`, `:60`, `:65`, `:71`, `:75`, `:84` (verified at 83c78fa; antes do trecho acrescentado) | PASS |
 | C7 | alvo `min(0.55, atan(33.1578/v²))`, 7 casos | vitest `steering target shrinks with speed` ✓ | `tests/unit/drivetrain.test.ts:100` (tabela `:90-97`), `:103`, `:107` | PASS |
-| C8 | 5 velocidades, ≤ 1.15 g em todo passo | vitest `lateral grip never exceeds 1.15 g` ✓ | `tests/physics/grip.test.ts:35-36` | PASS |
-| C9 | 60 km/h: ≥ 0.80 g | vitest `reaches at least 0.8 g at 60 kmh` ✓ | `tests/physics/grip.test.ts:43` | PASS |
-| C10 | 10 casos, sideslip ≤ 12° | vitest `understeers instead of spinning` ✓ | `tests/physics/grip.test.ts:60` `slip <= 12`; `:66` 10 casos (laço 5 × 2 em `:49-50`) | PASS |
-| C11 | freio de mão: sideslip > 20° em 90 passos | vitest `handbrake kicks the rear out` ✓ | `tests/physics/grip.test.ts:79` `expect(max).toBeGreaterThan(20)` (sem mudança; o teste não usa acelerador) | PASS |
-| C12 | soltando no 1º passo > 20°: < 8° em 150 passos, velocidade dianteira > 0 | vitest `car recovers after the handbrake is released` ✓ | `tests/physics/grip.test.ts:104` `kicked`; `:109` `forwardSpeed > 0`; `:113` `recovered` (andaram +12 linhas) | PASS |
-| C13 | 100 km/h, freio + `steer +1`: heading ≥ +0.20 rad | vitest `steers while braking hard` ✓ | `tests/physics/grip.test.ts:145` `turned >= 0.2` (normalizado em `:144`) | PASS |
+| C8 | 5 velocidades, ≤ 1.15 g em todo passo | vitest `lateral grip never exceeds 1.15 g` ✓ | `tests/physics/grip.test.ts:35-36` (carried from 202999a) | PASS |
+| C9 | 60 km/h: ≥ 0.80 g | vitest `reaches at least 0.8 g at 60 kmh` ✓ | `tests/physics/grip.test.ts:43` (carried from 202999a) | PASS |
+| C10 | 10 casos, sideslip ≤ 12° | vitest `understeers instead of spinning` ✓ | `tests/physics/grip.test.ts:60` `slip <= 12`; `:66` 10 casos (carried from 202999a) | PASS |
+| C11 | freio de mão: sideslip > 20° em 90 passos | vitest `handbrake kicks the rear out` ✓ | `tests/physics/grip.test.ts:79` `expect(max).toBeGreaterThan(20)` (carried from 202999a) | PASS |
+| C12 | soltando no 1º passo > 20°: < 8° em 150 passos, velocidade dianteira > 0 | vitest `car recovers after the handbrake is released` ✓ | `tests/physics/grip.test.ts:104`, `:109`, `:113` (carried from 202999a) | PASS |
+| C13 | 100 km/h, freio + `steer +1`: heading ≥ +0.20 rad | vitest `steers while braking hard` ✓ | `tests/physics/grip.test.ts:145` `turned >= 0.2` (carried from 202999a) | PASS |
 | C14 | freio a 60 km/h: motor 0, soma = `brakeForceN`, 0.65 | vitest `brake split front biased` ✓ | `tests/unit/drivetrain.test.ts:114`, `:115`, `:117`, `:118-119` | PASS |
-| C15 | força pela curva, interpolação, limitador, freio-motor ≤ 0 | vitest `engine force follows the torque curve` ✓ | `tests/unit/drivetrain.test.ts:148`, `:153`, `:156`, `:163-164`, `:174` | PASS (a nota do round 1 sobre o limitador em 7000.01 continua valendo, carried from a46591b) |
+| C15 | força pela curva, interpolação, limitador, freio-motor ≤ 0 | vitest `engine force follows the torque curve` ✓ | `tests/unit/drivetrain.test.ts:148`, `:153`, `:156`, `:163-164`, `:174` | PASS |
 | C16 | 5 casos de rpm; varredura em [1000, 7000] | vitest `rpm from wheel speed and gear` ✓ | `tests/unit/drivetrain.test.ts:184-188`, `:195-196` | PASS |
 | C17 | 2ª → 3ª com corte de 0.25 s; 6ª fica | vitest `upshift at 6500 rpm with power cut` ✓ | `tests/unit/drivetrain.test.ts:207-208`, `:211`, `:215`, `:218` | PASS |
 | C18 | 4ª → 3ª com hold; sobregiro; 1ª fica | vitest `downshift with hysteresis and hold time` ✓ | `tests/unit/drivetrain.test.ts:226-227`, `:235`, `:245`, `:247`, `:251` | PASS |
@@ -62,130 +71,132 @@ mudaram desde a46591b e estão carried from a46591b.
 | C21 | 100 → 60 km/h sem entradas em [4, 12] s | vitest `coasting from 100 to 60 kmh` ✓ | `tests/physics/powertrain.test.ts:53-54` (carried from a46591b) | PASS |
 | C22 | parada de 100 km/h em [34, 45] m | vitest `braking from 100 kmh stops in 34 to 45 m` ✓ | `tests/physics/powertrain.test.ts:71-72` (carried from a46591b) | PASS |
 | C23 | rampa de 9 %: 60 km/h em ≤ 10 s | vitest `climbs a 9 percent grade` ✓ | `tests/physics/powertrain.test.ts:84` (carried from a46591b) | PASS |
-| C24 | entra em R, força < 0 a −29, = 0 a −30/−31, sai com acelerador a ≥ −1 | vitest `reverse gear capped at 30 kmh` ✓ | `tests/unit/drivetrain.test.ts:268-269`, `:271-273`, `:276` | PASS |
-| C25 | freio de mão: frente 0, traseira > 0, fator 0.4; sem ele 1 | vitest `handbrake locks rear and cuts rear grip` ✓ | `tests/unit/drivetrain.test.ts:283-287` (sem mudança; o caso não usa acelerador) | PASS |
-| C26 | pura, estado congelado, sem as funções antigas | vitest `drivetrain step is pure` ✓ | `tests/unit/drivetrain.test.ts:330-331` `toEqual(b)`, `toEqual(copy)`; `:333-335` (andaram +27 linhas) | PASS |
-| C27 | `carSpec.ts` e `drivetrain.ts` sem three/rapier | vitest `pure modules do not import three or rapier` ✓ | `tests/unit/purity.test.ts:40`, `:43` (carried from a46591b) | PASS |
+| C24 | entra em R, força < 0 a −29, = 0 a −30/−31, sai com acelerador a ≥ −1 | vitest `reverse gear capped at 30 kmh` ✓ | `tests/unit/drivetrain.test.ts:268-269`, `:271-273`, `:276`. Todos os casos usam S ou W, então o ramo novo `else` não entra neles | PASS |
+| C25 | freio de mão: frente 0, traseira > 0, fator 0.4; sem ele 1 | vitest `handbrake locks rear and cuts rear grip` ✓ | `tests/unit/drivetrain.test.ts:283-287` | PASS |
+| C26 | pura, estado congelado, sem as funções antigas | vitest `drivetrain step is pure` ✓ | `tests/unit/drivetrain.test.ts:347` `toEqual(b)`, `:348` `toEqual(copy)`, `:350-352` (andaram +17 linhas) | PASS |
+| C27 | `carSpec.ts` e `drivetrain.ts` sem three/rapier | vitest `pure modules do not import three or rapier` ✓ | `tests/unit/purity.test.ts:40`, `:43` (carried from a46591b). O fix não acrescentou import em `drivetrain.ts` | PASS |
 | C28 | valores de `DEFAULT_CAR`; `massKg: 1500` vira `body.mass()` 1500 | vitest `default car spec values` ✓; vitest `car reads mass from its spec` ✓ | `tests/unit/carSpec.test.ts:38-54`, `:64`, `:71`; `tests/physics/harness.test.ts:174-178` (carried from a46591b) | PASS |
 | C29 | harness com 4 rodas em repouso | vitest `harness builds the real car at rest` ✓ | `tests/physics/harness.test.ts:184-185`, `:192-193`, `:196-197`, `:200` (carried from a46591b) | PASS |
 | C30 | tabela de 6 casos de `isSkidding` | vitest `skidding from lateral slip or handbrake` ✓ | `tests/unit/effectsMath.test.ts:80-85` (carried from a46591b) | PASS |
-| C31 | derrapagem real: verdadeiro no 1º passo; reta falso em 60 passos | vitest `skidding from real lateral slip` ✓ | `tests/physics/grip.test.ts:125` `toBe(true)`; `:132` `toBe(false)` (andaram +12 linhas) | PASS |
+| C31 | derrapagem real: verdadeiro no 1º passo; reta falso em 60 passos | vitest `skidding from real lateral slip` ✓ | `tests/physics/grip.test.ts:125` `toBe(true)`; `:132` `toBe(false)` (carried from 202999a) | PASS |
 | C32 | troca para cima no browser, queda de rpm ≥ 1500, `#gear` | pw `automatic upshift drops rpm on the hud` ✓ | `tests/e2e/hud.spec.ts:174`, `:176`, `:181` (carried from a46591b) | PASS |
 | C33 | `__game.car` expõe o estado de dirigibilidade | pw `car debug exposes handling state` ✓ | `tests/e2e/drive.spec.ts:122-124`, `:126-127`, `:129`, `:134` (carried from a46591b) | PASS |
-| C34 | 9 provas antigas verdes sem mudança | pw os 9 nomes ✓ | `tests/e2e/drive.spec.ts:25`, `:35`, `:44-45`, `:60`; `tests/e2e/hud.spec.ts:199-204`; `tests/e2e/audio.spec.ts:106-117`; `tests/e2e/visual.spec.ts:175-177`, `:215`, `:291-300` (carried from a46591b; `tests/e2e` não mudou desde a46591b) | PASS |
+| C34 | 9 provas antigas verdes sem mudança | pw os 9 nomes ✓ | `tests/e2e/drive.spec.ts:25`, `:35`, `:44-45`, `:60`; `tests/e2e/hud.spec.ts:199-204`; `tests/e2e/audio.spec.ts:106-117`; `tests/e2e/visual.spec.ts:175-177`, `:215`, `:291-300` (carried from a46591b; `tests/e2e` não mudou) | PASS |
 | C35 | `__game.car.spec` igual a `DEFAULT_CAR` | pw `game builds the car from the default spec` ✓ | `tests/e2e/drive.spec.ts:143`, `:144` `expect(live).toEqual(expected)` (carried from a46591b) | PASS |
-| C36 (novo) | acelerador + freio de mão na 3ª a 4500 rpm: força igual à do acelerador sozinho (> 0), frente 0, traseira > 0, fator 0.4; freio de mão sem acelerador: força 0; harness a 60 km/h: com acelerador termina > 2 km/h acima de sem | vitest `handbrake with throttle keeps engine force` ✓; vitest `throttle keeps pushing with the handbrake pulled` ✓ | `tests/unit/drivetrain.test.ts:295` `drive.engineForce > 0`; `:296` `expect(slide.engineForce).toBe(drive.engineForce)`; `:297` `brakeFront` 0; `:298` `brakeRear > 0`; `:299` `toBe(spec.handbrakeRearGrip)` (o 0.4 está em `:285`); `:301` sem acelerador `toBe(0)`; `tests/physics/grip.test.ts:91` `expect(run(true)).toBeGreaterThan(run(false) + 2)`, com 60 km/h em `:87` e 60 passos em `:88` | PASS. Bate com a linha de Assumptions: "o motor continua empurrando; sem acelerador, nem motor nem freio-motor". A 4500 rpm na 3ª o freio-motor seria −447.7 N (F5), então o `toBe(0)` de `:301` separa "sem motor" de "sem freio-motor" |
-| C37 (novo) | R, acelerador, −10 km/h: fica em R, força 0, soma = `brakeForceN`, frente/total = 0.65; R, S, +5 km/h: força 0, soma = `brakeForceN` | vitest `service brake while in reverse gear` ✓ | `tests/unit/drivetrain.test.ts:308` `gear` −1; `:309` força 0; `:310` `toBeCloseTo(both, 9)`; `:311` `toBeCloseTo(spec.brakeBiasFront, 9)`; `:313`; `:314` | PASS. Bate com a segunda frase da linha de Assumptions |
+| C36 | acelerador + freio de mão na 3ª: força igual à do acelerador sozinho, frente 0, traseira > 0, fator 0.4; sem acelerador força 0; harness: com acelerador > 2 km/h acima | vitest `handbrake with throttle keeps engine force` ✓; vitest `throttle keeps pushing with the handbrake pulled` ✓ | `tests/unit/drivetrain.test.ts:295`, `:296`, `:297`, `:298`, `:299`, `:301`; `tests/physics/grip.test.ts:91` (carried from 202999a) | PASS |
+| C37 | R, acelerador, −10 km/h: fica em R, força 0, soma = `brakeForceN`, 0.65; R, S, +5 km/h: força 0, soma = `brakeForceN` | vitest `service brake while in reverse gear` ✓ | `tests/unit/drivetrain.test.ts:308`, `:309` `toBe(0)`, `:310`, `:311`, `:313`, `:314` | PASS. `:309` agora também separa "freio de serviço" de "freio de serviço + freio-motor" (F3 abaixo) |
+| C38 (novo) | R sem entrada a −20 km/h: fica em R, `rpm` > `idleRpm`, `engineForce` > 0, sem freio de serviço; mesma lei do freio-motor da 1ª × `reverseRatio` / `gearRatios[0]`; parado, força 0 | vitest `engine braking in reverse with no input` ✓ | `tests/unit/drivetrain.test.ts:320` `gear` −1; `:321` `rpm > idleRpm`; `:322` `engineForce > 0`; `:323` freio `toBe(0)`; `:328` `toBeCloseTo(-fwd * ratio, 6)`, com `fwd` no mesmo giro em `:326`; `:331` parado `toBe(0)` | PASS no que o check afirma. Lacuna de precisão: o check não fala do carro **rolando para frente** em R, que a decisão (`plan.md:162`, "contra o sentido em que o carro rola") cobre. A "mesma lei" também não tem sinal de sentido. O caso parado (`:331`) não separa nada, porque a 0 km/h o giro é `idleRpm` e `t` = 0 com ou sem o `Math.sign`. Ver Coverage e F5 |
 
 ## Coverage
 
-Verified at 202999a na linha que o fix tocou (drive input regimes, autoridade `src/vehicle/drivetrain.ts`). As outras
-linhas vêm de autoridades que o fix não tocou e estão carried from a46591b.
+Verified at 83c78fa nas linhas cuja autoridade o fix tocou: drive input regimes (`src/vehicle/drivetrain.ts`) e a
+decisão do usuário (`plan.md:162`). As outras linhas vêm de autoridades que o fix não tocou e estão carried from
+202999a.
 
-Recálculo da tabela de decisão de `stepDrivetrain` (`src/vehicle/drivetrain.ts:119-202`), ramo por ramo, em 202999a:
+Recálculo da tabela de decisão de `stepDrivetrain` (`src/vehicle/drivetrain.ts:119-206`), ramo por ramo, em 83c78fa:
 
 - **volante** (`:110-117`, `:127`): ida C6 · volta C6 · troca de lado C6 · parado no alvo C6 · guarda `v` < 1 C7.
-- **câmbio** (`:135-156`): entra em R C24 · sai da R C24 · sobe C17 · não sobe da 6ª C17 · desce C18 · bloqueio por
-  sobregiro C18 · hold C18 · não desce da 1ª C18.
-- **corte e giro** (`:132`, `:158-161`): corte na troca C17 · embreagem na 1ª e na R C16 · limitador C15, C16.
-- **força, marcha ≥ 1** (`:179-187`): S freia com divisão 65/35 C14, C22 · W empurra C15, C19 · W no corte da troca
-  C17 · W no limitador C15 · sem entrada, freio-motor C15 (`:174`), C21.
-- **força, R** (`:172-178`):
+- **câmbio** (`:135-156`, sem mudança): entra em R C24 · sai da R C24 · sobe C17 · não sobe da 6ª C17 · desce C18 ·
+  bloqueio por sobregiro C18 · hold C18 · não desce da 1ª C18. Com R e sem entrada, nenhum dos três ramos dispara
+  (`:135` pede S, `:140` pede W, `:145` pede `gear >= 1`): a R fica engatada em qualquer sentido de rolagem.
+- **corte e giro** (`:132`, `:158-161`): corte na troca C17 · embreagem na 1ª e na R C16 · limitador C15, C16. Em R sem
+  entrada, `driving` é falso (`:158`), então não há piso de embreagem: o giro é `max(idleRpm, giro de roda)`.
+- **força, R** (`:172-182`):
   - S a ≤ 1 km/h empurra para trás: C24.
   - corte a −29.5 km/h: C24.
-  - S a > +1 km/h aciona o freio de serviço: C37 (novo).
-  - W a < −1 km/h aciona o freio de serviço: C37 (novo).
-  - **sem entrada: força 0, freio 0, sem freio-motor: sem caso.**
-  - O `rawRpm < redlineRpm` de `:175` é inalcançável com `DEFAULT_CAR`: a 29.5 km/h em R dá ~3380 rpm
-    (8.2 m/s / 0.45 m × 9.549 × 3.6 × 5.4). Não é linha.
-- **freio de mão** (`:189-196`): com W mantém a força C36 (novo) · sem W zera a força C36 `:301` (novo; C25 não afirma
-  a força) · traseira = max(traseira, 6000) C25, C36 · fator 0.4 C25, C36 · sem freio de mão, fator 1 C25.
+  - S a > +1 km/h aciona o freio de serviço: C37 (`:313-314`).
+  - W a < −1 km/h aciona o freio de serviço: C37 (`:309-311`).
+  - sem entrada, rolando para trás: freio-motor para frente (`:181`, `-Math.sign(v)` = +1). C38 `:322`, `:328`.
+  - sem entrada, parado: força 0. C38 `:331`.
+  - **sem entrada, rolando para frente: freio-motor para trás (`:181`, `-Math.sign(v)` = −1). Sem caso.** F5 sobreviveu.
+- **força, marcha ≥ 1** (`:183-191`, só andou +4 linhas): S freia com divisão 65/35 C14, C22 · W empurra C15, C19 ·
+  W no corte da troca C17 · W no limitador C15 · sem entrada, freio-motor C15 (`tests/unit/drivetrain.test.ts:174`), C21.
+- **freio de mão** (`:193-200`): com W mantém a força C36 · sem W zera a força C36 `:301` · traseira =
+  max(traseira, 6000) C25, C36 · fator 0.4 C25, C36 · sem freio de mão, fator 1 C25. Com R e sem W, o freio de mão
+  também zera o freio-motor novo da ré, pela mesma linha `:197` que C36 `:301` já prova na 3ª. Não é ramo novo.
 
 | Set (size) | Recomputed from | Member -> proof | Unproven |
 | --- | --- | --- | --- |
-| plan ACs (25) | `plan.md` Criteria (carried from a46591b; o fix não mexe nos ACs) | 1 C1 · 2 C2 · 3 C3 · 4 C4 · 5 C5 · 6 C6, C33 · 7 C7 · 8 C8 · 9 C9 · 10 C10 · 11 C11 · 12 C12 · 13 C13, C14 · 14 C15 · 15 C16 · 16 C17 · 17 C18 · 18 C19 · 19 C20 · 20 C21 · 21 C22 · 22 C23 · 23 C30, C31 · 24 C32, C34 · 25 C32 | - |
-| plan Assumptions com decisão do usuário (1 nova) | `plan.md:162` "freio de mão com acelerador" (verified at 202999a) | power slide com W C36 unit e física · sem W, nem motor nem freio-motor C36 `:301` · R com W andando para trás C37 · R com S andando para frente C37 | - |
+| plan ACs (25) | `plan.md` Criteria (carried from 202999a; o fix não mexe nos ACs) | 1 C1 · 2 C2 · 3 C3 · 4 C4 · 5 C5 · 6 C6, C33 · 7 C7 · 8 C8 · 9 C9 · 10 C10 · 11 C11 · 12 C12 · 13 C13, C14 · 14 C15 · 15 C16 · 16 C17 · 17 C18 · 18 C19 · 19 C20 · 20 C21 · 21 C22 · 22 C23 · 23 C30, C31 · 24 C32, C34 · 25 C32 | - |
+| decisão do usuário "freio de mão com acelerador" (6 regras) | `plan.md:162` (verified at 83c78fa) | power slide com W C36 unit e física · sem W, nem motor nem freio-motor C36 `:301` · R com W andando para trás C37 · R com S andando para frente C37 · R sem entrada rolando para trás, freio-motor contra C38 `:322` · **R sem entrada rolando para frente, freio-motor contra: sem caso** | R sem entrada rolando para frente: a decisão diz "contra o sentido em que o carro rola", mas nenhum teste chama `stepDrivetrain` com `gear: -1`, `idle` e velocidade positiva. `rg -n "gear: -1" tests` acha `tests/unit/drivetrain.test.ts:187`, `:271-273`, `:275`, `:307`, `:312`, `:319`, `:331`, `:339`. Só `:319` (−20 km/h) e `:331` (0) são `idle`, e `:187` e `:339` usam S. A varredura de C16 (`:189-196`) passa por R + `idle` a velocidades positivas, mas só afirma `rpm`. F5 sobreviveu às 103 provas |
 | landing doors (3) | `plan.md` Landing (carried from a46591b) | 1 C1, C27, C35, `tests/unit/carSpec.test.ts:64` · 2 C6, C17, C18, C24, C26 · 3 C29, `vite.config.ts:6` | - |
 | rollover matrix (54) | C2 (carried from a46591b) | `tests/physics/stability.test.ts:10-19`, `:72`, `:81` | - |
 | maneuvers (6) | AC 2 (carried from a46591b) | `tests/physics/stability.test.ts:13-18` | - |
-| understeer cases (10) | AC 10 | 5 velocidades × 2 em `tests/physics/grip.test.ts:49-50`, `:66`. A citação `:176-177` do round 1 estava errada: o arquivo tinha 135 linhas em a46591b | - |
-| gearbox transitions (8) | `drivetrain.ts:135-156` (verified at 202999a; o fix não tocou este trecho) | 2→3 C17 · sem subir da 6ª C17 · corte C17 · 4→3 C18 · sobregiro C18 · hold C18 · sem descer da 1ª C18 · entrar e sair da R C24 | - |
+| understeer cases (10) | AC 10 (carried from 202999a) | 5 velocidades × 2 em `tests/physics/grip.test.ts:49-50`, `:66` | - |
+| gearbox transitions (8) | `drivetrain.ts:135-156` (verified at 83c78fa; o fix não tocou este trecho) | 2→3 C17 · sem subir da 6ª C17 · corte C17 · 4→3 C18 · sobregiro C18 · hold C18 · sem descer da 1ª C18 · entrar e sair da R C24 | - |
 | rpm regimes (5) | AC 15 (carried from a46591b) | C16, C15 | - |
-| drive input regimes (recalculado: 12) | ramos de `src/vehicle/drivetrain.ts:158-196` em 202999a (lista acima) | acelerador C15, C19 · freio para frente C14, C22 · freio-motor C15, C21 · volante C6, C7 · ré acionada e cortada C24 · R + S andando para frente C37 · R + W andando para trás C37 · freio de mão: frente 0, traseira, fator C25, C11 · freio de mão + W mantém o motor C36 · freio de mão sem W zera o motor C36 · **R sem entrada (força 0, sem freio-motor): sem caso** | R engatada sem entrada: força 0, freio 0 e nenhum freio-motor (`src/vehicle/drivetrain.ts:172-178`, o `else` que falta depois de `:176`). Nenhum teste chama `stepDrivetrain` com `gear: -1` e `idle` afirmando força ou freio. `rg -n "gear: -1" tests` só acha `tests/unit/drivetrain.test.ts:187`, `:271-273`, `:275`, `:307`, `:312`, `:322`, todos com S ou W, e a varredura de C16 (`:190-196`) passa por `idle` em R mas só afirma rpm |
+| drive input regimes (recalculado: 13) | ramos de `src/vehicle/drivetrain.ts:158-200` em 83c78fa (lista acima) | acelerador C15, C19 · freio para frente C14, C22 · freio-motor para frente C15, C21 · volante C6, C7 · ré acionada e cortada C24 · R + S andando para frente C37 · R + W andando para trás C37 · R sem entrada rolando para trás C38 · R sem entrada parado C38 · freio de mão: frente 0, traseira, fator C25, C11 · freio de mão + W mantém o motor C36 · freio de mão sem W zera o motor C36 · **R sem entrada rolando para frente: sem caso** | R sem entrada rolando para frente (`src/vehicle/drivetrain.ts:181`, o lado −1 do `Math.sign`). O mutante F5, que tira o sentido e empurra sempre para frente, passa pelas 103 provas. O `checks.md` diz que "coast in reverse C38" cobre a linha, mas C38 só afirma o lado de trás |
 | steering target cases (7) | C7 (carried from a46591b) | `tests/unit/drivetrain.test.ts:90-97` | - |
 | skidding table (6) | AC 23 (carried from a46591b) | `tests/unit/effectsMath.test.ts:80-85` | - |
 | superseded free-roam checks (7) | carried from a46591b | C2 → C14 · C4 → C24 · C6 → C6, C7 · C7 → C25 · C8 → C20 · C27 → C17, C18 · C28 → C16 | - |
 | superseded visual checks (1) | carried from a46591b | a unidade de visual C36 → C30; browser `tests/e2e/visual.spec.ts:198` | - |
-| tests in the fix diff | `git show f7adc7a -- tests` e `git diff a46591b..202999a -- tests` | `drivetrain.test.ts` +27 e `grip.test.ts` +12, sem nenhuma linha removida. A única remoção no intervalo é em `tests/unit/bridges.test.ts` (city-terrain, fora desta feature) | - |
+| tests in the fix diff | `git show f80e5dc -- tests` e `git diff 202999a..83c78fa -- tests` (verified at 83c78fa) | `tests/unit/drivetrain.test.ts` +17, sem nenhuma linha removida (`grep -c '^-[^-]'` = 0). Nenhum outro arquivo de teste mudou | - |
 | startup config (2 assemblies) | carried from a46591b | `src/core/Game.ts:146` → C35 · `tests/physics/harness.ts:72` → C29, C28 | - |
-
-Combinações que não são linhas próprias, só registro: W + S juntos (a ordem dos `if` dá precedência ao S nos dois
-sentidos); S + freio de mão (a traseira fica em 6000 porque 11500 × 0.35 = 4025 < 6000); S + freio de mão em R a
-≤ 1 km/h (a força de ré é zerada pela regra "sem W, sem motor", já provada em C36 na 3ª). Nenhuma delas é um ramo
-novo do código.
 
 ## Test policy rows
 
-Verified at 202999a na linha não cumprida no round 1 e nas linhas que classificam arquivos tocados
-(`drivetrain.ts`). As outras estão carried from a46591b.
+Verified at 83c78fa na linha não cumprida no round 2, que também é a que classifica o arquivo tocado
+(`drivetrain.ts`). As outras estão carried from 202999a.
 
 | Row | Files it classifies | Required proof | Expectation met |
 | --- | --- | --- | --- |
-| Decides, reached across a boundary | `src/vehicle/drivetrain.ts`; `src/vehicle/effectsMath.ts` `isSkidding` | own layer C6, C7, C14-C18, C20, C24-C26, C30, C36, C37 · boundary C8-C13, C19-C23, C31, C32, C36 (harness) | not met - as duas linhas do round 1 agora têm caso. O freio de mão com acelerador tem C36 nas duas camadas (`tests/unit/drivetrain.test.ts:296`, `tests/physics/grip.test.ts:91`) e virou decisão registrada (`plan.md:162`). O freio de serviço em R tem C37 (`tests/unit/drivetrain.test.ts:310`, `:314`). Falta uma linha que o recálculo achou agora: R sem entrada dá força 0 e nenhum freio-motor (`src/vehicle/drivetrain.ts:172-178`), sem caso afirmado. `effectsMath` cumpre (carried from a46591b) |
-| Decides, not reached across a boundary | nenhum arquivo do diff | um caso por linha | n/a - nenhum arquivo nesta forma (carried from a46591b) |
-| Entry point that decides nothing | nenhum arquivo do diff | accepted / rejected / error paths | n/a - nenhum arquivo nesta forma (carried from a46591b) |
-| Instrumentation, pass-throughs | `src/core/Game.ts`, `src/hud/Hud.ts`, `src/audio/AudioEngine.ts`, `src/vehicle/Car.ts` | coberto pela prova do consumidor | yes - carried from a46591b. O fix não tocou esses arquivos |
+| Decides, reached across a boundary | `src/vehicle/drivetrain.ts`; `src/vehicle/effectsMath.ts` `isSkidding` | own layer C6, C7, C14-C18, C20, C24-C26, C30, C36-C38 · boundary C8-C13, C19-C23, C31, C32, C36 (harness) | not met - a linha do round 2 fechou pela metade. R sem entrada rolando para trás agora tem caso (C38, `tests/unit/drivetrain.test.ts:322`, `:328`) e virou decisão registrada (`plan.md:162`). Mas a expectativa é "um caso afirmado por linha da tabela de decisão", e o `Math.sign` de `src/vehicle/drivetrain.ts:181` abre uma linha que continua sem caso: R sem entrada rolando para frente. O mutante F5 prova que ela não é afirmada. Na fronteira, C38 só tem unidade; o contrato de ré no browser segue coberto por C24/C34 (`tests/e2e/drive.spec.ts:39`, que segura S). `effectsMath` cumpre (carried from a46591b) |
+| Decides, not reached across a boundary | nenhum arquivo do diff | um caso por linha | n/a - nenhum arquivo nesta forma (carried from 202999a) |
+| Entry point that decides nothing | nenhum arquivo do diff | accepted / rejected / error paths | n/a - nenhum arquivo nesta forma (carried from 202999a) |
+| Instrumentation, pass-throughs | `src/core/Game.ts`, `src/hud/Hud.ts`, `src/audio/AudioEngine.ts`, `src/vehicle/Car.ts` | coberto pela prova do consumidor | yes - carried from 202999a. O fix não tocou esses arquivos |
 
-A seção `Test policy` do `checks.md` ainda lista como "Próprias" de `drivetrain.ts` só C6, C7, C14-C18, C20, C24-C26,
-sem C36 e C37. É deriva de texto, não muda a verificação.
+A deriva de texto do round 2 foi corrigida: a `Test policy` do `checks.md` agora lista C36-C38 entre as provas
+próprias de `drivetrain.ts` (`checks.md:377`).
 
 ## Faults injected
 
-Verified at 202999a, só nas superfícies do fix. As faltas rodaram num worktree isolado
-(`git worktree add --detach <scratchpad>/faults HEAD`, com junction de `node_modules`). Cada mutação partiu de uma cópia
-do `drivetrain.ts` original, e o `diff` de cada uma foi conferido antes de rodar. O `git status --porcelain` do
-worktree do Verifier estava vazio antes (baseline de 0 bytes) e depois. O worktree de rascunho voltou limpo antes de
-ser removido: a junction foi apagada sozinha primeiro, e depois veio o `git worktree remove`.
+Verified at 83c78fa, só na superfície do fix (`src/vehicle/drivetrain.ts:176-181`). As faltas rodaram num worktree
+isolado (`git worktree add --detach <scratchpad>/faults HEAD`, com junction de `node_modules`). Cada mutação partiu de
+uma cópia do `drivetrain.ts` original, e o `diff` de cada uma foi conferido antes de rodar. No fim, o arquivo do
+rascunho era byte a byte igual ao original (`cmp`). O `git status --porcelain` do worktree do Verifier estava vazio
+antes (baseline de 0 bytes) e depois. A junction foi apagada sozinha (`.Delete()`) antes do `git worktree remove`.
 
 | Mutation | Location | Killed |
 | --- | --- | --- |
-| F1 volta ao corte sempre: `if (!input.throttle) engineForce = 0;` → `engineForce = 0;` | `src/vehicle/drivetrain.ts:193` | yes - unit `tests/unit/drivetrain.test.ts:296` "expected +0 to be 5409.4" e física `tests/physics/grip.test.ts:91` "expected 44.30 to be greater than 46.30" (as duas provas de C36 falharam na mesma rodada) |
-| F2 freio de mão com W sem travar a traseira: `brakeRear = Math.max(...)` → `if (!input.throttle) brakeRear = Math.max(...)` | `src/vehicle/drivetrain.ts:194` | yes - `tests/unit/drivetrain.test.ts:298` "expected 0 to be greater than 0" |
-| F3 R + W andando para trás sem frear: `input.brake \|\| (input.throttle && kmh < -1)` → `input.brake` | `src/vehicle/drivetrain.ts:176` | yes - `tests/unit/drivetrain.test.ts:310` "expected +0 to be close to 11500" |
-| F4 R + S andando para frente sem frear: `input.brake \|\| (input.throttle && kmh < -1)` → `input.throttle && kmh < -1` | `src/vehicle/drivetrain.ts:176` | yes - `tests/unit/drivetrain.test.ts:314` "expected +0 to be close to 11500" |
-| F5 freio de mão sem W mantém o freio-motor: linha `if (!input.throttle) engineForce = 0;` removida | `src/vehicle/drivetrain.ts:193` | yes - `tests/unit/drivetrain.test.ts:301` "expected -447.74 to be +0" |
-
-O teto de 5 foi atingido, e cada prova nova (C36 unit, C36 física, C37 nos dois casos) falhou pelo menos uma vez. Não
-houve falta na linha sem caso (R sem entrada). A ausência foi mostrada por busca na linha de Coverage.
+| F1 volta à roda livre: `engineForce = -Math.sign(...) * ... * toWheel;` → `engineForce = 0;` | `src/vehicle/drivetrain.ts:181` | yes - `tests/unit/drivetrain.test.ts:322` "expected 0 to be greater than 0" |
+| F2 sinal trocado: `-Math.sign(wheelSpeedMs)` → `Math.sign(wheelSpeedMs)` | `src/vehicle/drivetrain.ts:181` | yes - `tests/unit/drivetrain.test.ts:322` "expected -276.71 to be greater than 0" |
+| F3 freio-motor em R mesmo com freio de serviço: `brakeAll();` → `brakeAll(); engineForce = -Math.sign(v) * ENGINE_BRAKE_NM * t * toWheel;` | `src/vehicle/drivetrain.ts:177` | yes - C37 `tests/unit/drivetrain.test.ts:309` "expected 31.26 to be +0" |
+| F4 intensidade errada (relação da 1ª em vez da R): `* toWheel` → `* toWheel * gearRatios[0] / reverseRatio` | `src/vehicle/drivetrain.ts:181` | yes - `tests/unit/drivetrain.test.ts:328` "expected 461.18 to be close to 276.71" |
+| F5 sem sentido de rolagem: `engineForce = -Math.sign(wheelSpeedMs) * ENGINE_BRAKE_NM * t * toWheel` → `engineForce = ENGINE_BRAKE_NM * t * toWheel` (sempre para frente) | `src/vehicle/drivetrain.ts:181` | no - survived. A suíte vitest inteira (`npx vitest run`, 27 arquivos) deu 103/103 verdes. Com F5, em R, sem entrada e rolando para frente, o motor empurra o carro para frente, a favor da rolagem, em vez de segurar |
 
 ## Swept existing
 
-Carried from a46591b. O fix não tocou `Car.ts`, `input.ts` nem `harness.ts`. A citação do Observable foi corrigida
-no `plan.md` para `src/core/input.ts:52`, como o round 1 apontou.
+Carried from a46591b. O fix não tocou `Car.ts`, `input.ts` nem `harness.ts`.
 
 ## Deviations judged
 
-- A decisão "freio de mão com acelerador" está registrada em `plan.md:162`, com a marca de decisão do usuário
-  (`y`) e a data. O comentário do código (`src/vehicle/drivetrain.ts:191-192`) diz a mesma coisa. O round 1 pedia
-  exatamente isso.
-- As outras decisões são carried from a46591b: `restoreRollMoment`, C18 com ficha variante, limitador em 7000.01 e
-  R ignorando o hold.
+- A decisão sobre R sem entrada está registrada em `plan.md:162` ("de ré sem input, freio-motor contra o sentido em
+  que o carro rola, como nas marchas para frente"), com a marca `y` e a data. O comentário do código
+  (`src/vehicle/drivetrain.ts:179`) diz a mesma coisa, e o código segue a regra nos dois sentidos. O que falta é o caso
+  afirmado de um dos sentidos. Não é desvio de comportamento.
+- As outras decisões são carried from 202999a: power slide, freio de serviço em R, `restoreRollMoment`, C18 com
+  ficha variante, limitador em 7000.01 e R ignorando o hold.
 
 ## Gate
 
-`npx vitest run` - 102 passed, 0 failed · `E2E_PORT=5187 npx playwright test` (12 nomeados, C32-C35) - 12 passed, 0 failed (6.3 min, sem timeout de boot)
+`npx vitest run` - 103 passed, 0 failed · `E2E_PORT=5188 npx playwright test` (12 nomeados, C32-C35, incluindo `reverse drives backward up to 30 kmh`) - 12 passed, 0 failed (5.2 min, sem timeout de boot)
 
 ## Ranked gaps
 
-1. **R engatada sem entrada não tem caso.** Test policy, linha "Decides, reached across a boundary", e Coverage,
-   linha "drive input regimes". `src/vehicle/drivetrain.ts:172-178`: com `gear` −1 e nem S nem W, a força e o freio
-   ficam em 0. O carro desce livre em ré, sem o freio-motor que a marcha para frente tem (`:183-187`). Nem o plano
-   nem os checks registram essa escolha. Um mutante plausível, como freio-motor ou freio de serviço em R sem
-   entrada, passaria por toda a suíte. Isso pede duas coisas: confirmar a regra (roda livre ou freio-motor em R) e
-   pôr um caso afirmado em `tests/unit/drivetrain.test.ts`, perto de C37 (`:305-315`).
+1. **R sem entrada rolando para frente não tem caso (mutante F5 sobrevive).** Coverage (linhas "drive input regimes"
+   e "decisão do usuário"), Test policy (linha "Decides, reached across a boundary") e Faults (F5).
+   `src/vehicle/drivetrain.ts:181`: o `-Math.sign(wheelSpeedMs)` decide o sentido, e só o lado de trás é afirmado
+   (`tests/unit/drivetrain.test.ts:322`, `:328`). Para fechar, basta acrescentar ao teste de C38
+   (`tests/unit/drivetrain.test.ts:318-332`) um passo com `gear: -1`, `idle` e `+20 / 3.6`. Esse passo deve afirmar
+   que a marcha continua −1, que `engineForce` < 0 e que ele é o oposto exato do caso a −20 km/h. Também é preciso
+   ajustar o texto de C38 no `checks.md:323-329` para dizer "contra o sentido do movimento nos dois sentidos".
+2. **Lacuna de precisão em C38** (`checks.md:325`): a "mesma lei" `engineForce` na ré = −(`engineForce` na 1ª) ×
+   `reverseRatio` / `gearRatios[0]` não tem sinal de sentido. Lida ao pé da letra, F5 a satisfaz em qualquer
+   velocidade. O caso "parado, força 0" (`tests/unit/drivetrain.test.ts:331`) também não separa a implementação
+   certa de F5, porque a 0 km/h o giro é `idleRpm` e `t` = 0.
 
-Resíduos que não mudam o veredito:
-- Round 1, carried from a46591b: o "R na ré" do AC 24 só tem a cadeia de unidade, sem browser. A parte browser de
-  visual C36 é `tests/e2e/visual.spec.ts:198`, e não visual C13 como diz o checks.md.
-- Novo: a evidência da `Test policy` no `checks.md` não lista C36 e C37 entre as provas próprias de `drivetrain.ts`.
-- Novo: a citação de Coverage do round 1 `grip.test.ts:176-177` estava errada; o certo é `:49-50`.
+Resíduos que não mudam o veredito (carried from 202999a):
+- O "R na ré" do AC 24 só tem a cadeia de unidade, sem browser. A parte browser de visual C36 é
+  `tests/e2e/visual.spec.ts:198`, e não visual C13 como diz o checks.md.
+- C38 é só unidade, sem prova no harness. A linha da Test policy aceita a fronteira no nível do arquivo, e o round 2
+  aceitou C37 do mesmo jeito.
