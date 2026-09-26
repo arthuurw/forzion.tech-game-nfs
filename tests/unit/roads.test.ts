@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateTerrain } from '../../src/world/terrain/TerrainGenerator';
+import { generateTerrain, type Heightmap } from '../../src/world/terrain/TerrainGenerator';
 import { carveRoads } from '../../src/world/terrain/carveRoads';
 import { ROAD_SPECS, generateRoads, type Road } from '../../src/world/roads/RoadGenerator';
 import { generateLamps } from '../../src/world/roads/roadMesh';
@@ -164,6 +164,9 @@ describe('road network', () => {
     const n = carved.size;
     let under = 0;
     let bandPairs = 0;
+    let innerPairs = 0;
+    let outerPairs = 0;
+    let shaped = 0;
     for (const r of net.roads) {
       const w2 = r.width / 2;
       const np = count(r);
@@ -172,17 +175,20 @@ describe('road network', () => {
         const [px, py, pz] = pt(r, i);
         // amostras cuja seção transversal é o ponto i (o ponto mais próximo da estrada entre i−8 e i+8 é o próprio i)
         const cross = new Map<number, number>();
+        // as mesmas, até 4 m (1 amostra) além da mistura: vizinhas de fora do par que cruza w/2 + 6
+        const beyond = new Map<number, number>();
         const reach = w2 + 6;
-        const ix0 = Math.max(0, Math.ceil((px - reach + 1536) / 4));
-        const ix1 = Math.min(n - 1, Math.floor((px + reach + 1536) / 4));
-        const iz0 = Math.max(0, Math.ceil((pz - reach + 1536) / 4));
-        const iz1 = Math.min(n - 1, Math.floor((pz + reach + 1536) / 4));
+        const scan = reach + 4;
+        const ix0 = Math.max(0, Math.ceil((px - scan + 1536) / 4));
+        const ix1 = Math.min(n - 1, Math.floor((px + scan + 1536) / 4));
+        const iz0 = Math.max(0, Math.ceil((pz - scan + 1536) / 4));
+        const iz1 = Math.min(n - 1, Math.floor((pz + scan + 1536) / 4));
         for (let iz = iz0; iz <= iz1; iz++) {
           for (let ix = ix0; ix <= ix1; ix++) {
             const sx = -1536 + ix * 4;
             const sz = -1536 + iz * 4;
             const d = Math.hypot(sx - px, sz - pz);
-            if (d > reach) continue;
+            if (d > scan) continue;
             let nearest = i;
             let nd = d;
             for (let j = i - 8; j <= i + 8; j++) {
@@ -196,7 +202,8 @@ describe('road network', () => {
               }
             }
             if (nearest !== i) continue;
-            cross.set(iz * n + ix, d);
+            if (d <= reach) cross.set(iz * n + ix, d);
+            else beyond.set(iz * n + ix, d);
           }
         }
         for (const [k, d] of cross) {
@@ -204,6 +211,14 @@ describe('road network', () => {
             under++;
             const h = carved.heights[k]!;
             if (Math.abs(h - py) > 0.3) throw new Error(`road ${r.id} point ${i}: sample ${k} at ${d.toFixed(2)} m is ${h} vs ${py}`);
+            // par que cruza w/2: da pista para a mistura também sem degrau (AC 17)
+            for (const nb of [k + 1, k - 1, k + n, k - n]) {
+              const dn = cross.get(nb);
+              if (dn === undefined || dn <= w2) continue;
+              innerPairs++;
+              const step = Math.abs(h - carved.heights[nb]!);
+              if (step > 1.5) throw new Error(`road ${r.id} point ${i}: step ${step} crossing width/2`);
+            }
           } else {
             for (const nb of [k + 1, k - 1, k + n, k - n]) {
               const dn = cross.get(nb);
@@ -212,12 +227,122 @@ describe('road network', () => {
               const step = Math.abs(carved.heights[k]! - carved.heights[nb]!);
               if (step > 1.5) throw new Error(`road ${r.id} point ${i}: band step ${step}`);
             }
+            // par que cruza w/2 + 6: a mistura chega ao terreno de fora sem degrau (AC 17, door 5)
+            for (const nb of [k + 1, k - 1, k + n, k - n]) {
+              if (!beyond.has(nb)) continue;
+              outerPairs++;
+              const step = Math.abs(carved.heights[k]! - carved.heights[nb]!);
+              if (step > 1.5) throw new Error(`road ${r.id} point ${i}: step ${step} crossing width/2 + 6`);
+            }
+            // formato da mistura (door 5): de `py` em w/2 até a altura crua em w/2 + 6, sem sair do
+            // intervalo entre as duas; no 1.º quarto da faixa mais perto da pista, no último mais perto do terreno
+            const rawH = hm.heights[k]!;
+            const h = carved.heights[k]!;
+            if (h < Math.min(py, rawH) - 0.3 || h > Math.max(py, rawH) + 0.3) {
+              throw new Error(`road ${r.id} point ${i}: blend ${h} outside [${py}, ${rawH}]`);
+            }
+            if (Math.abs(rawH - py) > 1) {
+              const t = (d - w2) / 6;
+              const f = (h - py) / (rawH - py);
+              if (t <= 0.25 && f > 0.5) throw new Error(`road ${r.id} point ${i}: t ${t.toFixed(2)} already ${f.toFixed(2)} of the way to the terrain`);
+              if (t >= 0.75 && f < 0.5) throw new Error(`road ${r.id} point ${i}: t ${t.toFixed(2)} only ${f.toFixed(2)} of the way to the terrain`);
+              if (t <= 0.25 || t >= 0.75) shaped++;
+            }
           }
         }
       }
     }
     expect(under).toBeGreaterThan(1000);
     expect(bandPairs).toBeGreaterThan(100);
+    expect(innerPairs).toBeGreaterThan(100);
+    expect(outerPairs).toBeGreaterThan(100);
+    expect(shaped).toBeGreaterThan(20);
+  });
+
+  // C20 (AC 17, door 5): um caso afirmado por faixa do carve - sob a pista, mistura, fora do alcance e sob ponte
+  it('carve bands: under the road, blend, outside and under a bridge', () => {
+    // terreno plano a 3 m, amostras a cada 1 m em x, z ∈ [-80, 80]; estrada reta em x = 0, y = 0, largura 10;
+    // pontos a cada 2 m de z = -80 a 80, com os de z ≥ 20 em ponte
+    const size = 161;
+    const flat: Heightmap = { size, spacing: 1, origin: -80, heights: new Float32Array(size * size).fill(3) };
+    const np = 81;
+    const points = new Float32Array(np * 3);
+    for (let i = 0; i < np; i++) points[i * 3 + 2] = -80 + i * 2;
+    const road: Road = { id: 0, kind: 'hill', lanes: 2, width: 10, closed: false, points, bridges: [{ from: 50, to: 80 }] };
+    const out = carveRoads(flat, { roads: [road] });
+    const at = (x: number, z: number) => out.heights[(z + 80) * size + (x + 80)]!;
+    // distância ao ponto fora de ponte mais próximo (z ≤ 18)
+    const dist = (x: number, z: number) => Math.hypot(x, z - Math.max(-80, Math.min(18, 2 * Math.round(z / 2))));
+
+    // sob a pista (d ≤ width/2): altura da estrada
+    for (const x of [-5, -2, 0, 3, 5]) expect(at(x, -40), `x ${x}`).toBeCloseTo(0, 5);
+    // mistura (width/2, width/2 + 6]: estritamente entre a pista e o terreno, subindo com a distância;
+    // no 1.º quarto mais perto da pista, no último mais perto do terreno, e chega ao terreno em width/2 + 6
+    let prev = 0;
+    for (let x = 6; x <= 11; x++) {
+      const h = at(x, -40);
+      expect(at(-x, -40), `x ±${x} symmetric`).toBeCloseTo(h, 5);
+      const t = (x - 5) / 6;
+      if (x < 11) {
+        expect(h, `x ${x}`).toBeGreaterThan(0);
+        expect(h, `x ${x}`).toBeLessThan(3);
+      }
+      if (t <= 0.25) expect(h / 3, `x ${x}`).toBeLessThanOrEqual(0.5);
+      if (t >= 0.75) expect(h / 3, `x ${x}`).toBeGreaterThanOrEqual(0.5);
+      expect(h, `x ${x} rises`).toBeGreaterThan(prev);
+      expect(h - prev, `x ${x} step`).toBeLessThanOrEqual(1.5);
+      prev = h;
+    }
+    expect(at(11, -40)).toBeCloseTo(3, 5);
+    // fora do alcance (d > width/2 + 6): terreno intacto
+    for (let z = -80; z <= 80; z++) {
+      for (let x = -80; x <= 80; x++) {
+        if (dist(x, z) > 11) expect(at(x, z), `(${x}, ${z})`).toBe(3);
+      }
+    }
+    // sob ponte (só pontos de ponte ao alcance): nada muda, nem no eixo
+    let bridged = 0;
+    for (let z = 30; z <= 80; z++) {
+      for (let x = -11; x <= 11; x++) {
+        expect(dist(x, z)).toBeGreaterThan(11);
+        expect(at(x, z), `(${x}, ${z}) under the bridge`).toBe(3);
+        bridged++;
+      }
+    }
+    expect(bridged).toBeGreaterThan(1000);
+    expect(flat.heights.every((h) => h === 3)).toBe(true);
+
+    // no mundo do seed 1337: amostra longe de todo ponto fora de ponte (> width/2 + 6) fica com a altura crua,
+    // inclusive as que só têm ponto de ponte ao alcance
+    const n = hm.size;
+    const touched = new Uint8Array(n * n);
+    const nearBridge = new Uint8Array(n * n);
+    for (const r of net.roads) {
+      const reach = r.width / 2 + 6 + 0.01;
+      for (let i = 0; i < count(r); i++) {
+        const [px, , pz] = pt(r, i);
+        const mark = inBridge(r, i) ? nearBridge : touched;
+        const ix0 = Math.max(0, Math.ceil((px - reach + 1536) / 4));
+        const ix1 = Math.min(n - 1, Math.floor((px + reach + 1536) / 4));
+        const iz0 = Math.max(0, Math.ceil((pz - reach + 1536) / 4));
+        const iz1 = Math.min(n - 1, Math.floor((pz + reach + 1536) / 4));
+        for (let iz = iz0; iz <= iz1; iz++) {
+          for (let ix = ix0; ix <= ix1; ix++) {
+            if (Math.hypot(-1536 + ix * 4 - px, -1536 + iz * 4 - pz) <= reach) mark[iz * n + ix] = 1;
+          }
+        }
+      }
+    }
+    let outside = 0;
+    let underBridge = 0;
+    for (let k = 0; k < n * n; k++) {
+      if (touched[k]) continue;
+      outside++;
+      if (nearBridge[k]) underBridge++;
+      if (carved.heights[k] !== hm.heights[k]) throw new Error(`sample ${k} out of reach changed: ${hm.heights[k]} -> ${carved.heights[k]}`);
+    }
+    expect(outside).toBeGreaterThan(500_000);
+    expect(underBridge).toBeGreaterThan(500);
   });
 
   // C24 (AC 19)

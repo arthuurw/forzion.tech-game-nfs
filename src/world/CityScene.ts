@@ -5,7 +5,7 @@ import { FACADE_SETS, ROAD_SET, SIDEWALK_SET } from '../core/textureSets';
 import type { QualityPreset } from '../core/quality';
 import { FACADE_TYPES, NEON_PALETTE } from './CityGenerator';
 import { ChunkManager } from './ChunkManager';
-import type { Lot, LotSign } from './lots/LotGenerator';
+import { facadeTransform, type Lot, type LotSign } from './lots/LotGenerator';
 import { bridgeParts } from './roads/bridges';
 import type { RoadNetwork } from './roads/RoadGenerator';
 import type { Lamp } from './roads/roadMesh';
@@ -161,10 +161,11 @@ export class CityScene {
     const p = new THREE.Vector3();
     const up = new THREE.Vector3(0, 1, 0);
     lots.forEach((l, i) => {
-      // eixo local x ao longo da rua: yaw = heading − 90°
-      q.setFromAxisAngle(up, l.rotation - Math.PI / 2);
-      p.set(l.x, l.y + l.height / 2, l.z);
-      s.set(l.width, l.height, l.depth);
+      // eixo local x ao longo da rua; a caixa unitária começa na base do lote e sobe `height`
+      const t = facadeTransform(l);
+      q.setFromAxisAngle(up, t.yaw);
+      p.set(...t.position);
+      s.set(...t.scale);
       m.compose(p, q, s);
       mesh.setMatrixAt(i, m);
     });

@@ -354,6 +354,33 @@ export class Game {
       },
       city: {
         seed: game.city.data.seed,
+        /** Por malha de fachada, por instância: [y mínimo, y máximo, x, z] da caixa depois da matriz (C33). */
+        facadeSpans() {
+          const m = new THREE.Matrix4();
+          const v = new THREE.Vector3();
+          return game.city.facadeMeshes.map((mesh) => {
+            if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+            const b = mesh.geometry.boundingBox!;
+            const out: number[][] = [];
+            for (let i = 0; i < mesh.count; i++) {
+              mesh.getMatrixAt(i, m);
+              let lo = Infinity;
+              let hi = -Infinity;
+              for (const x of [b.min.x, b.max.x]) {
+                for (const y of [b.min.y, b.max.y]) {
+                  for (const z of [b.min.z, b.max.z]) {
+                    v.set(x, y, z).applyMatrix4(m);
+                    lo = Math.min(lo, v.y);
+                    hi = Math.max(hi, v.y);
+                  }
+                }
+              }
+              v.setFromMatrixPosition(m);
+              out.push([lo, hi, v.x, v.z]);
+            }
+            return out;
+          });
+        },
         get facadeMeshes() {
           return game.city.facadeMeshes.map((mesh, i) => {
             const aRepeat = mesh.geometry.getAttribute('aRepeat') as THREE.InstancedBufferAttribute;
@@ -743,6 +770,7 @@ export class Game {
           loaded: [...game.city.chunks.loaded.keys()].sort((a, b) => a - b),
           maxBuildsInOneFrame: game.city.chunks.maxBuildsInOneFrame,
           builds: game.city.chunks.builds,
+          dropped: game.city.chunks.dropped.map((d) => ({ ...d })),
         };
       },
       walls: game.physics.walls.map((w) => ({ ...w })),

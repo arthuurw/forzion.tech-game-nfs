@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CHUNK_SIZE, CHUNKS_PER_SIDE, chunkOf, planChunks } from './chunks';
 import type { Road, RoadNetwork } from './roads/RoadGenerator';
-import { bridgeMeshes, extrudeAlong, PILLAR_SIZE, type BridgeParts, type TriMesh } from './roads/bridges';
+import { bridgeMeshes, extrudeAlong, pillarBox, type BridgeParts } from './roads/bridges';
 import { roadStripGeometry } from './roads/roadMesh';
 import type { Heightmap } from './terrain/TerrainGenerator';
 import { DOWNTOWN_HALF } from './worldMath';
@@ -28,6 +28,11 @@ export class ChunkManager {
   readonly loaded = new Map<number, THREE.Group>();
   maxBuildsInOneFrame = 0;
   builds = 0;
+  /**
+   * Últimos chunks descartados: quantas geometrias cada um tinha e quantas já
+   * emitiram o evento `dispose` do three (door 7; lido por C37).
+   */
+  readonly dropped: Array<{ id: number; geometries: number; disposed: number }> = [];
   private readonly bridges: Array<{ road: Road; parts: BridgeParts }>;
   /** pontos de estrada por célula de 32 m: [x, z, meia largura, id da estrada, ...] */
   private readonly grid = new Map<number, number[]>();
@@ -55,6 +60,8 @@ export class ChunkManager {
     const plan = planChunks(carX, carZ, new Set(this.loaded.keys()));
     for (const id of plan.dispose) {
       const group = this.loaded.get(id)!;
+      this.dropped.push(group.userData.disposal);
+      if (this.dropped.length > 64) this.dropped.shift();
       this.scene.remove(group);
       group.traverse((o) => {
         if (o instanceof THREE.Mesh) o.geometry.dispose();
@@ -137,6 +144,13 @@ export class ChunkManager {
       mesh.name = name;
       group.add(mesh);
     }
+    const disposal = { id, geometries: 0, disposed: 0 };
+    group.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      disposal.geometries++;
+      o.geometry.addEventListener('dispose', () => disposal.disposed++);
+    });
+    group.userData.disposal = disposal;
     return group;
   }
 
@@ -321,22 +335,4 @@ function splitRuns(idx: number[]): number[][] {
   }
   if (cur.length) runs.push(cur);
   return runs;
-}
-
-function pillarBox(x: number, z: number, bottom: number, top: number, heading: number): TriMesh {
-  const s = PILLAR_SIZE / 2;
-  const cos = Math.cos(heading);
-  const sin = Math.sin(heading);
-  const corners: number[] = [];
-  for (const y of [bottom, top]) {
-    for (const [a, b] of [[-s, -s], [s, -s], [s, s], [-s, s]] as const) {
-      corners.push(x + a * cos + b * sin, y, z - a * sin + b * cos);
-    }
-  }
-  // normais para fora: fundo para −y, topo para +y, laterais para fora
-  const idx = [
-    0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6,
-    0, 5, 1, 0, 4, 5, 1, 6, 2, 1, 5, 6, 2, 7, 3, 2, 6, 7, 3, 4, 0, 3, 7, 4,
-  ];
-  return { positions: new Float32Array(corners), indices: new Uint32Array(idx) };
 }
