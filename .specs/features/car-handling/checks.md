@@ -58,8 +58,10 @@ Proof: `npx vitest run tests/physics/stability.test.ts -t "no rollover across th
 Proof: `npx vitest run tests/physics/stability.test.ts -t "all four wheels back on the ground after release"`
 
 **C4** - Curva à esquerda (`steer +1`) a partir de 80 km/h, com `throttle` ligado sempre que a velocidade está abaixo de 80 km/h, por 3 s:
-- A rolagem média dos passos 90–180 está entre −6.0° e −1.0°. Negativa: o lado esquerdo, de dentro da curva, sobe menos que o de fora, ou seja, o carro inclina para fora.
-- O mesmo com `steer −1` dá média entre +1.0° e +6.0°.
+- A rolagem média dos passos 90–180 está entre +1.0° e +6.0°. Positiva: o lado esquerdo, de dentro da curva, sobe, ou seja, o carro inclina para fora.
+- O mesmo com `steer −1` dá média entre −6.0° e −1.0°.
+
+(Sinal corrigido com o usuário em 2026-09-26: a versão aprovada pedia o sinal oposto, que pela definição de rolagem acima seria inclinar para dentro, contradizendo o AC 4.)
 
 (AC 4)
 Proof: `npx vitest run tests/physics/stability.test.ts -t "body roll leans out of the turn"`
@@ -233,7 +235,9 @@ Proof: `npx vitest run tests/physics/harness.test.ts -t "car reads mass from its
 
 **C29** - ✅ O harness monta o jogo de verdade:
 - O `Car` tem um `DynamicRayCastVehicleController` com 4 rodas.
-- Depois de 60 passos parado no plano, as 4 rodas estão em contato, a velocidade é < 0.1 km/h e a inclinação < 1°.
+- Depois de 60 passos parado no plano, as 4 rodas estão em contato, a velocidade horizontal é < 0.1 km/h, a altura do chassi varia menos de 1 mm nos últimos 10 passos e a inclinação < 1°.
+
+(Esclarecido com o usuário em 2026-09-26: "velocidade" é horizontal; o Rapier deixa ~0.06 m/s de velocidade vertical residual entre passos, gravidade × dt, com a altura parada.)
 - `npm test` inclui `tests/physics`: o `test.include` de `vite.config.ts` contém `tests/physics/**/*.test.ts`.
 
 (door 3)
