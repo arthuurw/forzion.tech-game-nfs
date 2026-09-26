@@ -214,10 +214,10 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "drivetrain step is pure
 
 ### S4 - Jogo, efeitos e fichas · 9 files · 90 KB · ~23k
 
-**C27** - `src/vehicle/carSpec.ts` e `src/vehicle/drivetrain.ts` estão na lista de módulos puros: nenhum importa `three` nem `@dimforge/rapier3d-compat` (door 1, door 2)
+**C27** - ✅ `src/vehicle/carSpec.ts` e `src/vehicle/drivetrain.ts` estão na lista de módulos puros: nenhum importa `three` nem `@dimforge/rapier3d-compat` (door 1, door 2)
 Proof: `npx vitest run tests/unit/purity.test.ts -t "pure modules do not import three or rapier"`
 
-**C28** - Valores de `DEFAULT_CAR`:
+**C28** - ✅ Valores de `DEFAULT_CAR`:
 - `massKg` 1250, `wheelbaseM` 2.6, `trackM` 1.7, `wheelRadiusM` 0.45.
 - `idleRpm` 1000, `redlineRpm` 7000.
 - `gearRatios` com 6 valores estritamente decrescentes.
@@ -231,7 +231,7 @@ No harness, um `Car` construído com `{ ...DEFAULT_CAR, massKg: 1500 }` tem `bod
 Proof: `npx vitest run tests/unit/carSpec.test.ts -t "default car spec values"`
 Proof: `npx vitest run tests/physics/harness.test.ts -t "car reads mass from its spec"`
 
-**C29** - O harness monta o jogo de verdade:
+**C29** - ✅ O harness monta o jogo de verdade:
 - O `Car` tem um `DynamicRayCastVehicleController` com 4 rodas.
 - Depois de 60 passos parado no plano, as 4 rodas estão em contato, a velocidade é < 0.1 km/h e a inclinação < 1°.
 - `npm test` inclui `tests/physics`: o `test.include` de `vite.config.ts` contém `tests/physics/**/*.test.ts`.
@@ -239,7 +239,7 @@ Proof: `npx vitest run tests/physics/harness.test.ts -t "car reads mass from its
 (door 3)
 Proof: `npx vitest run tests/physics/harness.test.ts -t "harness builds the real car at rest"`
 
-**C30** - `isSkidding(handbrake, kmh, lateralSlipMs)`:
+**C30** - ✅ `isSkidding(handbrake, kmh, lateralSlipMs)`:
 
 | Entrada | Resultado |
 | --- | --- |
@@ -253,14 +253,14 @@ Proof: `npx vitest run tests/physics/harness.test.ts -t "harness builds the real
 Substitui a parte unitária do check 36 da visual-upgrade. (AC 23)
 Proof: `npx vitest run tests/unit/effectsMath.test.ts -t "skidding from lateral slip or handbrake"`
 
-**C31** - No harness, com o carro assentado:
+**C31** - ✅ No harness, com o carro assentado:
 - Com velocidade de 60 km/h ao longo do heading mais 5 m/s de lado, `car.skidding` fica true já no primeiro passo, sem freio de mão.
 - Em linha reta a 100 km/h, sem entradas, `car.skidding` fica false em todos os 60 passos.
 
 (AC 23)
 Proof: `npx vitest run tests/physics/grip.test.ts -t "skidding from real lateral slip"`
 
-**C32** - No browser, segurando `W` a partir do spawn por 4 s de simulação e amostrando `__game.car.gear`, `__game.car.rpm` e o texto de `#gear`:
+**C32** - ✅ No browser, segurando `W` a partir do spawn por 4 s de simulação e amostrando `__game.car.gear`, `__game.car.rpm` e o texto de `#gear`:
 - Há pelo menos uma amostra em que `gear` aumenta de uma para a seguinte.
 - Nessa troca, o `rpm` da amostra anterior menos o menor `rpm` nas amostras dentro dos 0.3 s seguintes é ≥ 1500.
 - `#gear` mostra `String(gear)` em toda amostra.
@@ -268,7 +268,7 @@ Proof: `npx vitest run tests/physics/grip.test.ts -t "skidding from real lateral
 (AC 24, AC 25)
 Proof: `npx playwright test tests/e2e/hud.spec.ts -g "automatic upshift drops rpm on the hud"`
 
-**C33** - No browser, `__game.car` expõe:
+**C33** - ✅ No browser, `__game.car` expõe:
 - `spec.massKg` = 1250.
 - `steerInput` em `[-0.55, 0.55]`.
 - `bodyRoll`, `bodyPitch`, `sideslip` e `lateralG` como números finitos.
@@ -277,7 +277,7 @@ Proof: `npx playwright test tests/e2e/hud.spec.ts -g "automatic upshift drops rp
 (Surface, AC 6)
 Proof: `npx playwright test tests/e2e/drive.spec.ts -g "car debug exposes handling state"`
 
-**C34** - Continuam verdes, sem mudança nas asserções, as provas não superadas que leem a mecânica do carro:
+**C34** - ✅ Continuam verdes, sem mudança nas asserções, as provas não superadas que leem a mecânica do carro:
 - free-roam-city C1, C3, C5 e "A turns left"
 - free-roam-city C29 (HUD de marcha e RPM)
 - engine-sound C13 e C15 (som segue `rpm`)
@@ -295,7 +295,7 @@ Proof: `npx playwright test tests/e2e/visual.spec.ts -g "handbrake leaves skid m
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "tire smoke while skidding"`
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "camera swings left while turning left"`
 
-**C35** - `Game` constrói o carro com `DEFAULT_CAR`: no browser, `__game.car.spec` é igual campo a campo a `DEFAULT_CAR` (importado no teste via `page.evaluate` sobre o módulo servido pelo Vite) (door 1, startup config)
+**C35** - ✅ `Game` constrói o carro com `DEFAULT_CAR`: no browser, `__game.car.spec` é igual campo a campo a `DEFAULT_CAR` (importado no teste via `page.evaluate` sobre o módulo servido pelo Vite) (door 1, startup config)
 Proof: `npx playwright test tests/e2e/drive.spec.ts -g "game builds the car from the default spec"`
 
 ## Coverage

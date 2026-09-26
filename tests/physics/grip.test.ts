@@ -101,6 +101,26 @@ describe('grip', () => {
     expect(recovered).toBe(true);
   });
 
+  // C31 (AC 23)
+  it('skidding from real lateral slip', () => {
+    const slide = createHarness();
+    slide.settle();
+    const f = axis(slide.car, 0, 0, 1);
+    const side = axis(slide.car, 1, 0, 0);
+    const v = 60 / 3.6;
+    slide.car.body.setLinvel({ x: f.x * v + side.x * 5, y: f.y * v + side.y * 5, z: f.z * v + side.z * 5 }, true);
+    slide.step(NO_INPUT);
+    expect(slide.car.skidding).toBe(true);
+
+    const straight = createHarness();
+    straight.settle();
+    straight.setForwardKmh(100);
+    for (let i = 0; i < 60; i++) {
+      straight.step(NO_INPUT);
+      expect(straight.car.skidding, `step ${i + 1}`).toBe(false);
+    }
+  });
+
   // C13 (AC 13)
   it('steers while braking hard', () => {
     const h = createHarness();

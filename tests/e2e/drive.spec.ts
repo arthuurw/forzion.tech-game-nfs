@@ -106,6 +106,44 @@ test.describe('drive', () => {
     }
   });
 
+  // car-handling C33 (Surface, AC 6)
+  test('car debug exposes handling state', async ({ page }) => {
+    const info = await page.evaluate(() => {
+      const car = (window as any).__game.car;
+      return {
+        massKg: car.spec.massKg,
+        steerInput: car.steerInput,
+        bodyRoll: car.bodyRoll,
+        bodyPitch: car.bodyPitch,
+        sideslip: car.sideslip,
+        lateralG: car.lateralG,
+      };
+    });
+    expect(info.massKg).toBe(1250);
+    expect(info.steerInput).toBeGreaterThanOrEqual(-0.55);
+    expect(info.steerInput).toBeLessThanOrEqual(0.55);
+    for (const key of ['bodyRoll', 'bodyPitch', 'sideslip', 'lateralG'] as const) {
+      expect(typeof info[key], key).toBe('number');
+      expect(Number.isFinite(info[key]), key).toBe(true);
+    }
+    expect(Math.abs(await speedKmh(page))).toBeLessThan(1);
+    await page.keyboard.down('KeyA');
+    await advanceSim(page, 0.5);
+    const steer = await page.evaluate(() => (window as any).__game.car.steerInput as number);
+    await page.keyboard.up('KeyA');
+    expect(steer).toBeGreaterThan(0.5);
+  });
+
+  // car-handling C35 (door 1, startup config)
+  test('game builds the car from the default spec', async ({ page }) => {
+    const [live, expected] = await page.evaluate(async () => {
+      const mod = await import('/src/vehicle/carSpec.ts' as string);
+      return [(window as any).__game.car.spec, mod.DEFAULT_CAR];
+    });
+    expect(Object.keys(expected).length).toBe(26);
+    expect(live).toEqual(expected);
+  });
+
   // C11 (AC 9)
   test('reset puts car upright', async ({ page }) => {
     await page.evaluate(() => (window as any).__game.car.setRotation({ x: 0, y: 0, z: 1, w: 0 }));

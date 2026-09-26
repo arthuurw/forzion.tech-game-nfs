@@ -125,6 +125,8 @@ export class Car {
         .setContactForceEventThreshold(CONTACT_FORCE_THRESHOLD),
       this.body,
     );
+    // sem isto a massa só aparece depois do primeiro passo do mundo
+    this.body.recomputeMassPropertiesFromColliders();
 
     this.controller = world.createVehicleController(this.body);
     this.controller.setIndexForwardAxis = 2; // +Z é a frente (door 9)
