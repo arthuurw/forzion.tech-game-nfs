@@ -257,5 +257,5 @@ Cost: 25 provas unitárias em 4 arquivos, 2 de física real em 1 arquivo e 20 Pl
   - S5 +16k → 98k: `InteriorProps` ~5 KB, `CityScene` 20 KB, `WorldPhysics` 4 KB, `Game` ~20 KB, testes ~14 KB.
   - S6 +23k → 121k: `interiorMotion` ~8 KB, `Game` 44 KB, `CityScene` 20 KB, testes ~18 KB.
   - S7 +5k → 126k: `render.spec` 6 KB, `visual.spec` ~10 KB em parte, `purity.test` 2 KB.
-- **Total:** ~126k, abaixo do budget de 150k - one builder.
+- **Total:** ~126k, abaixo do budget de 150k - one builder. Mecanismo: one builder (sem pergunta, cabe no budget).
 - **Números de ajuste:** cores exatas da luz, geometria low-poly, shaders de balanço e de água, e como cada tipo vira `InstancedMesh` (global ou por chunk) são do build, até C1-C38 passarem. Os limites não mudam. Se o orçamento de 220 draw calls ou o boot de 30 s não couberem com tudo, é stop-and-ask (a troca seria cortar densidade ou um tipo de objeto, decisão do usuário).
