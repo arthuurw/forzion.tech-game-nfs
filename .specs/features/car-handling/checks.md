@@ -127,7 +127,7 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "brake split front biase
 
 ### S3 - Motor, câmbio e freios · 4 files · 24 KB · ~6k
 
-**C15** - Com `throttle`, marcha 3 e `wheelSpeedMs` tal que o `rpm` resultante seja 4500, `engineForce` = `torque(4500) × gearRatios[2] × finalDrive × drivetrainEfficiency / wheelRadiusM` (± 1e-6). Além disso:
+**C15** - ✅ Com `throttle`, marcha 3 e `wheelSpeedMs` tal que o `rpm` resultante seja 4500, `engineForce` = `torque(4500) × gearRatios[2] × finalDrive × drivetrainEfficiency / wheelRadiusM` (± 1e-6). Além disso:
 - `torque` interpola linearmente: no ponto médio entre dois pontos consecutivos da `torqueCurve`, dá a média dos dois torques.
 - Em cada ponto da curva, dá o valor exato.
 - Com `rpm` ≥ `redlineRpm`, `engineForce` = 0 (limitador).
@@ -136,7 +136,7 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "brake split front biase
 (AC 14)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "engine force follows the torque curve"`
 
-**C16** - `rpm` do estado devolvido, com `wheelSpeedMs` = `v`:
+**C16** - ✅ `rpm` do estado devolvido, com `wheelSpeedMs` = `v`:
 
 | Caso | `rpm` esperado |
 | --- | --- |
@@ -149,7 +149,7 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "engine force follows th
 O `rpm` fica sempre em `[1000, 7000]` numa varredura de `v` de −10 a 80 m/s em todas as marchas. Substitui free-roam-city C28. (AC 15)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "rpm from wheel speed and gear"`
 
-**C17** - Troca para cima:
+**C17** - ✅ Troca para cima:
 - Na marcha 2, com `throttle` e `v` que dá `rpm` ≥ 6500, o estado seguinte tem `gear` 3 e `shiftTimer` 0.25.
 - Nos 15 passos seguintes (0.25 s), mantendo o input, `engineForce` = 0. No 16º passo, `engineForce` > 0.
 - Na 6ª, com `rpm` ≥ 6500, `gear` continua 6.
@@ -157,7 +157,7 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "rpm from wheel speed an
 (AC 16, door 2)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "upshift at 6500 rpm with power cut"`
 
-**C18** - Troca para baixo:
+**C18** - ✅ Troca para baixo:
 - Na marcha 4, com `rpm` ≤ 2800 e `lastShiftAgo` ≥ 0.6, vai para a 3ª quando o `rpm` na 3ª fica abaixo de 6500.
 - Na mesma situação, mas com `v` tal que o `rpm` na 3ª seria ≥ 6500, continua na 4ª.
 - Com `lastShiftAgo` = 0.5, nenhuma troca acontece, nem para cima nem para baixo.
@@ -166,10 +166,10 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "upshift at 6500 rpm wit
 Com C17, substitui free-roam-city C27. (AC 17, door 2)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "downshift with hysteresis and hold time"`
 
-**C19** - No harness, parado e com `throttle`, o carro atinge 100 km/h num passo entre 5.5 s e 7.5 s de simulação (AC 18)
+**C19** - ✅ No harness, parado e com `throttle`, o carro atinge 100 km/h num passo entre 5.5 s e 7.5 s de simulação (AC 18)
 Proof: `npx vitest run tests/physics/powertrain.test.ts -t "zero to 100 kmh between 5.5 and 7.5 s"`
 
-**C20** - Top speed:
+**C20** - ✅ Top speed:
 - No harness, com `throttle` por 60 s, a velocidade aos 60 s está em `[215, 240]` km/h.
 - Entre 50 s e 60 s, ela varia menos de 3 km/h.
 - Em `stepDrivetrain` na 6ª a 230 km/h, com `rpm` abaixo de 7000, `engineForce` > 0: não há corte por velocidade.
@@ -178,16 +178,16 @@ Substitui free-roam-city C8. (AC 19)
 Proof: `npx vitest run tests/physics/powertrain.test.ts -t "top speed limited by drag"`
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "no speed cut below redline"`
 
-**C21** - No harness, a 100 km/h e sem entradas, o carro cai a 60 km/h num passo entre 4 s e 12 s (AC 20)
+**C21** - ✅ No harness, a 100 km/h e sem entradas, o carro cai a 60 km/h num passo entre 4 s e 12 s (AC 20)
 Proof: `npx vitest run tests/physics/powertrain.test.ts -t "coasting from 100 to 60 kmh"`
 
-**C22** - No harness, com `brake` a partir de 100 km/h em linha reta, a distância horizontal até a velocidade dianteira chegar a ≤ 1 km/h está em `[34, 45]` m (AC 21)
+**C22** - ✅ No harness, com `brake` a partir de 100 km/h em linha reta, a distância horizontal até a velocidade dianteira chegar a ≤ 1 km/h está em `[34, 45]` m (AC 21)
 Proof: `npx vitest run tests/physics/powertrain.test.ts -t "braking from 100 kmh stops in 34 to 45 m"`
 
-**C23** - No harness, parado na rampa de 9 % e virado para cima, com `throttle`, o carro atinge 60 km/h em até 10 s (AC 22)
+**C23** - ✅ No harness, parado na rampa de 9 % e virado para cima, com `throttle`, o carro atinge 60 km/h em até 10 s (AC 22)
 Proof: `npx vitest run tests/physics/powertrain.test.ts -t "climbs a 9 percent grade"`
 
-**C24** - Ré em `stepDrivetrain`:
+**C24** - ✅ Ré em `stepDrivetrain`:
 - Com `brake` e velocidade dianteira ≤ 1 km/h, entra em `gear` −1 com `engineForce` < 0.
 - Em ré, `engineForce` < 0 a −29 km/h e = 0 a −30 e a −31 km/h (corte a −29.5).
 - Com `throttle` em `gear` −1 e velocidade ≥ −1 km/h, volta para `gear` 1.
@@ -195,7 +195,7 @@ Proof: `npx vitest run tests/physics/powertrain.test.ts -t "climbs a 9 percent g
 Substitui free-roam-city C4, com o mesmo contrato do AC 3. (free-roam-city AC 3, door 2)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "reverse gear capped at 30 kmh"`
 
-**C25** - Com `handbrake` a 60 km/h, `stepDrivetrain` dá:
+**C25** - ✅ Com `handbrake` a 60 km/h, `stepDrivetrain` dá:
 - `brakeFront` = 0.
 - `brakeRear` > 0.
 - `rearFrictionFactor` = `handbrakeRearGrip` = 0.4.
@@ -204,7 +204,7 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "reverse gear capped at 
 Substitui free-roam-city C7, com o mesmo contrato do AC 5. (free-roam-city AC 5)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "handbrake locks rear and cuts rear grip"`
 
-**C26** - `stepDrivetrain` é pura:
+**C26** - ✅ `stepDrivetrain` é pura:
 - Duas chamadas com o mesmo `(spec, state, input, wheelSpeedMs, dt)` devolvem resultados iguais campo a campo.
 - O objeto `state` recebido não muda (congelado com `Object.freeze` no teste).
 - O módulo não exporta mais `computeDrive`, `gearFor` nem `rpmFor`.
