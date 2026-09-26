@@ -102,7 +102,9 @@ Chuva, neon que pisca, cones de farol, marcas de pneu, fumaça no drift, faísca
 15. WHEN a `CollisionEvent` with `impulse` of 3000 N·s or more is drained THEN the system SHALL spawn 40 spark particles at the contact point living 0.4 s, and `__game.effects.lastCollision.impulse` SHALL report that impulse
 16. IF a `CollisionEvent` has `impulse` below 3000 N·s THEN the system SHALL spawn no sparks and SHALL not update `lastCollision`
 
-**Independent test:** dirigir na chuva, puxar o freio de mão a 60 km/h e ver marcas + fumaça, bater num prédio e ver faíscas.
+26. The system SHALL change each sign material's `emissiveIntensity` by at most 0.2 over any 0.5 s window, using breathing frequencies of 0.5 Hz or less - added 2026-09-25 at the user's request: "as luzes nas janelas estão piscando demais. coloque um ambiente um pouco mais low-cortisol"
+
+**Independent test:** dirigir na chuva, puxar o freio de mão a 60 km/h e ver marcas + fumaça, bater num prédio e ver faíscas; os letreiros respiram devagar, sem piscar.
 
 ### S4: Câmera e velocidade (P2)
 
@@ -143,6 +145,7 @@ Product capabilities only.
 | Menu de opções gráficas | `?quality=` cobre o toggle; menu vem com a carreira (sub-projeto 5) |
 | Tráfego, dano visual, ciclo dia/noite | sub-projetos 6 e além |
 | Poças com física (aquaplanagem) | efeito visual só; física do pneu não muda |
+| Janelas acendendo e apagando ao longo do tempo | ambiente calmo pedido pelo usuário; janelas são estáticas |
 
 ## Assumptions
 

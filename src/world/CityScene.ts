@@ -306,7 +306,7 @@ function makeFacadeMaterial(set: PbrSet | undefined, type: number): THREE.MeshSt
     material.normalMap = set.normalMap;
     material.roughnessMap = set.roughnessMap;
   }
-  const litRatio = [0.2, 0.26, 0.18, 0.22][type] ?? 0.2;
+  const litRatio = [0.14, 0.18, 0.12, 0.16][type] ?? 0.14;
 
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader
@@ -354,11 +354,15 @@ float windowHash(vec2 c, float s) { return fract(sin(dot(c + s * 97.0, vec2(12.9
 vec2 cellId = floor(vCell);
 vec2 inCell = fract(vCell);
 // janela de 1.6 m x 1.4 m no meio da célula de 4 m
-float glassMask = step(0.3, inCell.x) * step(inCell.x, 0.7) * step(0.35, inCell.y) * step(inCell.y, 0.7);
+// bordas suavizadas pela largura do pixel: sem degraus, a janela não cintila com a câmera andando
+vec2 fw = max(fwidth(vCell), vec2(1e-4));
+vec2 winLo = smoothstep(vec2(0.3, 0.35) - fw, vec2(0.3, 0.35) + fw, inCell);
+vec2 winHi = 1.0 - smoothstep(vec2(0.7) - fw, vec2(0.7) + fw, inCell);
+float glassMask = winLo.x * winLo.y * winHi.x * winHi.y;
 float litMask = glassMask * step(windowHash(cellId, vSeedF), ${litRatio.toFixed(2)});
 // longe, a janela fica menor que um pixel e o padrão vira ruído: troca pela média da célula
 float cellPx = max(fwidth(vCell.x), fwidth(vCell.y));
-float detail = 1.0 - smoothstep(0.08, 0.3, cellPx);
+float detail = 1.0 - smoothstep(0.05, 0.2, cellPx);
 float glass = mix(0.14, glassMask, detail);
 float lit = mix(0.14 * ${litRatio.toFixed(2)}, litMask, detail);
 glass *= (1.0 - step(0.5, vRoof));

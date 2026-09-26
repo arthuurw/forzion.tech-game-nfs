@@ -63,7 +63,7 @@ export class Rain {
           vec2 p = gl_PointCoord - 0.5;
           float streak = (1.0 - smoothstep(0.0, 0.06, abs(p.x))) * (1.0 - smoothstep(0.35, 0.5, abs(p.y)));
           if (streak < 0.01) discard;
-          gl_FragColor = vec4(vec3(0.62, 0.72, 0.9), 0.38 * streak * vFade);
+          gl_FragColor = vec4(vec3(0.62, 0.72, 0.9), 0.22 * streak * vFade);
         }
       `,
       transparent: true,
