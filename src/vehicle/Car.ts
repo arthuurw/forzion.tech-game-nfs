@@ -11,6 +11,7 @@ import {
   type DriveInput,
   type DrivetrainState,
 } from './drivetrain';
+import { yawAssistTorque } from './yawAssist';
 
 /**
  * O carro: um corpo rígido (chassi) + 4 rodas por raycast do Rapier (door 2).
@@ -74,6 +75,8 @@ export class Car {
   drive: DrivetrainState;
   /** aceleração lateral (g), média dos últimos 30 passos */
   lateralG = 0;
+  /** torque da ajuda de giro aplicado no último passo (N·m, eixo Y do mundo; door 1 da yaw-assist) */
+  yawAssistNm = 0;
 
   private readonly wheelMeshes: THREE.Object3D[] = [];
   private wheelSpin = 0;
@@ -174,6 +177,7 @@ export class Car {
     }
     this.controller.updateVehicle(dt);
     this.restoreRollMoment();
+    this.applyYawAssist(dt);
     this.applyResistance(dt);
     this.sampleLateralG();
     this.wheelSpin += (this.speedMs() * dt) / this.wheelRadius;
@@ -344,6 +348,20 @@ export class Car {
       tz += h * (up.x * f.y - up.y * f.x);
     }
     this.body.applyTorqueImpulse({ x: tx, y: ty, z: tz }, true);
+  }
+
+  /** A única ajuda arcade (AD-013): torque em Y do mundo que leva o giro ao alvo das rodas. */
+  private applyYawAssist(dt: number): void {
+    const yawInertia = this.body.effectiveAngularInertia().m22;
+    this.yawAssistNm = yawAssistTorque(
+      this.spec,
+      this.drive.steer,
+      this.speedMs(),
+      this.body.angvel().y,
+      this.wheelsOnGround(),
+      yawInertia,
+    );
+    if (this.yawAssistNm !== 0) this.body.applyTorqueImpulse({ x: 0, y: this.yawAssistNm * dt, z: 0 }, true);
   }
 
   private sampleLateralG(): void {

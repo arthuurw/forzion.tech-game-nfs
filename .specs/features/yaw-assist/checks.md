@@ -17,24 +17,24 @@ Plan: `.specs/features/yaw-assist/plan.md`
 
 ### S1 - O carro aponta rápido e vira mais · 5 files · 40 KB · ~10k
 
-**C1** - A 40 km/h, com `steer +1` a partir do passo 0 (volante com a rampa da car-feel), o primeiro passo com giro ≥ 0.9 × giro em regime é no máximo o passo 15 (0.25 s) (AC 1).
+**C1** - ✅ A 40 km/h, com `steer +1` a partir do passo 0 (volante com a rampa da car-feel), o primeiro passo com giro ≥ 0.9 × giro em regime é no máximo o passo 15 (0.25 s) (AC 1).
 Proof: `npx vitest run tests/physics/agility.test.ts -t "points into the turn within 0.25 s at 40 kmh"`
 
-**C2** - Giro em regime a 60 km/h ≥ 32°/s (0.5585 rad/s) (AC 2).
+**C2** - ✅ Giro em regime a 60 km/h ≥ 32°/s (0.5585 rad/s) (AC 2).
 Proof: `npx vitest run tests/physics/agility.test.ts -t "turns at least 32 degrees per second at 60 kmh"`
 
-**C3** - Giro em regime a 100 km/h ≥ 20°/s (0.3491 rad/s) (AC 3).
+**C3** - ✅ Giro em regime a 100 km/h ≥ 20°/s (0.3491 rad/s) (AC 3).
 Proof: `npx vitest run tests/physics/agility.test.ts -t "turns at least 20 degrees per second at 100 kmh"`
 
-**C4** - A 100 km/h, depois de 180 passos com `steer +1`, `steer` volta a 0 (acelerador mantendo 100 km/h): o giro fica abaixo de 3°/s (0.05236 rad/s) em algum passo dos 48 seguintes (0.8 s) e continua abaixo disso até o passo 60 depois de soltar (AC 4).
+**C4** - ✅ A 100 km/h, depois de 180 passos com `steer +1`, `steer` volta a 0 (acelerador mantendo 100 km/h): o giro fica abaixo de 3°/s (0.05236 rad/s) em algum passo dos 48 seguintes (0.8 s) e continua abaixo disso até o passo 60 depois de soltar (AC 4).
 Proof: `npx vitest run tests/physics/agility.test.ts -t "stops turning within 0.8 s after release"`
 
-**C5** - Para 60, 90, 120, 150 e 180 km/h, com `steer +1` por 3 s, a aceleração lateral em janela de 0.5 s fica ≤ 1.05 g em todo passo.
+**C5** - ✅ Para 60, 90, 120, 150 e 180 km/h, com `steer +1` por 3 s, a aceleração lateral em janela de 0.5 s fica ≤ 1.05 g em todo passo.
 
 Substitui car-feel C8. (AC 5)
 Proof: `npx vitest run tests/physics/agility.test.ts -t "lateral grip never exceeds 1.05 g"`
 
-**C6** - A 60 km/h, com `steer +1`, a aceleração lateral em janela de 0.5 s atinge ≥ 0.85 g em algum passo dos primeiros 120.
+**C6** - ✅ A 60 km/h, com `steer +1`, a aceleração lateral em janela de 0.5 s atinge ≥ 0.85 g em algum passo dos primeiros 120.
 
 Substitui car-feel C9. (AC 6)
 Proof: `npx vitest run tests/physics/agility.test.ts -t "reaches at least 0.85 g at 60 kmh"`

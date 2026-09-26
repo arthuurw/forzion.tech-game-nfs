@@ -72,6 +72,8 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "steering ramps at 4 and
 Substitui car-handling C7. (AC 7)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "steering target with 1.7 g"`
 
+> C8 e C9 foram superados pela yaw-assist (C8 → C5, C9 → C6 de `.specs/features/yaw-assist/checks.md`), e os testes deles foram removidos. As provas de C8 e C9 citadas abaixo não existem mais.
+
 **C8** - ✅ Para 60, 90, 120, 150 e 180 km/h: `steer +1` por 3 s, com `throttle` sempre que a velocidade está abaixo da inicial. A aceleração lateral em janela de 0.5 s fica ≤ 0.95 g em todo passo.
 
 Substitui car-handling C8. (AC 8)
