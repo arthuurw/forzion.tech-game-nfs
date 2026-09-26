@@ -69,7 +69,7 @@ Proof: `npx vitest run tests/physics/stability.test.ts -t "nose dives under brak
 
 ### S2 - Aderência, direção e derrapagem · 5 files · 22 KB · ~6k
 
-**C6** - Rampa do volante em `stepDrivetrain`, a 0 km/h, com `dt` = 1/60 e partindo de `steer` 0:
+**C6** - ✅ Rampa do volante em `stepDrivetrain`, a 0 km/h, com `dt` = 1/60 e partindo de `steer` 0:
 - Com `steer` do input +1, o `steer` cresce exatamente 2.5/60 rad por passo. Chega a 0.55 no passo 14 e fica em 0.55, sem passar.
 - Soltando (input 0), cai exatamente 3.5/60 por passo até 0, sem passar para o lado oposto.
 - De +0.55 com input −1, vai até −0.55 sem pular valores: cada passo muda no máximo 3.5/60.
@@ -78,7 +78,7 @@ Proof: `npx vitest run tests/physics/stability.test.ts -t "nose dives under brak
 (AC 6, door 2)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "steering ramps toward the target"`
 
-**C7** - O ângulo alvo do volante é `min(0.55, atan(1.3 × 9.81 × 2.6 / v²))`, com `v` a velocidade dianteira em m/s. Casos, com tolerância de 1e-6:
+**C7** - ✅ O ângulo alvo do volante é `min(0.55, atan(1.3 × 9.81 × 2.6 / v²))`, com `v` a velocidade dianteira em m/s. Casos, com tolerância de 1e-6:
 
 | `v` (m/s) | alvo esperado |
 | --- | --- |
@@ -93,19 +93,19 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "steering ramps toward t
 (AC 7)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "steering target shrinks with speed"`
 
-**C8** - Para as velocidades 60, 90, 120, 150 e 180 km/h: `steer +1` por 3 s, com `throttle` ligado sempre que a velocidade está abaixo da inicial. A aceleração lateral em janela de 0.5 s fica ≤ 1.15 g em todo passo (AC 8)
+**C8** - ✅ Para as velocidades 60, 90, 120, 150 e 180 km/h: `steer +1` por 3 s, com `throttle` ligado sempre que a velocidade está abaixo da inicial. A aceleração lateral em janela de 0.5 s fica ≤ 1.15 g em todo passo (AC 8)
 Proof: `npx vitest run tests/physics/grip.test.ts -t "lateral grip never exceeds 1.15 g"`
 
-**C9** - A 60 km/h, com `steer +1` e o mesmo controle de `throttle` de C8, a aceleração lateral em janela de 0.5 s atinge ≥ 0.80 g em algum passo dos primeiros 120 (2 s) (AC 9)
+**C9** - ✅ A 60 km/h, com `steer +1` e o mesmo controle de `throttle` de C8, a aceleração lateral em janela de 0.5 s atinge ≥ 0.80 g em algum passo dos primeiros 120 (2 s) (AC 9)
 Proof: `npx vitest run tests/physics/grip.test.ts -t "reaches at least 0.8 g at 60 kmh"`
 
-**C10** - 10 casos: velocidades 60, 90, 120, 150 e 180 km/h × {com `throttle`, sem `throttle`}. Com `steer +1`, sem `handbrake`, por 3 s, o sideslip fica ≤ 12° em todo passo (AC 10)
+**C10** - ✅ 10 casos: velocidades 60, 90, 120, 150 e 180 km/h × {com `throttle`, sem `throttle`}. Com `steer +1`, sem `handbrake`, por 3 s, o sideslip fica ≤ 12° em todo passo (AC 10)
 Proof: `npx vitest run tests/physics/grip.test.ts -t "understeers instead of spinning"`
 
-**C11** - A 60 km/h, com `steer +1` e `handbrake`, o sideslip passa de 20° em algum passo dos primeiros 90 (1.5 s) (AC 11)
+**C11** - ✅ A 60 km/h, com `steer +1` e `handbrake`, o sideslip passa de 20° em algum passo dos primeiros 90 (1.5 s) (AC 11)
 Proof: `npx vitest run tests/physics/grip.test.ts -t "handbrake kicks the rear out"`
 
-**C12** - Na continuação de C11:
+**C12** - ✅ Na continuação de C11:
 - No primeiro passo em que o sideslip passa de 20°, `handbrake` e `steer` são soltos.
 - O sideslip fica abaixo de 8° em algum passo dentro dos 150 seguintes (2.5 s).
 - O carro não passa a andar para trás: a velocidade dianteira fica > 0.
@@ -113,10 +113,10 @@ Proof: `npx vitest run tests/physics/grip.test.ts -t "handbrake kicks the rear o
 (AC 12)
 Proof: `npx vitest run tests/physics/grip.test.ts -t "car recovers after the handbrake is released"`
 
-**C13** - A 100 km/h, com `brake` e `steer +1` por 60 passos (1.0 s), o heading muda pelo menos +0.20 rad, com diferença normalizada em (−π, π] (AC 13)
+**C13** - ✅ A 100 km/h, com `brake` e `steer +1` por 60 passos (1.0 s), o heading muda pelo menos +0.20 rad, com diferença normalizada em (−π, π] (AC 13)
 Proof: `npx vitest run tests/physics/grip.test.ts -t "steers while braking hard"`
 
-**C14** - `stepDrivetrain` com `brake` a 60 km/h:
+**C14** - ✅ `stepDrivetrain` com `brake` a 60 km/h:
 - `engineForce` é 0.
 - `brakeFront + brakeRear` = `brakeForceN`.
 - `brakeFront / (brakeFront + brakeRear)` = `brakeBiasFront` = 0.65 (± 1e-9).
