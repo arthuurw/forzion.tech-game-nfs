@@ -75,12 +75,14 @@ describe('effects math', () => {
     expect(SPARK_IMPULSE_THRESHOLD).toBe(3000);
   });
 
-  // visual-upgrade C36 (AC 13) - limiar de derrapagem
-  it('skidding needs handbrake above 20 kmh', () => {
-    expect(isSkidding(true, 21)).toBe(true);
-    expect(isSkidding(true, 20)).toBe(false);
-    expect(isSkidding(true, 5)).toBe(false);
-    expect(isSkidding(false, 100)).toBe(false);
+  // car-handling C30 (AC 23) - substitui a parte unitária de visual-upgrade C36
+  it('skidding from lateral slip or handbrake', () => {
+    expect(isSkidding(false, 100, 2.6)).toBe(true);
+    expect(isSkidding(false, 100, 2.5)).toBe(false);
+    expect(isSkidding(false, 5, 3)).toBe(true);
+    expect(isSkidding(true, 21, 0)).toBe(true);
+    expect(isSkidding(true, 20, 0)).toBe(false);
+    expect(isSkidding(false, 100, 0)).toBe(false);
   });
 
   // visual-upgrade C35 (AC 15, AC 16) - colisão abaixo do limiar não muda lastCollision

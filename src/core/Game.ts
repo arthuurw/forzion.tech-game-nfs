@@ -18,6 +18,7 @@ import { ChaseCamera } from '../camera/ChaseCamera';
 import { Hud } from '../hud/Hud';
 import { Minimap } from '../hud/Minimap';
 import { Car } from '../vehicle/Car';
+import { DEFAULT_CAR } from '../vehicle/carSpec';
 import { steerAxis } from './input';
 import { DEFAULT_SEED } from '../world/CityGenerator';
 import { CityScene, type WorldData } from '../world/CityScene';
@@ -142,7 +143,7 @@ export class Game {
     // spawn: parado numa avenida do centro, alinhado a ela, 12 m antes do cruzamento
     // central (AC 33): à frente e à esquerda há pista livre (a avenida transversal)
     const spawn = centralSpawn(network.roads);
-    this.car = new Car(this.world, this.scene, assets, { x: spawn.x, y: spawn.y + 1.2, z: spawn.z });
+    this.car = new Car(this.world, this.scene, assets, { x: spawn.x, y: spawn.y + 1.2, z: spawn.z }, DEFAULT_CAR);
     this.car.teleport(spawn.x, spawn.y + 1.2, spawn.z, spawn.heading);
     this.city.chunks.update(spawn.x, spawn.z);
 
@@ -528,6 +529,24 @@ export class Game {
         },
         get rpm() {
           return game.car.state().rpm;
+        },
+        /** ficha técnica com que o carro foi construído (car-handling door 1) */
+        spec: game.car.spec,
+        /** ângulo atual das rodas dianteiras depois da rampa do volante (rad) */
+        get steerInput() {
+          return game.car.steerInput;
+        },
+        get bodyRoll() {
+          return game.car.bodyRoll;
+        },
+        get bodyPitch() {
+          return game.car.bodyPitch;
+        },
+        get sideslip() {
+          return game.car.sideslip;
+        },
+        get lateralG() {
+          return game.car.lateralG;
         },
         placeholder: game.car.placeholder,
         get collisionEvents() {

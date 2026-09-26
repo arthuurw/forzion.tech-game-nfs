@@ -146,6 +146,41 @@ test.describe('hud - rodada 2', () => {
     expect(tip.minX).toBeGreaterThanOrEqual(74);
   });
 
+  // car-handling C32 (AC 24, AC 25) - troca automática com queda de giro, e o HUD mostra a marcha engatada
+  test('automatic upshift drops rpm on the hud', async ({ page }) => {
+    await gotoGame(page);
+    await page.keyboard.down('KeyW');
+    const samples = await page.evaluate(
+      () =>
+        new Promise<Array<{ t: number; gear: number; rpm: number; label: string | null }>>((resolve) => {
+          const g = (window as any).__game;
+          const start = g.simTime as number;
+          const out: Array<{ t: number; gear: number; rpm: number; label: string | null }> = [];
+          const tick = (): void => {
+            out.push({
+              t: g.simTime,
+              gear: g.car.gear,
+              rpm: g.car.rpm,
+              label: document.querySelector('#gear')!.textContent,
+            });
+            if (g.simTime >= start + 4) resolve(out);
+            else requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        }),
+    );
+    await page.keyboard.up('KeyW');
+
+    for (const s of samples) expect(s.label, `t ${s.t.toFixed(2)}`).toBe(String(s.gear));
+    const up = samples.findIndex((s, i) => i > 0 && s.gear > samples[i - 1]!.gear);
+    expect(up).toBeGreaterThan(0);
+    const before = samples[up - 1]!;
+    const after = samples.filter((s) => s.t > before.t && s.t <= before.t + 0.3);
+    expect(after.length).toBeGreaterThan(0);
+    const lowest = Math.min(...after.map((s) => s.rpm));
+    expect(before.rpm - lowest).toBeGreaterThanOrEqual(1500);
+  });
+
   // C44 (AC 21, AC 22) - marcha e barra de RPM no DOM batem com o estado do carro
   test('gear and rpm bar match car state', async ({ page }) => {
     await gotoGame(page);

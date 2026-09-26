@@ -39,6 +39,7 @@ Reusa o `DynamicRayCastVehicleController` do Rapier. A AD-002 fica como está: o
 4. `vehicle/Car` (exists)
    - aplica no corpo do Rapier a massa, o centro de massa e a inércia da ficha
    - aplica o comando no controlador e o arrasto como força no corpo
+   - devolve ao corpo o momento de rolagem que o Rapier descarta: ele aplica a força lateral de cada roda a só 10 % da altura do contato ("roll influence" do Bullet), e sem isso a rolagem sai ~0.3° a 1 g
    - mede o escorregamento lateral das rodas para o campo `skidding` (exists)
    - expõe `gear` e `rpm` vindos do câmbio
 5. `vehicle/Effects`, `hud/Hud`, `audio/AudioEngine`, `camera/ChaseCamera` (exist) - leem `skidding`, `gear`, `rpm` e `yawRate` como hoje

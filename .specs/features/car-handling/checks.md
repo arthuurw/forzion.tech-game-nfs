@@ -35,7 +35,7 @@ Os testes de física usam o harness de `tests/physics/`:
 
 ### S1 - O carro não capota em chão plano · 6 files · 26 KB · ~7k
 
-**C1** - No harness, parado e assentado:
+**C1** - ✅ No harness, parado e assentado:
 - `body.mass()` está em `[1249, 1251]` kg.
 - O centro de massa no mundo (`body.worldCom()`) fica no máximo 0.50 m acima do plano `y = 0`.
 - `DEFAULT_CAR.trackM / (2 × essa altura)` ≥ 1.6.
@@ -43,7 +43,7 @@ Os testes de física usam o harness de `tests/physics/`:
 (AC 1, door 1)
 Proof: `npx vitest run tests/physics/stability.test.ts -t "mass and low center of mass"`
 
-**C2** - Matriz table-driven de 54 casos: 6 manobras × velocidade inicial 40, 60, 80, 100, 120, 140, 160, 180 e 200 km/h. Cada caso dura 3 s, e a inclinação fica em no máximo 15° em todo passo. As 6 manobras:
+**C2** - ✅ Matriz table-driven de 54 casos: 6 manobras × velocidade inicial 40, 60, 80, 100, 120, 140, 160, 180 e 200 km/h. Cada caso dura 3 s, e a inclinação fica em no máximo 15° em todo passo. As 6 manobras:
 - `steer +1`
 - `steer −1`
 - zigue-zague, trocando o sinal de `steer` a cada 30 passos
@@ -54,22 +54,24 @@ Proof: `npx vitest run tests/physics/stability.test.ts -t "mass and low center o
 (AC 2)
 Proof: `npx vitest run tests/physics/stability.test.ts -t "no rollover across the maneuver matrix"`
 
-**C3** - Nos mesmos 54 casos, depois dos 3 s com todas as entradas soltas, as 4 rodas estão em contato (`wheelIsInContact`) em algum passo dentro de 60 passos (1.0 s) (AC 3)
+**C3** - ✅ Nos mesmos 54 casos, depois dos 3 s com todas as entradas soltas, as 4 rodas estão em contato (`wheelIsInContact`) em algum passo dentro de 60 passos (1.0 s) (AC 3)
 Proof: `npx vitest run tests/physics/stability.test.ts -t "all four wheels back on the ground after release"`
 
-**C4** - Curva à esquerda (`steer +1`) a partir de 80 km/h, com `throttle` ligado sempre que a velocidade está abaixo de 80 km/h, por 3 s:
-- A rolagem média dos passos 90–180 está entre −6.0° e −1.0°. Negativa: o lado esquerdo, de dentro da curva, sobe menos que o de fora, ou seja, o carro inclina para fora.
-- O mesmo com `steer −1` dá média entre +1.0° e +6.0°.
+**C4** - ✅ Curva à esquerda (`steer +1`) a partir de 80 km/h, com `throttle` ligado sempre que a velocidade está abaixo de 80 km/h, por 3 s:
+- A rolagem média dos passos 90–180 está entre +1.0° e +6.0°. Positiva: o lado esquerdo, de dentro da curva, sobe, ou seja, o carro inclina para fora.
+- O mesmo com `steer −1` dá média entre −6.0° e −1.0°.
+
+(Sinal corrigido com o usuário em 2026-09-26: a versão aprovada pedia o sinal oposto, que pela definição de rolagem acima seria inclinar para dentro, contradizendo o AC 4.)
 
 (AC 4)
 Proof: `npx vitest run tests/physics/stability.test.ts -t "body roll leans out of the turn"`
 
-**C5** - Com `brake` a partir de 100 km/h, a menor arfagem nos primeiros 30 passos (0.5 s) está entre −4.0° e −0.5°, com a frente para baixo (AC 5)
+**C5** - ✅ Com `brake` a partir de 100 km/h, a menor arfagem nos primeiros 30 passos (0.5 s) está entre −4.0° e −0.5°, com a frente para baixo (AC 5)
 Proof: `npx vitest run tests/physics/stability.test.ts -t "nose dives under braking"`
 
 ### S2 - Aderência, direção e derrapagem · 5 files · 22 KB · ~6k
 
-**C6** - Rampa do volante em `stepDrivetrain`, a 0 km/h, com `dt` = 1/60 e partindo de `steer` 0:
+**C6** - ✅ Rampa do volante em `stepDrivetrain`, a 0 km/h, com `dt` = 1/60 e partindo de `steer` 0:
 - Com `steer` do input +1, o `steer` cresce exatamente 2.5/60 rad por passo. Chega a 0.55 no passo 14 e fica em 0.55, sem passar.
 - Soltando (input 0), cai exatamente 3.5/60 por passo até 0, sem passar para o lado oposto.
 - De +0.55 com input −1, vai até −0.55 sem pular valores: cada passo muda no máximo 3.5/60.
@@ -78,7 +80,7 @@ Proof: `npx vitest run tests/physics/stability.test.ts -t "nose dives under brak
 (AC 6, door 2)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "steering ramps toward the target"`
 
-**C7** - O ângulo alvo do volante é `min(0.55, atan(1.3 × 9.81 × 2.6 / v²))`, com `v` a velocidade dianteira em m/s. Casos, com tolerância de 1e-6:
+**C7** - ✅ O ângulo alvo do volante é `min(0.55, atan(1.3 × 9.81 × 2.6 / v²))`, com `v` a velocidade dianteira em m/s. Casos, com tolerância de 1e-6:
 
 | `v` (m/s) | alvo esperado |
 | --- | --- |
@@ -93,19 +95,19 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "steering ramps toward t
 (AC 7)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "steering target shrinks with speed"`
 
-**C8** - Para as velocidades 60, 90, 120, 150 e 180 km/h: `steer +1` por 3 s, com `throttle` ligado sempre que a velocidade está abaixo da inicial. A aceleração lateral em janela de 0.5 s fica ≤ 1.15 g em todo passo (AC 8)
+**C8** - ✅ Para as velocidades 60, 90, 120, 150 e 180 km/h: `steer +1` por 3 s, com `throttle` ligado sempre que a velocidade está abaixo da inicial. A aceleração lateral em janela de 0.5 s fica ≤ 1.15 g em todo passo (AC 8)
 Proof: `npx vitest run tests/physics/grip.test.ts -t "lateral grip never exceeds 1.15 g"`
 
-**C9** - A 60 km/h, com `steer +1` e o mesmo controle de `throttle` de C8, a aceleração lateral em janela de 0.5 s atinge ≥ 0.80 g em algum passo dos primeiros 120 (2 s) (AC 9)
+**C9** - ✅ A 60 km/h, com `steer +1` e o mesmo controle de `throttle` de C8, a aceleração lateral em janela de 0.5 s atinge ≥ 0.80 g em algum passo dos primeiros 120 (2 s) (AC 9)
 Proof: `npx vitest run tests/physics/grip.test.ts -t "reaches at least 0.8 g at 60 kmh"`
 
-**C10** - 10 casos: velocidades 60, 90, 120, 150 e 180 km/h × {com `throttle`, sem `throttle`}. Com `steer +1`, sem `handbrake`, por 3 s, o sideslip fica ≤ 12° em todo passo (AC 10)
+**C10** - ✅ 10 casos: velocidades 60, 90, 120, 150 e 180 km/h × {com `throttle`, sem `throttle`}. Com `steer +1`, sem `handbrake`, por 3 s, o sideslip fica ≤ 12° em todo passo (AC 10)
 Proof: `npx vitest run tests/physics/grip.test.ts -t "understeers instead of spinning"`
 
-**C11** - A 60 km/h, com `steer +1` e `handbrake`, o sideslip passa de 20° em algum passo dos primeiros 90 (1.5 s) (AC 11)
+**C11** - ✅ A 60 km/h, com `steer +1` e `handbrake`, o sideslip passa de 20° em algum passo dos primeiros 90 (1.5 s) (AC 11)
 Proof: `npx vitest run tests/physics/grip.test.ts -t "handbrake kicks the rear out"`
 
-**C12** - Na continuação de C11:
+**C12** - ✅ Na continuação de C11:
 - No primeiro passo em que o sideslip passa de 20°, `handbrake` e `steer` são soltos.
 - O sideslip fica abaixo de 8° em algum passo dentro dos 150 seguintes (2.5 s).
 - O carro não passa a andar para trás: a velocidade dianteira fica > 0.
@@ -113,10 +115,10 @@ Proof: `npx vitest run tests/physics/grip.test.ts -t "handbrake kicks the rear o
 (AC 12)
 Proof: `npx vitest run tests/physics/grip.test.ts -t "car recovers after the handbrake is released"`
 
-**C13** - A 100 km/h, com `brake` e `steer +1` por 60 passos (1.0 s), o heading muda pelo menos +0.20 rad, com diferença normalizada em (−π, π] (AC 13)
+**C13** - ✅ A 100 km/h, com `brake` e `steer +1` por 60 passos (1.0 s), o heading muda pelo menos +0.20 rad, com diferença normalizada em (−π, π] (AC 13)
 Proof: `npx vitest run tests/physics/grip.test.ts -t "steers while braking hard"`
 
-**C14** - `stepDrivetrain` com `brake` a 60 km/h:
+**C14** - ✅ `stepDrivetrain` com `brake` a 60 km/h:
 - `engineForce` é 0.
 - `brakeFront + brakeRear` = `brakeForceN`.
 - `brakeFront / (brakeFront + brakeRear)` = `brakeBiasFront` = 0.65 (± 1e-9).
@@ -127,7 +129,7 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "brake split front biase
 
 ### S3 - Motor, câmbio e freios · 4 files · 24 KB · ~6k
 
-**C15** - Com `throttle`, marcha 3 e `wheelSpeedMs` tal que o `rpm` resultante seja 4500, `engineForce` = `torque(4500) × gearRatios[2] × finalDrive × drivetrainEfficiency / wheelRadiusM` (± 1e-6). Além disso:
+**C15** - ✅ Com `throttle`, marcha 3 e `wheelSpeedMs` tal que o `rpm` resultante seja 4500, `engineForce` = `torque(4500) × gearRatios[2] × finalDrive × drivetrainEfficiency / wheelRadiusM` (± 1e-6). Além disso:
 - `torque` interpola linearmente: no ponto médio entre dois pontos consecutivos da `torqueCurve`, dá a média dos dois torques.
 - Em cada ponto da curva, dá o valor exato.
 - Com `rpm` ≥ `redlineRpm`, `engineForce` = 0 (limitador).
@@ -136,7 +138,7 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "brake split front biase
 (AC 14)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "engine force follows the torque curve"`
 
-**C16** - `rpm` do estado devolvido, com `wheelSpeedMs` = `v`:
+**C16** - ✅ `rpm` do estado devolvido, com `wheelSpeedMs` = `v`:
 
 | Caso | `rpm` esperado |
 | --- | --- |
@@ -149,7 +151,7 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "engine force follows th
 O `rpm` fica sempre em `[1000, 7000]` numa varredura de `v` de −10 a 80 m/s em todas as marchas. Substitui free-roam-city C28. (AC 15)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "rpm from wheel speed and gear"`
 
-**C17** - Troca para cima:
+**C17** - ✅ Troca para cima:
 - Na marcha 2, com `throttle` e `v` que dá `rpm` ≥ 6500, o estado seguinte tem `gear` 3 e `shiftTimer` 0.25.
 - Nos 15 passos seguintes (0.25 s), mantendo o input, `engineForce` = 0. No 16º passo, `engineForce` > 0.
 - Na 6ª, com `rpm` ≥ 6500, `gear` continua 6.
@@ -157,7 +159,7 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "rpm from wheel speed an
 (AC 16, door 2)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "upshift at 6500 rpm with power cut"`
 
-**C18** - Troca para baixo:
+**C18** - ✅ Troca para baixo:
 - Na marcha 4, com `rpm` ≤ 2800 e `lastShiftAgo` ≥ 0.6, vai para a 3ª quando o `rpm` na 3ª fica abaixo de 6500.
 - Na mesma situação, mas com `v` tal que o `rpm` na 3ª seria ≥ 6500, continua na 4ª.
 - Com `lastShiftAgo` = 0.5, nenhuma troca acontece, nem para cima nem para baixo.
@@ -166,10 +168,10 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "upshift at 6500 rpm wit
 Com C17, substitui free-roam-city C27. (AC 17, door 2)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "downshift with hysteresis and hold time"`
 
-**C19** - No harness, parado e com `throttle`, o carro atinge 100 km/h num passo entre 5.5 s e 7.5 s de simulação (AC 18)
+**C19** - ✅ No harness, parado e com `throttle`, o carro atinge 100 km/h num passo entre 5.5 s e 7.5 s de simulação (AC 18)
 Proof: `npx vitest run tests/physics/powertrain.test.ts -t "zero to 100 kmh between 5.5 and 7.5 s"`
 
-**C20** - Top speed:
+**C20** - ✅ Top speed:
 - No harness, com `throttle` por 60 s, a velocidade aos 60 s está em `[215, 240]` km/h.
 - Entre 50 s e 60 s, ela varia menos de 3 km/h.
 - Em `stepDrivetrain` na 6ª a 230 km/h, com `rpm` abaixo de 7000, `engineForce` > 0: não há corte por velocidade.
@@ -178,16 +180,16 @@ Substitui free-roam-city C8. (AC 19)
 Proof: `npx vitest run tests/physics/powertrain.test.ts -t "top speed limited by drag"`
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "no speed cut below redline"`
 
-**C21** - No harness, a 100 km/h e sem entradas, o carro cai a 60 km/h num passo entre 4 s e 12 s (AC 20)
+**C21** - ✅ No harness, a 100 km/h e sem entradas, o carro cai a 60 km/h num passo entre 4 s e 12 s (AC 20)
 Proof: `npx vitest run tests/physics/powertrain.test.ts -t "coasting from 100 to 60 kmh"`
 
-**C22** - No harness, com `brake` a partir de 100 km/h em linha reta, a distância horizontal até a velocidade dianteira chegar a ≤ 1 km/h está em `[34, 45]` m (AC 21)
+**C22** - ✅ No harness, com `brake` a partir de 100 km/h em linha reta, a distância horizontal até a velocidade dianteira chegar a ≤ 1 km/h está em `[34, 45]` m (AC 21)
 Proof: `npx vitest run tests/physics/powertrain.test.ts -t "braking from 100 kmh stops in 34 to 45 m"`
 
-**C23** - No harness, parado na rampa de 9 % e virado para cima, com `throttle`, o carro atinge 60 km/h em até 10 s (AC 22)
+**C23** - ✅ No harness, parado na rampa de 9 % e virado para cima, com `throttle`, o carro atinge 60 km/h em até 10 s (AC 22)
 Proof: `npx vitest run tests/physics/powertrain.test.ts -t "climbs a 9 percent grade"`
 
-**C24** - Ré em `stepDrivetrain`:
+**C24** - ✅ Ré em `stepDrivetrain`:
 - Com `brake` e velocidade dianteira ≤ 1 km/h, entra em `gear` −1 com `engineForce` < 0.
 - Em ré, `engineForce` < 0 a −29 km/h e = 0 a −30 e a −31 km/h (corte a −29.5).
 - Com `throttle` em `gear` −1 e velocidade ≥ −1 km/h, volta para `gear` 1.
@@ -195,7 +197,7 @@ Proof: `npx vitest run tests/physics/powertrain.test.ts -t "climbs a 9 percent g
 Substitui free-roam-city C4, com o mesmo contrato do AC 3. (free-roam-city AC 3, door 2)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "reverse gear capped at 30 kmh"`
 
-**C25** - Com `handbrake` a 60 km/h, `stepDrivetrain` dá:
+**C25** - ✅ Com `handbrake` a 60 km/h, `stepDrivetrain` dá:
 - `brakeFront` = 0.
 - `brakeRear` > 0.
 - `rearFrictionFactor` = `handbrakeRearGrip` = 0.4.
@@ -204,7 +206,7 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "reverse gear capped at 
 Substitui free-roam-city C7, com o mesmo contrato do AC 5. (free-roam-city AC 5)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "handbrake locks rear and cuts rear grip"`
 
-**C26** - `stepDrivetrain` é pura:
+**C26** - ✅ `stepDrivetrain` é pura:
 - Duas chamadas com o mesmo `(spec, state, input, wheelSpeedMs, dt)` devolvem resultados iguais campo a campo.
 - O objeto `state` recebido não muda (congelado com `Object.freeze` no teste).
 - O módulo não exporta mais `computeDrive`, `gearFor` nem `rpmFor`.
@@ -214,10 +216,10 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "drivetrain step is pure
 
 ### S4 - Jogo, efeitos e fichas · 9 files · 90 KB · ~23k
 
-**C27** - `src/vehicle/carSpec.ts` e `src/vehicle/drivetrain.ts` estão na lista de módulos puros: nenhum importa `three` nem `@dimforge/rapier3d-compat` (door 1, door 2)
+**C27** - ✅ `src/vehicle/carSpec.ts` e `src/vehicle/drivetrain.ts` estão na lista de módulos puros: nenhum importa `three` nem `@dimforge/rapier3d-compat` (door 1, door 2)
 Proof: `npx vitest run tests/unit/purity.test.ts -t "pure modules do not import three or rapier"`
 
-**C28** - Valores de `DEFAULT_CAR`:
+**C28** - ✅ Valores de `DEFAULT_CAR`:
 - `massKg` 1250, `wheelbaseM` 2.6, `trackM` 1.7, `wheelRadiusM` 0.45.
 - `idleRpm` 1000, `redlineRpm` 7000.
 - `gearRatios` com 6 valores estritamente decrescentes.
@@ -231,15 +233,17 @@ No harness, um `Car` construído com `{ ...DEFAULT_CAR, massKg: 1500 }` tem `bod
 Proof: `npx vitest run tests/unit/carSpec.test.ts -t "default car spec values"`
 Proof: `npx vitest run tests/physics/harness.test.ts -t "car reads mass from its spec"`
 
-**C29** - O harness monta o jogo de verdade:
+**C29** - ✅ O harness monta o jogo de verdade:
 - O `Car` tem um `DynamicRayCastVehicleController` com 4 rodas.
-- Depois de 60 passos parado no plano, as 4 rodas estão em contato, a velocidade é < 0.1 km/h e a inclinação < 1°.
+- Depois de 60 passos parado no plano, as 4 rodas estão em contato, a velocidade horizontal é < 0.1 km/h, a altura do chassi varia menos de 1 mm nos últimos 10 passos e a inclinação < 1°.
+
+(Esclarecido com o usuário em 2026-09-26: "velocidade" é horizontal; o Rapier deixa ~0.06 m/s de velocidade vertical residual entre passos, gravidade × dt, com a altura parada.)
 - `npm test` inclui `tests/physics`: o `test.include` de `vite.config.ts` contém `tests/physics/**/*.test.ts`.
 
 (door 3)
 Proof: `npx vitest run tests/physics/harness.test.ts -t "harness builds the real car at rest"`
 
-**C30** - `isSkidding(handbrake, kmh, lateralSlipMs)`:
+**C30** - ✅ `isSkidding(handbrake, kmh, lateralSlipMs)`:
 
 | Entrada | Resultado |
 | --- | --- |
@@ -253,14 +257,14 @@ Proof: `npx vitest run tests/physics/harness.test.ts -t "harness builds the real
 Substitui a parte unitária do check 36 da visual-upgrade. (AC 23)
 Proof: `npx vitest run tests/unit/effectsMath.test.ts -t "skidding from lateral slip or handbrake"`
 
-**C31** - No harness, com o carro assentado:
+**C31** - ✅ No harness, com o carro assentado:
 - Com velocidade de 60 km/h ao longo do heading mais 5 m/s de lado, `car.skidding` fica true já no primeiro passo, sem freio de mão.
 - Em linha reta a 100 km/h, sem entradas, `car.skidding` fica false em todos os 60 passos.
 
 (AC 23)
 Proof: `npx vitest run tests/physics/grip.test.ts -t "skidding from real lateral slip"`
 
-**C32** - No browser, segurando `W` a partir do spawn por 4 s de simulação e amostrando `__game.car.gear`, `__game.car.rpm` e o texto de `#gear`:
+**C32** - ✅ No browser, segurando `W` a partir do spawn por 4 s de simulação e amostrando `__game.car.gear`, `__game.car.rpm` e o texto de `#gear`:
 - Há pelo menos uma amostra em que `gear` aumenta de uma para a seguinte.
 - Nessa troca, o `rpm` da amostra anterior menos o menor `rpm` nas amostras dentro dos 0.3 s seguintes é ≥ 1500.
 - `#gear` mostra `String(gear)` em toda amostra.
@@ -268,7 +272,7 @@ Proof: `npx vitest run tests/physics/grip.test.ts -t "skidding from real lateral
 (AC 24, AC 25)
 Proof: `npx playwright test tests/e2e/hud.spec.ts -g "automatic upshift drops rpm on the hud"`
 
-**C33** - No browser, `__game.car` expõe:
+**C33** - ✅ No browser, `__game.car` expõe:
 - `spec.massKg` = 1250.
 - `steerInput` em `[-0.55, 0.55]`.
 - `bodyRoll`, `bodyPitch`, `sideslip` e `lateralG` como números finitos.
@@ -277,7 +281,7 @@ Proof: `npx playwright test tests/e2e/hud.spec.ts -g "automatic upshift drops rp
 (Surface, AC 6)
 Proof: `npx playwright test tests/e2e/drive.spec.ts -g "car debug exposes handling state"`
 
-**C34** - Continuam verdes, sem mudança nas asserções, as provas não superadas que leem a mecânica do carro:
+**C34** - ✅ Continuam verdes, sem mudança nas asserções, as provas não superadas que leem a mecânica do carro:
 - free-roam-city C1, C3, C5 e "A turns left"
 - free-roam-city C29 (HUD de marcha e RPM)
 - engine-sound C13 e C15 (som segue `rpm`)
@@ -295,7 +299,7 @@ Proof: `npx playwright test tests/e2e/visual.spec.ts -g "handbrake leaves skid m
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "tire smoke while skidding"`
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "camera swings left while turning left"`
 
-**C35** - `Game` constrói o carro com `DEFAULT_CAR`: no browser, `__game.car.spec` é igual campo a campo a `DEFAULT_CAR` (importado no teste via `page.evaluate` sobre o módulo servido pelo Vite) (door 1, startup config)
+**C35** - ✅ `Game` constrói o carro com `DEFAULT_CAR`: no browser, `__game.car.spec` é igual campo a campo a `DEFAULT_CAR` (importado no teste via `page.evaluate` sobre o módulo servido pelo Vite) (door 1, startup config)
 Proof: `npx playwright test tests/e2e/drive.spec.ts -g "game builds the car from the default spec"`
 
 ## Coverage

@@ -1,11 +1,14 @@
+import { DEFAULT_CAR, type CarSpec } from './carSpec';
+
 /**
- * Trem de força puro: dado o input e a velocidade atual (km/h, negativa em
- * ré), decide força de motor, freio por eixo, ângulo de direção e fator de
- * aderência traseira. `Car` aplica esses números no controlador de veículo do
- * Rapier. Aqui não existe three nem rapier, então tudo é testável no vitest.
+ * Trem de força puro e com estado (door 2 da car-handling). A cada passo fixo,
+ * `stepDrivetrain` recebe a ficha, o estado anterior, o input e a velocidade
+ * das rodas, e devolve o novo estado (marcha engatada, giro, troca em curso,
+ * volante) e o comando que `Car` aplica no controlador do Rapier. Aqui não
+ * existe three nem rapier, então tudo é testável no vitest.
  *
- * Unidades (door 9): velocidade em km/h só nesta camada de decisão; forças em
- * newtons; ângulos em radianos.
+ * Unidades (AD-007): velocidade em m/s (km/h só nas regras de ré), forças em
+ * newtons, ângulos em radianos.
  */
 export interface DriveInput {
   throttle: boolean;
@@ -16,96 +19,183 @@ export interface DriveInput {
 }
 
 export interface DriveCommand {
-  /** força aplicada nas rodas traseiras (N); negativa em ré */
+  /** força motriz total nas rodas traseiras (N); negativa em ré */
   engineForce: number;
+  /** força de freio total no eixo dianteiro (N) */
   brakeFront: number;
+  /** força de freio total no eixo traseiro (N) */
   brakeRear: number;
   /** ângulo das rodas dianteiras (rad); positivo = esquerda */
   steer: number;
-  /** multiplica o frictionSlip das rodas traseiras (1 = normal, 0.4 = freio de mão) */
+  /** multiplica a aderência das rodas traseiras (1 = normal, handbrakeRearGrip = freio de mão) */
   rearFrictionFactor: number;
 }
 
-export const MAX_SPEED_KMH = 220;
+export interface DrivetrainState {
+  /** -1 = ré, 1..6 = marchas */
+  gear: number;
+  rpm: number;
+  /** tempo restante sem força motriz depois de uma troca para cima (s) */
+  shiftTimer: number;
+  /** tempo desde a última troca (s) */
+  lastShiftAgo: number;
+  /** ângulo atual das rodas dianteiras (rad) */
+  steer: number;
+}
+
+export const RPM_MIN = DEFAULT_CAR.idleRpm;
+export const RPM_MAX = DEFAULT_CAR.redlineRpm;
+
 export const MAX_REVERSE_KMH = 30;
-/** a força é cortada meio km/h antes do limite: um passo de física pode ultrapassar ~0.25 km/h */
+/** a força é cortada meio km/h antes do limite: um passo de física pode ultrapassar ~0.4 km/h */
 export const REVERSE_CUTOFF_KMH = MAX_REVERSE_KMH - 0.5;
-export const ENGINE_FORCE = 4000;
-export const REVERSE_FORCE = 2500;
-export const BRAKE_FORCE = 6000;
-export const HANDBRAKE_FORCE = 9000;
-export const HANDBRAKE_REAR_FRICTION = 0.4;
+/** nenhuma troca a menos disso da anterior (AC 17) */
+export const SHIFT_HOLD_S = 0.6;
+/** piso de giro com a embreagem patinando na saída, em 1ª e ré (AC 15) */
+export const CLUTCH_RPM = 2500;
+/** torque de freio-motor no corte; cai linearmente até 0 na marcha lenta */
+export const ENGINE_BRAKE_NM = 35;
+export const HANDBRAKE_FORCE_N = 6000;
+export const GRAVITY = 9.81;
+export const AIR_DENSITY = 1.2;
 
-export const STEER_MAX_RAD = 0.5;
-export const STEER_MIN_RAD = 0.15;
-export const STEER_FALLOFF_KMH = 150;
+const RPM_PER_RAD_S = 60 / (2 * Math.PI);
+const EPS = 1e-9;
 
-/** Faixas de marcha [min, max) em km/h. A 6ª vai até o limite de velocidade. */
-export const GEAR_BANDS: ReadonlyArray<readonly [number, number]> = [
-  [0, 30],
-  [30, 60],
-  [60, 95],
-  [95, 130],
-  [130, 170],
-  [170, MAX_SPEED_KMH],
-];
+export function initialDrivetrain(spec: CarSpec): DrivetrainState {
+  return { gear: 1, rpm: spec.idleRpm, shiftTimer: 0, lastShiftAgo: SHIFT_HOLD_S, steer: 0 };
+}
 
-export const RPM_MIN = 1000;
-export const RPM_MAX = 7000;
-
-/** -1 = ré, 1..6 = marchas. Velocidade 0 é 1ª. */
-export function gearFor(speedKmh: number): number {
-  if (speedKmh < 0) return -1;
-  for (let i = GEAR_BANDS.length - 1; i >= 0; i--) {
-    if (speedKmh >= GEAR_BANDS[i]![0]) return i + 1;
+/** Torque (N·m) interpolado linearmente na curva; fora dela, o ponto da ponta. */
+export function torqueAt(spec: CarSpec, rpm: number): number {
+  const curve = spec.torqueCurve;
+  if (rpm <= curve[0]![0]) return curve[0]![1];
+  for (let i = 1; i < curve.length; i++) {
+    const [r1, t1] = curve[i]!;
+    if (rpm <= r1) {
+      const [r0, t0] = curve[i - 1]!;
+      return t0 + ((t1 - t0) * (rpm - r0)) / (r1 - r0);
+    }
   }
-  return 1;
+  return curve[curve.length - 1]![1];
 }
 
-/** RPM = 1000 + fração dentro da faixa × 6000, limitado a [1000, 7000]. */
-export function rpmFor(speedKmh: number): number {
-  const abs = Math.abs(speedKmh);
-  const gear = speedKmh < 0 ? 1 : gearFor(speedKmh);
-  const band = GEAR_BANDS[gear - 1]!;
-  const fraction = (abs - band[0]) / (band[1] - band[0]);
-  const rpm = RPM_MIN + fraction * (RPM_MAX - RPM_MIN);
-  return Math.min(RPM_MAX, Math.max(RPM_MIN, rpm));
+/** Alvo do volante: `min(steerMaxRad, atan(steerLateralG × g × wheelbase / v²))`; `steerMaxRad` abaixo de 1 m/s. */
+export function steerTarget(spec: CarSpec, speedMs: number): number {
+  const v = Math.abs(speedMs);
+  if (v < 1) return spec.steerMaxRad;
+  return Math.min(spec.steerMaxRad, Math.atan((spec.steerLateralG * GRAVITY * spec.wheelbaseM) / (v * v)));
 }
 
-/** 0.5 rad parado, decaindo linearmente até 0.15 rad a 150 km/h ou mais. */
-export function steeringAngleFor(speedKmh: number): number {
-  const t = Math.min(1, Math.max(0, Math.abs(speedKmh) / STEER_FALLOFF_KMH));
-  return STEER_MAX_RAD + (STEER_MIN_RAD - STEER_MAX_RAD) * t;
+/** Arrasto aerodinâmico (N), sempre ≥ 0: `0.5 × ρ × cdA × v²`. */
+export function airDragN(spec: CarSpec, speedMs: number): number {
+  return 0.5 * AIR_DENSITY * spec.cdA * speedMs * speedMs;
 }
 
-export function computeDrive(input: DriveInput, speedKmh: number): DriveCommand {
+/** Resistência de rolagem (N) contra o movimento; some suavemente abaixo de 1 m/s. */
+export function rollingResistanceN(spec: CarSpec, forwardSpeedMs: number): number {
+  const s = Math.max(-1, Math.min(1, forwardSpeedMs));
+  return spec.rollingResistance * spec.massKg * GRAVITY * s;
+}
+
+function ratioOf(spec: CarSpec, gear: number): number {
+  return gear === -1 ? spec.reverseRatio : spec.gearRatios[gear - 1]!;
+}
+
+/** Giro que a roda impõe ao motor na marcha, sem piso nem teto. */
+function wheelRpm(spec: CarSpec, gear: number, speedMs: number): number {
+  return (Math.abs(speedMs) / spec.wheelRadiusM) * RPM_PER_RAD_S * ratioOf(spec, gear) * spec.finalDrive;
+}
+
+function rampSteer(spec: CarSpec, current: number, target: number, dt: number): number {
+  const delta = target - current;
+  if (delta === 0) return current;
+  // afastando do centro no mesmo lado: rampa de ida; voltando (ou trocando de lado): rampa de volta
+  const outward = current === 0 || Math.sign(delta) === Math.sign(current);
+  const maxStep = (outward ? spec.steerRateRadS : spec.steerReturnRadS) * dt;
+  return current + Math.max(-maxStep, Math.min(maxStep, delta));
+}
+
+export function stepDrivetrain(
+  spec: CarSpec,
+  s: DrivetrainState,
+  input: DriveInput,
+  wheelSpeedMs: number,
+  dt: number,
+): { state: DrivetrainState; cmd: DriveCommand } {
+  const kmh = wheelSpeedMs * 3.6;
+  const steer = rampSteer(spec, s.steer, Math.sign(input.steer) * steerTarget(spec, wheelSpeedMs), dt);
+
+  let gear = s.gear;
+  let shiftTimer = Math.max(0, s.shiftTimer - dt);
+  let lastShiftAgo = s.lastShiftAgo + dt;
+  let cut = s.shiftTimer > EPS;
+
+  // sentido: S parado engata a ré; W parado (ou quase) na ré volta para a 1ª
+  if (input.brake && kmh <= 1 && gear !== -1) {
+    gear = -1;
+    shiftTimer = 0;
+    cut = false;
+    lastShiftAgo = 0;
+  } else if (input.throttle && !input.brake && gear === -1 && kmh >= -1) {
+    gear = 1;
+    shiftTimer = 0;
+    cut = false;
+    lastShiftAgo = 0;
+  } else if (gear >= 1 && s.lastShiftAgo >= SHIFT_HOLD_S) {
+    const rpmNow = Math.max(spec.idleRpm, wheelRpm(spec, gear, wheelSpeedMs));
+    if (input.throttle && gear < spec.gearRatios.length && rpmNow >= spec.shiftUpRpm) {
+      gear += 1;
+      shiftTimer = spec.shiftTimeS;
+      cut = true;
+      lastShiftAgo = 0;
+    } else if (gear > 1 && rpmNow <= spec.shiftDownRpm && wheelRpm(spec, gear - 1, wheelSpeedMs) < spec.shiftUpRpm) {
+      gear -= 1;
+      lastShiftAgo = 0;
+    }
+  }
+
+  const driving = gear === -1 ? input.brake : input.throttle;
+  const clutchSlip = (gear === 1 || gear === -1) && driving;
+  const rawRpm = Math.max(spec.idleRpm, clutchSlip ? CLUTCH_RPM : 0, wheelRpm(spec, gear, wheelSpeedMs));
+  const rpm = Math.min(spec.redlineRpm, rawRpm);
+  const toWheel = (ratioOf(spec, gear) * spec.finalDrive * spec.drivetrainEfficiency) / spec.wheelRadiusM;
+
   let engineForce = 0;
   let brakeFront = 0;
   let brakeRear = 0;
+  const brakeAll = (): void => {
+    brakeFront = spec.brakeForceN * spec.brakeBiasFront;
+    brakeRear = spec.brakeForceN - brakeFront;
+  };
 
-  if (input.throttle && speedKmh < MAX_SPEED_KMH) {
-    engineForce = ENGINE_FORCE;
-  }
-
-  if (input.brake) {
-    if (speedKmh > 1) {
-      // andando pra frente: S é freio
-      engineForce = 0;
-      brakeFront = BRAKE_FORCE;
-      brakeRear = BRAKE_FORCE;
-    } else if (speedKmh > -REVERSE_CUTOFF_KMH) {
-      // parado ou em ré: S é ré, cortada antes de 30 km/h
-      engineForce = -REVERSE_FORCE;
+  if (gear === -1) {
+    if (input.brake && kmh <= 1) {
+      // ré: S acelera para trás, cortada antes de 30 km/h
+      if (kmh > -REVERSE_CUTOFF_KMH && rawRpm < spec.redlineRpm) engineForce = -torqueAt(spec, rpm) * toWheel;
+    } else if (input.brake || (input.throttle && kmh < -1)) {
+      brakeAll();
     }
+  } else if (input.brake) {
+    brakeAll();
+  } else if (input.throttle) {
+    if (!cut && rawRpm < spec.redlineRpm) engineForce = torqueAt(spec, rpm) * toWheel;
+  } else {
+    // freio-motor: proporcional ao giro acima da marcha lenta
+    const t = (rpm - spec.idleRpm) / (spec.redlineRpm - spec.idleRpm);
+    engineForce = -ENGINE_BRAKE_NM * t * toWheel;
   }
 
   let rearFrictionFactor = 1;
   if (input.handbrake) {
-    brakeRear = HANDBRAKE_FORCE;
-    rearFrictionFactor = HANDBRAKE_REAR_FRICTION;
+    // freio de mão: embreagem aberta, traseira travada e com menos aderência
+    engineForce = 0;
+    brakeRear = Math.max(brakeRear, HANDBRAKE_FORCE_N);
+    rearFrictionFactor = spec.handbrakeRearGrip;
   }
 
-  const steer = Math.sign(input.steer) * steeringAngleFor(speedKmh);
-
-  return { engineForce, brakeFront, brakeRear, steer, rearFrictionFactor };
+  return {
+    state: { gear, rpm, shiftTimer, lastShiftAgo, steer },
+    cmd: { engineForce, brakeFront, brakeRear, steer, rearFrictionFactor },
+  };
 }
