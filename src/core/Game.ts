@@ -62,7 +62,7 @@ interface HeadlightShimmerOpts {
   specularAA: boolean;
   /** false zera só o especular das fachadas (padrão true) */
   specular?: boolean;
-  /** true usa os materiais de antes da facade-glint (normalScale 1, metal com metalness 0.5) */
+  /** true usa os materiais de antes da facade-glint (normalScale 1, metal com metalness 0.5, sem piso de rugosidade) */
   legacyMaterials?: boolean;
 }
 
@@ -842,12 +842,18 @@ export class Game {
     this.city.facadeSpecularAA.value = opts.specularAA ? 1 : 0;
     const spec = this.city.facadeSpecular.value;
     this.city.facadeSpecular.value = opts.specular === false ? 0 : 1;
-    // aparência de antes da facade-glint (db836b8): normal map inteiro, metal com metalness 0.5
-    const look = this.city.facadeMaterials.map((m) => ({ normalScale: m.normalScale.clone(), metalness: m.metalness }));
+    // aparência de antes da facade-glint (db836b8): normal map inteiro, metal com metalness 0.5, sem piso de rugosidade
+    const floorOf = (m: THREE.MeshStandardMaterial) => m.userData.roughnessFloor as { value: number };
+    const look = this.city.facadeMaterials.map((m) => ({
+      normalScale: m.normalScale.clone(),
+      metalness: m.metalness,
+      roughnessFloor: floorOf(m).value,
+    }));
     if (opts.legacyMaterials) {
       this.city.facadeMaterials.forEach((m, i) => {
         m.normalScale.set(1, 1);
         m.metalness = i === 1 ? 0.5 : 0.05;
+        floorOf(m).value = 0;
       });
     }
 
@@ -878,6 +884,7 @@ export class Game {
     this.city.facadeMaterials.forEach((m, i) => {
       m.normalScale.copy(look[i]!.normalScale);
       m.metalness = look[i]!.metalness;
+      floorOf(m).value = look[i]!.roughnessFloor;
     });
     this.headlight.intensity = intensity;
     hidden.forEach((o, i) => (o.visible = was[i]!));

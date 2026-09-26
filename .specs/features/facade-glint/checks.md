@@ -46,13 +46,19 @@ Ela devolve:
 
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "headlight adds no facade glint"`
 
+Status: complete
+
 **C2** - Com `specularAA: false` e a aparência de antes (o shader e os materiais de `db836b8`), pelo menos um dos 4 tipos passa de 0.0010 na mesma diferença de C1. Isso prova que a sonda enxerga o defeito que o usuário viu e que C1 não passa por vazio.
 
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "probe detects glint without specular antialiasing"`
 
+Status: complete
+
 **C3** - Para cada um dos 4 tipos, com `specularAA: true`, `litMean(headlight: true)` ≥ 1.2 × `litMean(headlight: false)`. O farol continua iluminando a fachada: a correção não apaga o farol.
 
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "headlight still lights the facade"`
+
+Status: complete
 
 **C4** - Continuam verdes, sem mudar asserções:
 - visual-upgrade "lit windows stay stable while the camera moves" (C41, janelas estáveis);
@@ -61,9 +67,13 @@ Proof: `npx playwright test tests/e2e/visual.spec.ts -g "headlight still lights 
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "lit windows stay stable while the camera moves"`
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "four facade meshes with per-instance repeat"`
 
+Status: complete
+
 **C5** - Em build de produção, o antialiasing de especular fica sempre ligado. A chave `specularAA` só existe na sonda DEV, e o valor padrão do uniform é 1: `__game.materials.facadeSpecularAA` lê `true` logo depois de `ready`, antes de qualquer sonda.
 
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "specular antialiasing on by default"`
+
+Status: complete
 
 ## Coverage
 
@@ -128,3 +138,10 @@ Cost: 5 provas Playwright em 1 arquivo.
   - Metal (tipo 1): `normalScale` 0.25 → 0.0016-0.0022; + metalness 0.05 → 0.0018; metalness 0.05 + `normalScale` 0.25 + AA mais forte (σ² 2, κ 1) → **0.00057** (litMean 2.11×). O resto vem da parede mais clara em volta das bordas das janelas.
   - **Stop:** `normalScale` do tijolo sozinho não faz C1 passar no tipo 2. A aparência não foi mudada. Opções para o usuário: mexer no `roughnessMap`/`roughness` do tijolo (por exemplo, rugosidade mínima), aceitar o tipo 2 perto de 0.0015 ou mudar o limite.
 - **Decisão do usuário (2026-09-26, segunda parada):** autorizado também suavizar a rugosidade do tijolo (tipo 2), por exemplo um piso de rugosidade ou um mapa de rugosidade atenuado, e aplicar ao metal (tipo 1) a receita medida (`metalness` 0.05, `normalScale` 0.25, antialiasing de especular mais forte). O limite do C1 continua 0.0010 nos 4 tipos. Se o antialiasing mais forte mudar os tipos 0 e 3, eles seguem provados pelo mesmo C1 e pelo C3.
+- **Valores finais (build, 2026-09-26):**
+  - Antialiasing de especular: σ² 2.0 e κ 1.0 (antes 0.25 / 0.18), `kernelR2 = min(2·σ²·(|dN/dx|² + |dN/dy|²), κ)`, rugosidade = √(r² + kernelR2) limitada a [0, 1].
+  - Metal (tipo 1): `metalness` 0.5 → 0.05; `normalScale` 1 → 0.2 (0.25 da receita oscilava 0.0006-0.0013 conforme a fase sub-pixel da altura do carro; 0.15 dava 0.0010-0.0016).
+  - Tijolo (tipo 2): `normalScale` 1 → 0.25; piso de rugosidade 0.6 (`max(roughnessFactor, 0.6)` antes do vidro; 0.4 → 0.00103, 0.5 → 0.00067, 0.6 → 0.00067, 0.8 → 0.00079).
+  - Concreto (0) e reboco (3): sem mudança de material; só o AA mais forte.
+  - Medido com os valores finais (C1 · C2 sem AA e materiais antigos · C3 litMean farol/sem farol): 0 0.00016 · 0.0023 · 1.42 | 1 0.00038 · 0.0193 · 2.13 | 2 0.00072 · 0.0046 · 1.49 | 3 0.00030 · 0.00026 · 1.28.
+  - Varredura da altura do carro 0.970-0.994 m (fase sub-pixel): C1 máximo 0 0.00016 · 1 0.00074 · 2 0.00072 · 3 0.00031.
