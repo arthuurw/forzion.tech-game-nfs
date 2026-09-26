@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { NO_INPUT, createHarness, initRapier, kmh, pitchDeg, rollDeg } from './harness';
+import { LateralGWindow, NO_INPUT, createHarness, initRapier, kmh, pitchDeg, rollDeg, sideslipDeg } from './harness';
 
 beforeAll(async () => {
   await initRapier();
@@ -19,6 +19,20 @@ function corner80(steer: number): { h: ReturnType<typeof createHarness>; roll: n
     roll.push(rollDeg(h.car));
   }
   return { h, roll };
+}
+
+/** `steer +1` por `steps` passos a partir de `v` km/h, acelerando sempre que abaixo de `v`; devolve a janela de g lateral por passo. */
+function holdCorner(v: number, steps: number): number[] {
+  const h = createHarness();
+  h.settle();
+  h.setForwardKmh(v);
+  const w = new LateralGWindow();
+  const out: number[] = [];
+  for (let i = 0; i < steps; i++) {
+    h.step({ ...NO_INPUT, steer: 1, throttle: kmh(h.car) < v });
+    out.push(w.push(h.car));
+  }
+  return out;
 }
 
 /** Média dos passos 90 a 180 (1-based). */
@@ -83,5 +97,55 @@ describe('car feel - body motion', () => {
     }
     expect(maxPitch).toBeGreaterThanOrEqual(1.0);
     expect(maxPitch).toBeLessThanOrEqual(4.0);
+  });
+});
+
+describe('car feel - grip', () => {
+  // C8 (AC 8) - substitui car-handling C8; table-driven over the 5 speeds
+  it('lateral grip never exceeds 0.95 g', () => {
+    const speeds = [60, 90, 120, 150, 180];
+    for (const v of speeds) {
+      const g = holdCorner(v, 180);
+      expect(g.length).toBe(180);
+      g.forEach((x, i) => expect(x, `${v} km/h step ${i + 1}`).toBeLessThanOrEqual(0.95));
+    }
+  });
+
+  // C9 (AC 9) - substitui car-handling C9
+  it('reaches at least 0.75 g at 60 kmh', () => {
+    const g = holdCorner(60, 120);
+    expect(g.length).toBe(120);
+    expect(Math.max(...g)).toBeGreaterThanOrEqual(0.75);
+  });
+
+  // C10 (AC 10) - substitui car-handling C10; table-driven over the 8 cases
+  it('understeers without throttle or at speed', () => {
+    const cases: Array<[number, boolean]> = [
+      [60, false],
+      [90, false],
+      [120, false],
+      [150, false],
+      [180, false],
+      [120, true],
+      [150, true],
+      [180, true],
+    ];
+    let run = 0;
+    for (const [v, throttle] of cases) {
+      const h = createHarness();
+      h.settle();
+      h.setForwardKmh(v);
+      let measured = 0;
+      for (let i = 0; i < 180; i++) {
+        h.step({ ...NO_INPUT, steer: 1, throttle });
+        const slip = sideslipDeg(h.car);
+        if (slip === null) continue;
+        measured++;
+        expect(slip, `${v} km/h throttle ${throttle} step ${i + 1}`).toBeLessThanOrEqual(12);
+      }
+      expect(measured).toBeGreaterThan(0);
+      run++;
+    }
+    expect(run).toBe(8);
   });
 });

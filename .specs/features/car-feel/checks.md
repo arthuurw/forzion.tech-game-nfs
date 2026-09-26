@@ -48,7 +48,7 @@ Proof: `npx vitest run tests/physics/stability.test.ts -t "all four wheels back 
 
 ### S2 - Volante e aderência · 6 files · 50 KB · ~13k
 
-**C6** - Rampa do volante em `stepDrivetrain`, a 0 km/h, `dt` = 1/60, partindo de `steer` 0:
+**C6** - ✅ Rampa do volante em `stepDrivetrain`, a 0 km/h, `dt` = 1/60, partindo de `steer` 0:
 - Com input +1, `steer` cresce exatamente 4.0/60 rad por passo e chega a 0.55 no passo 9, sem passar de 0.55.
 - Soltando (input 0), cai exatamente 5.0/60 por passo até 0, sem passar para o outro lado.
 - De +0.55 com input −1, cada passo muda no máximo 5.0/60 até −0.55.
@@ -57,7 +57,7 @@ Proof: `npx vitest run tests/physics/stability.test.ts -t "all four wheels back 
 Substitui car-handling C6. (AC 6)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "steering ramps at 4 and 5 rad per second"`
 
-**C7** - Ângulo alvo `min(0.55, atan(1.7 × 9.81 × 2.6 / v²))`, tolerância 1e-6:
+**C7** - ✅ Ângulo alvo `min(0.55, atan(1.7 × 9.81 × 2.6 / v²))`, tolerância 1e-6:
 
 | `v` (m/s) | alvo esperado |
 | --- | --- |
@@ -72,17 +72,17 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "steering ramps at 4 and
 Substitui car-handling C7. (AC 7)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "steering target with 1.7 g"`
 
-**C8** - Para 60, 90, 120, 150 e 180 km/h: `steer +1` por 3 s, com `throttle` sempre que a velocidade está abaixo da inicial. A aceleração lateral em janela de 0.5 s fica ≤ 0.95 g em todo passo.
+**C8** - ✅ Para 60, 90, 120, 150 e 180 km/h: `steer +1` por 3 s, com `throttle` sempre que a velocidade está abaixo da inicial. A aceleração lateral em janela de 0.5 s fica ≤ 0.95 g em todo passo.
 
 Substitui car-handling C8. (AC 8)
 Proof: `npx vitest run tests/physics/feel.test.ts -t "lateral grip never exceeds 0.95 g"`
 
-**C9** - A 60 km/h, com `steer +1` e o controle de `throttle` de C8, a aceleração lateral em janela de 0.5 s atinge ≥ 0.75 g em algum passo dos primeiros 120.
+**C9** - ✅ A 60 km/h, com `steer +1` e o controle de `throttle` de C8, a aceleração lateral em janela de 0.5 s atinge ≥ 0.75 g em algum passo dos primeiros 120.
 
 Substitui car-handling C9. (AC 9)
 Proof: `npx vitest run tests/physics/feel.test.ts -t "reaches at least 0.75 g at 60 kmh"`
 
-**C10** - 8 casos, `steer +1` por 3 s, sem `handbrake`, sideslip ≤ 12° em todo passo:
+**C10** - ✅ 8 casos, `steer +1` por 3 s, sem `handbrake`, sideslip ≤ 12° em todo passo:
 - sem `throttle`: 60, 90, 120, 150 e 180 km/h;
 - com `throttle`: 120, 150 e 180 km/h.
 
@@ -103,7 +103,7 @@ Proof: `npx vitest run tests/physics/feel.test.ts -t "power oversteer in second 
 (AC 12)
 Proof: `npx vitest run tests/physics/feel.test.ts -t "recovers from power oversteer"`
 
-**C13** - Ficha e leitura da suspensão (door 1):
+**C13** - ✅ Ficha e leitura da suspensão (door 1):
 - `CarSpec` tem `suspensionStiffness`, `suspensionCompression` e `suspensionRelaxation`, e em `DEFAULT_CAR` os três são finitos e > 0.
 - `DEFAULT_CAR` tem `steerRateRadS` 4.0, `steerReturnRadS` 5.0 e `steerLateralG` 1.7; `steerMaxRad` continua 0.55.
 - No harness, um `Car` com `{ ...DEFAULT_CAR, suspensionStiffness: 17, suspensionCompression: 1.7, suspensionRelaxation: 2.1 }` tem, nas 4 rodas, `wheelSuspensionStiffness` 17, `wheelSuspensionCompression` 1.7 e `wheelSuspensionRelaxation` 2.1 no controlador do Rapier (lidos de volta, ± 1e-6): a suspensão vem da ficha.

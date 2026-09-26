@@ -20,6 +20,20 @@ describe('physics harness', () => {
     expect(h.car.body.mass()).toBeLessThanOrEqual(1501);
   });
 
+  // car-feel C13, segunda prova (door 1): a suspensão vem da ficha
+  it('car reads suspension from its spec', () => {
+    const h = createHarness({
+      spec: { ...DEFAULT_CAR, suspensionStiffness: 17, suspensionCompression: 1.7, suspensionRelaxation: 2.1 },
+    });
+    const c = h.car.controller;
+    expect(c.numWheels()).toBe(4);
+    for (let i = 0; i < 4; i++) {
+      expect(Math.abs(c.wheelSuspensionStiffness(i)! - 17), `wheel ${i} stiffness`).toBeLessThanOrEqual(1e-6);
+      expect(Math.abs(c.wheelSuspensionCompression(i)! - 1.7), `wheel ${i} compression`).toBeLessThanOrEqual(1e-6);
+      expect(Math.abs(c.wheelSuspensionRelaxation(i)! - 2.1), `wheel ${i} relaxation`).toBeLessThanOrEqual(1e-6);
+    }
+  });
+
   // C29 (door 3)
   it('harness builds the real car at rest', () => {
     const h = createHarness();

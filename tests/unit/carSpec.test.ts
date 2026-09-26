@@ -35,7 +35,7 @@ const FIELDS = [
 ];
 
 describe('car spec', () => {
-  // C28 (door 1)
+  // car-handling C28 (door 1) + car-feel C13
   it('default car spec values', () => {
     const c = DEFAULT_CAR;
     expect(c.massKg).toBe(1250);
@@ -52,9 +52,15 @@ describe('car spec', () => {
     expect(c.brakeBiasFront).toBe(0.65);
     expect(c.handbrakeRearGrip).toBe(0.4);
     expect(c.steerMaxRad).toBe(0.55);
-    expect(c.steerLateralG).toBe(1.3);
-    expect(c.steerRateRadS).toBe(2.5);
-    expect(c.steerReturnRadS).toBe(3.5);
+    // car-feel C13: valores de direção substituem os da car-handling C28
+    expect(c.steerLateralG).toBe(1.7);
+    expect(c.steerRateRadS).toBe(4.0);
+    expect(c.steerReturnRadS).toBe(5.0);
+    // car-feel C13 (door 1): suspensão na ficha, finita e > 0
+    for (const field of ['suspensionStiffness', 'suspensionCompression', 'suspensionRelaxation'] as const) {
+      expect(Number.isFinite(c[field]), field).toBe(true);
+      expect(c[field], field).toBeGreaterThan(0);
+    }
 
     expect(c.torqueCurve.length).toBeGreaterThanOrEqual(4);
     for (let i = 1; i < c.torqueCurve.length; i++) {

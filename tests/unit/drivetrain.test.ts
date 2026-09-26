@@ -34,23 +34,23 @@ function steerTrace(start: number, steer: number, n: number, v = 0): number[] {
 }
 
 describe('drivetrain', () => {
-  // C6 (AC 6, door 2) - substitui free-roam-city C6 junto com C7
-  it('steering ramps toward the target', () => {
-    const up = 2.5 / 60;
-    const down = 3.5 / 60;
+  // car-feel C6 (AC 6) - substitui car-handling C6
+  it('steering ramps at 4 and 5 rad per second', () => {
+    const up = 4.0 / 60;
+    const down = 5.0 / 60;
 
-    // A: cresce 2.5/60 por passo, chega a 0.55 no passo 14 e fica
+    // input +1: cresce 4.0/60 por passo, chega a 0.55 no passo 9 e fica, sem passar
     const a = steerTrace(0, 1, 30);
     let prev = 0;
-    for (let i = 0; i < 13; i++) {
+    for (let i = 0; i < 8; i++) {
       expect(Math.abs(a[i]! - prev - up), `step ${i + 1}`).toBeLessThan(1e-12);
       prev = a[i]!;
     }
-    expect(a[12]!).toBeLessThan(0.55);
-    expect(a[13]!).toBe(0.55);
-    for (let i = 13; i < 30; i++) expect(a[i]!, `step ${i + 1}`).toBe(0.55);
+    expect(a[7]!).toBeLessThan(0.55);
+    expect(a[8]!).toBe(0.55);
+    for (let i = 8; i < 30; i++) expect(a[i]!, `step ${i + 1}`).toBe(0.55);
 
-    // soltando: cai 3.5/60 por passo até 0, sem passar para o outro lado
+    // soltando (input 0): cai 5.0/60 por passo até 0, sem passar para o outro lado
     const rel = steerTrace(0.55, 0, 20);
     prev = 0.55;
     let reachedZero = false;
@@ -64,7 +64,7 @@ describe('drivetrain', () => {
     expect(reachedZero).toBe(true);
     expect(rel[19]!).toBe(0);
 
-    // de +0.55 com input -1: até -0.55 sem pular valores
+    // de +0.55 com input -1: cada passo muda no máximo 5.0/60 até -0.55
     const flip = steerTrace(0.55, -1, 60);
     prev = 0.55;
     for (let i = 0; i < 60; i++) {
@@ -74,7 +74,7 @@ describe('drivetrain', () => {
     }
     expect(flip[59]!).toBe(-0.55);
 
-    // D é o espelho exato de A (e dos outros dois casos)
+    // input -1 é o espelho exato de +1 (e dos outros dois casos)
     const mirror: Array<[number[], number[]]> = [
       [a, steerTrace(0, -1, 30)],
       [rel, steerTrace(-0.55, 0, 20)],
@@ -85,22 +85,22 @@ describe('drivetrain', () => {
     }
   });
 
-  // C7 (AC 7) - substitui free-roam-city C6 junto com C6
-  it('steering target shrinks with speed', () => {
+  // car-feel C7 (AC 7) - substitui car-handling C7
+  it('steering target with 1.7 g', () => {
     const table: Array<[number, number]> = [
       [0, 0.55],
       [0.9, 0.55],
       [5, 0.55],
-      [10, Math.atan(33.1578 / 100)],
-      [27.78, Math.atan(33.1578 / 771.73)],
-      [55.56, Math.atan(33.1578 / 3086.9)],
-      [-5, 0.55],
+      [10, Math.atan(43.3602 / 100)],
+      [27.78, Math.atan(43.3602 / 771.7284)],
+      [55.56, Math.atan(43.3602 / 3086.9136)],
+      [-10, Math.atan(43.3602 / 100)],
     ];
     for (const [v, expected] of table) {
       expect(Math.abs(steerTarget(spec, v) - expected), `target at ${v} m/s`).toBeLessThanOrEqual(1e-6);
     }
     // a ré usa o mesmo alvo da frente
-    expect(steerTarget(spec, -5)).toBe(steerTarget(spec, 5));
+    expect(steerTarget(spec, -10)).toBe(steerTarget(spec, 10));
     // e é o alvo para onde a rampa de stepDrivetrain converge
     for (const [v, expected] of table) {
       const trace = steerTrace(0, 1, 30, v);
