@@ -327,6 +327,11 @@ describe('drivetrain - engine and gearbox', () => {
     const ratio = spec.reverseRatio / spec.gearRatios[0]!;
     expect(back.cmd.engineForce).toBeCloseTo(-fwd * ratio, 6);
     expect(t).toBeGreaterThan(0);
+    // ré engatada rolando para frente (descida): o freio-motor segura contra o movimento, mesma magnitude
+    const ahead = stepDrivetrain(spec, settled({ gear: -1 }), idle, 20 / 3.6, DT);
+    expect(ahead.state.gear).toBe(-1);
+    expect(ahead.cmd.engineForce).toBeLessThan(0);
+    expect(ahead.cmd.engineForce).toBeCloseTo(-back.cmd.engineForce, 9);
     // parado em ré, nada
     expect(Math.abs(stepDrivetrain(spec, settled({ gear: -1 }), idle, 0, DT).cmd.engineForce)).toBe(0);
   });
