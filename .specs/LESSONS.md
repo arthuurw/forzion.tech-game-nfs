@@ -50,6 +50,24 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: verification.md round 2 gap 1 - src/audio/audioMap.ts:54 tremoloDepth lower clamp unsampled (audio)
 - last seen: 2026-09-25T23:43:13Z
 
+### L-007 - When a check bounds a blend or transition band, assert the neighbour pairs that cross each band edge, not only pairs inside the band.
+- signal: `surviving_mutant` · recurrence: 1 feature(s) · scope: `world` · harmful: 0
+- features: city-terrain
+- evidence: round1 F1 carveRoads.ts:62 (world)
+- last seen: 2026-09-26T18:38:18Z
+
+### L-008 - When a seeded generator has an OR of conditions, add a synthetic input for each branch; the production seed may never exercise one of them.
+- signal: `surviving_mutant` · recurrence: 1 feature(s) · scope: `world` · harmful: 0
+- features: city-terrain
+- evidence: round1 F2 RoadGenerator.ts:185 (world)
+- last seen: 2026-09-26T18:38:18Z
+
+### L-009 - A size asserted on the render mesh does not prove the physics collider; read the collider back from Rapier and assert its extents.
+- signal: `ac_gap` · recurrence: 1 feature(s) · scope: `physics` · harmful: 0
+- features: city-terrain
+- evidence: round2 C27 WorldPhysics.ts:50 (physics)
+- last seen: 2026-09-26T18:38:18Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.

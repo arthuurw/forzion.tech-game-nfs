@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 7,
+  "next_id": 10,
   "lessons": [
     {
       "id": "L-001",
@@ -112,6 +112,60 @@
       ],
       "created": "2026-09-25T23:43:13Z",
       "last_seen": "2026-09-25T23:43:13Z"
+    },
+    {
+      "id": "L-007",
+      "key": "surviving_mutant::when a check bounds a blend or transition band assert the neighbour pairs that cross each band edge not only pairs inside the band",
+      "text": "When a check bounds a blend or transition band, assert the neighbour pairs that cross each band edge, not only pairs inside the band.",
+      "signal": "surviving_mutant",
+      "scope": "world",
+      "status": "candidate",
+      "features": [
+        "city-terrain"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "round1 F1 carveRoads.ts:62 (world)"
+      ],
+      "created": "2026-09-26T18:38:18Z",
+      "last_seen": "2026-09-26T18:38:18Z"
+    },
+    {
+      "id": "L-008",
+      "key": "surviving_mutant::when a seeded generator has an or of conditions add a synthetic input for each branch the production seed may never exercise one of them",
+      "text": "When a seeded generator has an OR of conditions, add a synthetic input for each branch; the production seed may never exercise one of them.",
+      "signal": "surviving_mutant",
+      "scope": "world",
+      "status": "candidate",
+      "features": [
+        "city-terrain"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "round1 F2 RoadGenerator.ts:185 (world)"
+      ],
+      "created": "2026-09-26T18:38:18Z",
+      "last_seen": "2026-09-26T18:38:18Z"
+    },
+    {
+      "id": "L-009",
+      "key": "ac_gap::a size asserted on the render mesh does not prove the physics collider read the collider back from rapier and assert its extents",
+      "text": "A size asserted on the render mesh does not prove the physics collider; read the collider back from Rapier and assert its extents.",
+      "signal": "ac_gap",
+      "scope": "physics",
+      "status": "candidate",
+      "features": [
+        "city-terrain"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "round2 C27 WorldPhysics.ts:50 (physics)"
+      ],
+      "created": "2026-09-26T18:38:18Z",
+      "last_seen": "2026-09-26T18:38:18Z"
     }
   ]
 }
