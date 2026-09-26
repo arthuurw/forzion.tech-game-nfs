@@ -99,7 +99,7 @@ Proof: `npx playwright test tests/e2e/visual.spec.ts -g "camera swings left whil
 Na tabela, `cf-N` é o check N da car-feel.
 
 - **Checks com física real:** C1-C6, C8, C10-C13.
-- **Checks cruzando a fronteira do browser:** C13 (provas Playwright).
+- **Checks cruzando a fronteira do browser:** C8 (2ª prova) e C13 (provas Playwright).
 
 ## Test policy
 
