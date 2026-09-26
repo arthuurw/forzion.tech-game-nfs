@@ -321,6 +321,27 @@ test.describe('city-terrain - mundo', () => {
     expect(r.meshes.length).toBe(4);
     expect(r.meshes.reduce((a: number, b: number) => a + b, 0)).toBe(r.lots);
     for (const c of r.meshes) expect(c).toBeGreaterThan(0);
+
+    // C33 (AC 27): a instância de cada prédio começa na base `y` do lote e sobe `height`
+    // (instância i da malha do tipo T = i-ésimo lote com `facadeType` T, conferido pelo centro x, z)
+    const spans = await page.evaluate(() => ({
+      spans: (window as any).__game.city.facadeSpans() as number[][][],
+      lots: (window as any).__game.world.lots as Array<{ x: number; y: number; z: number; height: number; facadeType: number }>,
+    }));
+    let checked = 0;
+    spans.spans.forEach((mesh, type) => {
+      const lots = spans.lots.filter((l) => l.facadeType === type);
+      expect(mesh.length, `facade ${type}`).toBe(lots.length);
+      mesh.forEach(([lo, hi, x, z], i) => {
+        const l = lots[i]!;
+        const where = `facade ${type} instance ${i} at ${l.x.toFixed(1)},${l.z.toFixed(1)}`;
+        expect(Math.hypot(x! - l.x, z! - l.z), where).toBeLessThan(0.01);
+        expect(Math.abs(lo! - l.y), `${where} base`).toBeLessThanOrEqual(0.01);
+        expect(Math.abs(hi! - (l.y + l.height)), `${where} top`).toBeLessThanOrEqual(0.01);
+        checked++;
+      });
+    });
+    expect(checked).toBe(r.lots);
   });
 
   // C37 (AC 30, door 7)

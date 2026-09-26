@@ -3,7 +3,7 @@ import { NEON_PALETTE } from '../../src/world/CityGenerator';
 import { generateTerrain, heightAt } from '../../src/world/terrain/TerrainGenerator';
 import { carveRoads } from '../../src/world/terrain/carveRoads';
 import { generateRoads } from '../../src/world/roads/RoadGenerator';
-import { generateLots, type Lot } from '../../src/world/lots/LotGenerator';
+import { facadeTransform, generateLots, type Lot } from '../../src/world/lots/LotGenerator';
 
 const raw = generateTerrain(1337);
 const net = generateRoads(1337, raw);
@@ -119,6 +119,11 @@ describe('lots', () => {
       let low = heightAt(carved, l.x, l.z);
       for (const [x, z] of corners(l)) low = Math.min(low, heightAt(carved, x, z));
       expect(Math.abs(l.y - low)).toBeLessThanOrEqual(0.01);
+      // a malha (caixa unitária da fachada) começa na base e sobe `height`
+      const t = facadeTransform(l);
+      expect(t.position[1] - t.scale[1] / 2, `lot at ${l.x.toFixed(1)},${l.z.toFixed(1)} mesh base`).toBeCloseTo(l.y, 4);
+      expect(t.position[1] + t.scale[1] / 2, `lot at ${l.x.toFixed(1)},${l.z.toFixed(1)} mesh top`).toBeCloseTo(l.y + l.height, 4);
+      expect([t.position[0], t.position[2]]).toEqual([l.x, l.z]);
     }
   });
 

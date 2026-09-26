@@ -69,6 +69,24 @@ export function lotCorners(l: Pick<Lot, 'x' | 'z' | 'width' | 'depth' | 'rotatio
   return out;
 }
 
+/**
+ * Instância da fachada de um lote: a caixa unitária centrada na origem vira o
+ * prédio com centro `position`, tamanho `scale` e giro `yaw` em Y (eixo local
+ * x ao longo da rua: yaw = rotação − 90°). A malha começa na base `y` e sobe
+ * `height` (C33).
+ */
+export function facadeTransform(l: Pick<Lot, 'x' | 'y' | 'z' | 'width' | 'depth' | 'height' | 'rotation'>): {
+  position: [number, number, number];
+  scale: [number, number, number];
+  yaw: number;
+} {
+  return {
+    position: [l.x, l.y + l.height / 2, l.z],
+    scale: [l.width, l.height, l.depth],
+    yaw: l.rotation - Math.PI / 2,
+  };
+}
+
 /** Distância horizontal de (x, z) ao retângulo orientado do lote (0 dentro). */
 export function distanceToLot(l: Pick<Lot, 'x' | 'z' | 'width' | 'depth' | 'rotation'>, x: number, z: number): number {
   const dx = x - l.x;
