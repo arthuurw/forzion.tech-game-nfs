@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { generateTerrain, heightAt, riverCenterX } from '../../src/world/terrain/TerrainGenerator';
-import { generateRoads } from '../../src/world/roads/RoadGenerator';
+import { generateTerrain, heightAt, riverCenterX, type Heightmap } from '../../src/world/terrain/TerrainGenerator';
+import { generateRoads, markBridges } from '../../src/world/roads/RoadGenerator';
 import { bridgeMeshes, bridgeParts } from '../../src/world/roads/bridges';
 import { pointHeading } from '../../src/world/roads/roadMesh';
 
@@ -37,6 +37,34 @@ describe('bridges', () => {
       return false;
     });
     expect(overRiver).toBe(true);
+
+    // o seed 1337 não tem viaduto sobre vale seco (as 5 pontes cruzam o rio), então cada linha da
+    // decisão de `markBridges` ganha um caso sintético: estrada reta em z = 0, pontos a cada 2 m de
+    // x = -200 a 200 (índice i ↔ x = -200 + 2i), terreno que só varia em x (amostras a cada 4 m)
+    const line = (y: number) => {
+      const p = new Float32Array(201 * 3);
+      for (let i = 0; i < 201; i++) {
+        p[i * 3] = -200 + 2 * i;
+        p[i * 3 + 1] = y;
+      }
+      return p;
+    };
+    const terrain = (h: (x: number) => number): Heightmap => {
+      const heights = new Float32Array(101 * 101);
+      for (let iz = 0; iz < 101; iz++) for (let ix = 0; ix < 101; ix++) heights[iz * 101 + ix] = h(-200 + ix * 4);
+      return { size: 101, spacing: 4, origin: -200, heights };
+    };
+    // viaduto sobre vale SECO (door 6, "mais de 4 m acima do terreno original"): pista em 20, vale até 2 (acima da água)
+    const valley = terrain((x) => 20 - 18 * Math.max(0, 1 - Math.abs(x) / 60));
+    // mais de 4 m acima: |x| ≤ 46 (i 77..123); a ponte se estende enquanto a pista está a mais de 1.5 m do
+    // terreno, |x| ≤ 54 (i 73..127), mais 3 pontos de folga de cada lado
+    expect(markBridges(line(20), valley)).toEqual([{ from: 70, to: 130 }]);
+    // só água (pista a 3.5 m do leito, abaixo do limite de 4 m): leito a -3 em |x| ≤ 8, margem a 0 em |x| ≥ 12;
+    // água (< -2) em |x| ≤ 8 (i 96..104), pista a mais de 1.5 m do terreno em |x| ≤ 10 (i 95..105), mais a folga
+    const river = terrain((x) => -3 * Math.min(1, Math.max(0, (12 - Math.abs(x)) / 4)));
+    expect(markBridges(line(0.5), river)).toEqual([{ from: 92, to: 108 }]);
+    // nem água nem alto: pista 1 m acima de terreno plano, sem ponte
+    expect(markBridges(line(1), terrain(() => 0))).toEqual([]);
   });
 
   // C27 (AC 21, door 6)
