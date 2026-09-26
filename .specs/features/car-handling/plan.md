@@ -159,6 +159,7 @@ HUD, som e efeitos leem o estado real do carro.
 | nível de realismo | "arcade realista": números de carro real (aderência ~1 g, frenagem ~40 m, 0–100 em ~6.5 s), sem punir erro pequeno (o carro sai de frente, não roda sozinho) | pedido "natural, próximo ao real" num jogo estilo NFSU2; escolhido pelo usuário em 2026-09-26 | y |
 | carro de referência | esportivo compacto de tração traseira: 1250 kg, ~300 Nm, 6 marchas | é o carro que já existe (placeholder / Kenney) e casa com os números do problema; escolhido pelo usuário em 2026-09-26 | y |
 | freio de mão | fica o fator 0.4 na aderência traseira (free-roam-city AC 5) | derrapagem controlável já cabe no AC 11 e AC 12 | n |
+| freio de mão com acelerador | o motor continua empurrando (power slide); sem acelerador, nem motor nem freio-motor. Com a ré engatada, acelerador andando para trás ou S andando para frente acionam o freio de serviço | pedido "estilo NFSU2"; o build tinha cortado o motor sem registro, e o Verifier do round 1 apontou; escolhido pelo usuário em 2026-09-26 | y |
 | raio físico da roda | fica 0.45 m (o modelo visual é escalado 1.8×); a relação final compensa no cálculo de rpm | trocar o raio muda a altura do carro e o visual | n |
 
 **Open questions:** none - all resolved or logged above.
@@ -170,7 +171,7 @@ HUD, som e efeitos leem o estado real do carro.
 | screen HUD | marcha durante a troca (0.25 s sem força) | AC 24 - mostra a marcha nova assim que engata |
 | screen HUD | barra de RPM no corte (7000) | AC 15, AC 24 - barra cheia, sem passar de 100 % |
 | screen HUD | estados vazio, loading, erro | n/a - o HUD já existe e estes estados não mudam |
-| teclado | `A` e `D` juntos | existing - `steerAxis` devolve 0 (`src/core/input.ts:49`), a rampa do AC 6 volta ao centro |
+| teclado | `A` e `D` juntos | existing - `steerAxis` devolve 0 (`src/core/input.ts:52`), a rampa do AC 6 volta ao centro |
 | teclado | soltar a direção em alta velocidade | AC 6 - volta ao centro a 3.5 rad/s |
 | áudio | queda de giro na troca | AC 24, AC 25 |
 

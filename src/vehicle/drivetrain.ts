@@ -188,8 +188,9 @@ export function stepDrivetrain(
 
   let rearFrictionFactor = 1;
   if (input.handbrake) {
-    // freio de mão: embreagem aberta, traseira travada e com menos aderência
-    engineForce = 0;
+    // freio de mão: traseira travada e com menos aderência; com acelerador o motor segue empurrando
+    // (power slide), sem acelerador não há freio-motor
+    if (!input.throttle) engineForce = 0;
     brakeRear = Math.max(brakeRear, HANDBRAKE_FORCE_N);
     rearFrictionFactor = spec.handbrakeRearGrip;
   }
