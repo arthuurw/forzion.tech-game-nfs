@@ -35,7 +35,7 @@ export class Water {
 }
 
 /** Normal map 128 × 128 de ondas (soma de senos com período inteiro, repete sem emenda). */
-function waveNormalMap(): THREE.DataTexture {
+export function waveNormalMap(): THREE.DataTexture {
   const size = 128;
   const data = new Uint8Array(size * size * 4);
   const h = (x: number, y: number) => {

@@ -28,6 +28,8 @@ import { generateLamps } from '../world/roads/roadMesh';
 import { carveRoads } from '../world/terrain/carveRoads';
 import { generateTerrain, heightAt, riverCenterX } from '../world/terrain/TerrainGenerator';
 import { WorldPhysics } from '../world/WorldPhysics';
+import { findBlockInteriors } from '../world/interiors/BlockInteriors';
+import { FLOOD_REACH, placeInteriorProps } from '../world/interiors/InteriorProps';
 import { WORLD_HALF, nearestRoadPoint, needsWaterReset } from '../world/worldMath';
 import { addNightLights, createNightEnvironment } from '../world/Environment';
 import { GameLoop } from './GameLoop';
@@ -148,8 +150,11 @@ export class Game {
     const carved = carveRoads(raw, network);
     const { lots, signs } = generateLots(seed, network, carved);
     const { lamps } = generateLamps(network);
-    const data: WorldData = { seed, raw, carved, network, lots, signs, lamps };
-    this.physics = new WorldPhysics(this.world, carved, raw, network, lots);
+    // block-fill: miolo das quadras (door 1) e o que existe nele (door 2), do mesmo seed
+    const interiors = findBlockInteriors(carved, network, lots);
+    const props = placeInteriorProps(seed, interiors, lots, carved);
+    const data: WorldData = { seed, raw, carved, network, lots, signs, lamps, interiors, props };
+    this.physics = new WorldPhysics(this.world, carved, raw, network, lots, props);
     this.city = new CityScene(data, this.scene, assets, quality);
 
     // spawn: parado numa avenida do centro, alinhado a ela, 12 m antes do cruzamento
@@ -213,6 +218,7 @@ export class Game {
           ...this.headlightCones,
           this.city.water.mesh,
           ...this.city.chunks.outerObjects(),
+          ...this.city.interiors.objects(),
         ];
         const was = skip.map((o) => o.visible);
         skip.forEach((o) => (o.visible = false));
@@ -281,6 +287,9 @@ export class Game {
     );
     this.world.step(this.eventQueue);
     this.simTime += dt;
+    // pedestres do miolo (block-fill): sem collider, só leem a posição do carro
+    const carNow = this.car.body.translation();
+    this.city.interiors.stepWalkers(dt, { x: carNow.x, z: carNow.z }, this.simTime);
 
     // caiu na água (door 9): volta em pé, parado, 1 m acima do ponto de estrada mais próximo
     const pos = this.car.body.translation();
@@ -324,6 +333,8 @@ export class Game {
     this.chase.update(dt, state, this.car.yawRate(), this.car.bodyRoll);
     this.city.chunks.update(state.x, state.z);
     this.city.water.update(this.simTime);
+    this.city.interiors.update(this.simTime);
+    this.city.interiors.follow(state.x, state.z);
     this.rain.update(this.simTime, { x: state.x, y: state.y, z: state.z });
     this.effects.render();
     this.city.signMaterials.forEach((m, i) => {
@@ -850,10 +861,237 @@ export class Game {
       get waterResets() {
         return game.waterResets;
       },
+      interiors: game.interiorsDebug(),
       get lastWaterReset() {
         return game.lastWaterReset;
       },
     };
+  }
+
+  /** `__game.world.interiors` (só DEV): miolo das quadras, contagens e sondas (block-fill). */
+  private interiorsDebug(): unknown {
+    const game = this;
+    const bi = this.city.data.interiors;
+    const props = this.city.data.props;
+    const scene = this.city.interiors;
+    return {
+      summary() {
+        return {
+          zones: bi.zones.length,
+          downtown: bi.zones.filter((z) => z.kind === 'downtown').length,
+          outer: bi.zones.filter((z) => z.kind === 'outer').length,
+          yards: props.yards.length,
+          pools: props.pools.length,
+          trees: props.trees.length,
+          sites: props.sites.length,
+          fireflies: scene.fireflyCount,
+          walkersActive: scene.walkers.length,
+        };
+      },
+      zones: bi.zones.map((z) => ({ ...z, centroid: { ...z.centroid }, bbox: { ...z.bbox } })),
+      spacing: bi.spacing,
+      origin: bi.origin,
+      size: bi.size,
+      /** zona e distância à fachada do vértice (ix, iz) */
+      cell: (ix: number, iz: number) => ({ zoneOf: bi.zoneOf[iz * bi.size + ix]!, facadeDist: bi.facadeDist[iz * bi.size + ix]! }),
+      /** o que a malha de terreno carregada guarda no vértice (ix, iz): cor, peso da luz rebatida e zona; null se o chunk não está carregado */
+      terrainVertex: (ix: number, iz: number) => game.city.chunks.terrainVertex(ix, iz),
+      /** nível da luz da zona que o shader do terreno recebe agora */
+      zoneLevel: (id: number) => scene.zoneLevels[id]!,
+      get time() {
+        return scene.time;
+      },
+      groundProbe: (x: number, z: number, opts: { bounce: boolean }) => game.probeGround(x, z, opts),
+      get materials() {
+        const pool = scene.poolMaterial;
+        return {
+          yardLampEmissive: scene.yardLampMaterial.emissiveIntensity,
+          bulbEmissive: scene.bulbMaterial.emissiveIntensity,
+          pool: {
+            hasNormalMap: pool.normalMap !== null,
+            offset: pool.normalMap ? [pool.normalMap.offset.x, pool.normalMap.offset.y] : null,
+            emissive: [pool.emissive.r, pool.emissive.g, pool.emissive.b],
+            emissiveIntensity: pool.emissiveIntensity,
+          },
+        };
+      },
+      get bulbCount() {
+        return scene.bulbs.count;
+      },
+      /** `uTime` do material das copas agora */
+      get crownTime() {
+        return scene.swayTime.value;
+      },
+      /** as `n` primeiras matrizes de instância das árvores (troncos e copas) */
+      treeMatrices: (n: number) => {
+        const m = new THREE.Matrix4();
+        const out: number[][] = [];
+        for (let i = 0; i < Math.min(n, scene.trees.count); i++) {
+          scene.trees.getMatrixAt(i, m);
+          out.push([...m.elements]);
+        }
+        return out;
+      },
+      trees: props.trees.map((t) => ({ ...t })),
+      sites: props.sites.map((s) => ({ ...s, floodlights: s.floodlights.map((f) => ({ ...f })) })),
+      /** yaw (rad) da lança do canteiro `i`, lido da matriz da instância na cena */
+      jibYaw: (i: number) => scene.jibYaw(i),
+      /** intensidade do farol vermelho agora e o tempo com que foi calculada */
+      get beacon() {
+        return { intensity: scene.beaconMaterial.emissiveIntensity, time: scene.time };
+      },
+      beamProbe: (siteIndex: number) => game.probeBeam(siteIndex),
+      /** pedestres ativos: posição, zona e se está fugindo do carro */
+      walkers: () => scene.walkers.map((w) => ({ x: w.x, z: w.z, zoneId: w.zoneId, fleeing: w.fleeing })),
+      /** colliders do mundo no Rapier, e o que cada parte do mundo criou */
+      colliders: () => ({
+        total: game.world.colliders.len(),
+        terrain: 1,
+        roads: game.city.data.network.roads.length,
+        rails: game.physics.rails,
+        pillars: game.physics.pillars.length,
+        lots: game.city.data.lots.length,
+        walls: game.physics.walls.length,
+        trees: game.physics.trees.length,
+        cranes: game.physics.cranes.length,
+        car: game.car.body.numColliders(),
+      }),
+      /** posição da lâmpada `i` lida da malha: matriz da instância + balanço com o `uTime` aplicado */
+      bulbPosition: (i: number) => scene.bulbPosition(i),
+    };
+  }
+
+  /** Luminância média do quarto central da tela no último `composer.render` (lida com `readPixels`). */
+  private centralLuminance(): number {
+    const gl = this.renderer.getContext();
+    const w = gl.drawingBufferWidth;
+    const h = gl.drawingBufferHeight;
+    const px = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    let sum = 0;
+    let count = 0;
+    for (let y = Math.floor(h / 4); y < Math.floor((3 * h) / 4); y++) {
+      for (let x = Math.floor(w / 4); x < Math.floor((3 * w) / 4); x++) {
+        const k = (y * w + x) * 4;
+        sum += (0.2126 * px[k]! + 0.7152 * px[k + 1]! + 0.0722 * px[k + 2]!) / 255;
+        count++;
+      }
+    }
+    return sum / count;
+  }
+
+  /**
+   * Só DEV/testes (block-fill C11, C12): câmera 3 m acima de (x, z) olhando
+   * para baixo; carro, farol, cones, chuva, partículas, espelho da rua e os
+   * objetos do miolo escondidos; `bounce: false` zera só a luz rebatida. Um
+   * quadro pelo composer e a luminância média do quarto central da tela.
+   * Restaura tudo ao sair.
+   */
+  probeGround(x: number, z: number, opts: { bounce: boolean }): number {
+    const y = heightAt(this.city.data.carved, x, z);
+    const cam = this.chase.camera;
+    const camPos = cam.position.clone();
+    const camQuat = cam.quaternion.clone();
+    const hidden: THREE.Object3D[] = [
+      this.car.mesh,
+      this.rain.points,
+      ...this.effects.objects,
+      ...this.headlightCones,
+      ...this.city.interiors.objects(),
+    ];
+    if (this.city.reflector) hidden.push(this.city.reflector);
+    const was = hidden.map((o) => o.visible);
+    hidden.forEach((o) => (o.visible = false));
+    const intensity = this.headlight.intensity;
+    this.headlight.intensity = 0;
+    const bounce = this.city.interiors.terrainUniforms.uBounce.value;
+    this.city.interiors.terrainUniforms.uBounce.value = opts.bounce ? 1 : 0;
+
+    cam.position.set(x, y + 3, z);
+    cam.quaternion.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+    cam.updateMatrixWorld();
+    this.composer.render(0);
+    const lum = this.centralLuminance();
+
+    this.city.interiors.terrainUniforms.uBounce.value = bounce;
+    this.headlight.intensity = intensity;
+    hidden.forEach((o, i) => (o.visible = was[i]!));
+    cam.position.copy(camPos);
+    cam.quaternion.copy(camQuat);
+    cam.updateMatrixWorld();
+    return lum;
+  }
+
+  /**
+   * Só DEV/testes (block-fill C29): com o holofote 0 do canteiro `siteIndex`
+   * parado no meio da varredura, vista ortográfica de cima (carro, chuva,
+   * partículas, espelho e objetos do miolo ocultos) renderizada direto no
+   * canvas e lida com `readPixels`. Devolve a luminância média de 9 × 9 px no
+   * centro do facho no chão e a de um ponto do mesmo canteiro (vértice da
+   * mesma zona) a 12 m do centro do facho, de través a ele e fora dele.
+   */
+  probeBeam(siteIndex: number): { beam: number; outside: number; beamPoint: { x: number; z: number }; outsidePoint: { x: number; z: number } } {
+    const it = this.city.interiors;
+    const data = this.city.data;
+    const site = data.props.sites[siteIndex]!;
+    const f = site.floodlights[0]!;
+    const bi = data.interiors;
+    it.floodsFrozen = true;
+    it.update(this.simTime);
+    const dir = { x: Math.sin(f.heading), z: Math.cos(f.heading) };
+    const beam = { x: f.x + dir.x * FLOOD_REACH, z: f.z + dir.z * FLOOD_REACH };
+    // 12 m de través (dos dois lados) ou mais para frente/trás; o primeiro que cai na zona do canteiro
+    const zoneAt = (x: number, z: number) =>
+      bi.zoneOf[Math.round((z - bi.origin) / bi.spacing) * bi.size + Math.round((x - bi.origin) / bi.spacing)]!;
+    let outside = { x: beam.x + dir.z * 12, z: beam.z - dir.x * 12 };
+    for (let k = 0; k < 16; k++) {
+      const a = Math.PI / 2 + (k % 2 ? 1 : -1) * Math.floor((k + 1) / 2) * (Math.PI / 8);
+      const c = { x: beam.x + (dir.x * Math.cos(a) + dir.z * Math.sin(a)) * 12, z: beam.z + (dir.z * Math.cos(a) - dir.x * Math.sin(a)) * 12 };
+      if (zoneAt(c.x, c.z) === site.zoneId) {
+        outside = c;
+        break;
+      }
+    }
+    const span = 40;
+    const gl = this.renderer.getContext();
+    const W = gl.drawingBufferWidth;
+    const H = gl.drawingBufferHeight;
+    const aspect = W / H;
+    const cx = (beam.x + outside.x) / 2;
+    const cz = (beam.z + outside.z) / 2;
+    const y0 = heightAt(data.carved, cx, cz);
+    const cam = new THREE.OrthographicCamera((-span / 2) * aspect, (span / 2) * aspect, span / 2, -span / 2, 1, 400);
+    cam.position.set(cx, y0 + 150, cz);
+    cam.up.set(0, 0, -1);
+    cam.lookAt(cx, y0, cz);
+    cam.updateMatrixWorld();
+    const hidden: THREE.Object3D[] = [this.rain.points, ...this.effects.objects, this.car.mesh, ...it.objects()];
+    if (this.city.reflector) hidden.push(this.city.reflector);
+    const was = hidden.map((o) => o.visible);
+    hidden.forEach((o) => (o.visible = false));
+    this.renderer.setRenderTarget(null);
+    this.renderer.render(this.scene, cam);
+    const buf = new Uint8Array(W * H * 4);
+    gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    hidden.forEach((o, i) => (o.visible = was[i]!));
+    it.floodsFrozen = false;
+    it.update(this.simTime);
+    const lum = (x: number, z: number): number => {
+      const v = new THREE.Vector3(x, heightAt(data.carved, x, z), z).project(cam);
+      const px = Math.round(((v.x + 1) / 2) * (W - 1));
+      const py = Math.round(((v.y + 1) / 2) * (H - 1));
+      let sum = 0;
+      let count = 0;
+      for (let dy = -4; dy <= 4; dy++) {
+        for (let dx = -4; dx <= 4; dx++) {
+          const k = (Math.min(H - 1, Math.max(0, py + dy)) * W + Math.min(W - 1, Math.max(0, px + dx))) * 4;
+          sum += (0.2126 * buf[k]! + 0.7152 * buf[k + 1]! + 0.0722 * buf[k + 2]!) / 255;
+          count++;
+        }
+      }
+      return sum / count;
+    };
+    return { beam: lum(beam.x, beam.z), outside: lum(outside.x, outside.z), beamPoint: beam, outsidePoint: outside };
   }
 
   /**

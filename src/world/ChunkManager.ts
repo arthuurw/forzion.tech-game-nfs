@@ -4,7 +4,12 @@ import type { Road, RoadNetwork } from './roads/RoadGenerator';
 import { bridgeMeshes, extrudeAlong, pillarBox, type BridgeParts } from './roads/bridges';
 import { roadStripGeometry } from './roads/roadMesh';
 import type { Heightmap } from './terrain/TerrainGenerator';
+import type { BlockInteriors } from './interiors/BlockInteriors';
+import { bounceWeight, terrainColor, terrainNoise, type GroundKind } from './interiors/interiorMotion';
 import { DOWNTOWN_HALF } from './worldMath';
+
+/** o pátio do centro fica um pouco acima do espelho da rua (y = 0) para não brigar com ele */
+export const PATIO_LIFT = 0.03;
 
 export interface ChunkMaterials {
   terrain: THREE.Material;
@@ -43,6 +48,9 @@ export class ChunkManager {
     private readonly network: RoadNetwork,
     bridges: Array<{ road: Road; parts: BridgeParts }>,
     private readonly materials: ChunkMaterials,
+    /** miolo das quadras (block-fill): cor, luz rebatida e pátio do centro; null = terreno de antes */
+    private readonly interiors: BlockInteriors | null = null,
+    private readonly seed = 0,
   ) {
     this.bridges = bridges;
     for (const road of network.roads) {
@@ -75,6 +83,29 @@ export class ChunkManager {
       this.loaded.set(id, group);
       this.builds++;
     }
+  }
+
+  /**
+   * Só DEV/testes (block-fill C9, C10): cor, peso da luz rebatida e zona que a
+   * malha de terreno carregada guarda no vértice (ix, iz) da grade; null se o
+   * chunk dele não está carregado.
+   */
+  terrainVertex(ix: number, iz: number): { color: [number, number, number]; bounce: number; zone: number; y: number } | null {
+    const cells = CHUNK_SIZE / this.carved.spacing;
+    const cx = Math.min(CHUNKS_PER_SIDE - 1, Math.floor(ix / cells));
+    const cz = Math.min(CHUNKS_PER_SIDE - 1, Math.floor(iz / cells));
+    const group = this.loaded.get(cz * CHUNKS_PER_SIDE + cx);
+    const mesh = group?.getObjectByName('terrain') as THREE.Mesh | undefined;
+    if (!mesh) return null;
+    const k = (iz - cz * cells) * (cells + 1) + (ix - cx * cells);
+    const g = mesh.geometry;
+    const c = g.getAttribute('color');
+    return {
+      color: [c.getX(k), c.getY(k), c.getZ(k)],
+      bounce: g.getAttribute('aBounce').getX(k),
+      zone: g.getAttribute('aZone').getX(k),
+      y: g.getAttribute('position').getY(k),
+    };
   }
 
   /** Objetos de chunk fora do centro (o espelho do centro pode ignorá-los). */
@@ -232,13 +263,14 @@ export class ChunkManager {
     const positions = new Float32Array(side * side * 3);
     const normals = new Float32Array(side * side * 3);
     const colors = new Float32Array(side * side * 3);
+    // block-fill: peso da luz rebatida e zona de cada vértice (−1 fora do miolo)
+    const bounce = new Float32Array(side * side);
+    const zones = new Float32Array(side * side).fill(-1);
+    const interior = new Uint8Array(side * side);
     const n = hm.size;
     const H = (ix: number, iz: number) =>
       hm.heights[Math.min(n - 1, Math.max(0, iz)) * n + Math.min(n - 1, Math.max(0, ix))]!;
-    const grass = new THREE.Color('#2e4229');
-    const rock = new THREE.Color('#4d473d');
-    const sand = new THREE.Color('#5a5242');
-    const c = new THREE.Color();
+    const bi = this.interiors;
     for (let z = 0; z < side; z++) {
       for (let x = 0; x < side; x++) {
         const ix = ix0 + x;
@@ -256,9 +288,21 @@ export class ChunkManager {
         normals[k * 3 + 1] = 1 / len;
         normals[k * 3 + 2] = -dz / len;
         const slope = Math.hypot(dx, dz);
-        c.copy(grass).lerp(rock, Math.min(1, slope * 2.5));
-        if (h < 1) c.lerp(sand, Math.min(1, 1 - h / 1));
-        colors.set([c.r, c.g, c.b], k * 3);
+        let kind: GroundKind = 'none';
+        const inGrid = ix < n && iz < n;
+        if (bi && inGrid) {
+          const zone = bi.zoneOf[iz * n + ix]!;
+          if (zone >= 0) {
+            kind = bi.zones[zone]!.kind;
+            zones[k] = zone;
+            interior[k] = 1;
+            bounce[k] = bounceWeight(zone, bi.facadeDist[iz * n + ix]!);
+          }
+        }
+        const vx = hm.origin + ix * hm.spacing;
+        const vz = hm.origin + iz * hm.spacing;
+        colors.set(terrainColor(h, slope, terrainNoise(this.seed, vx, vz), kind), k * 3);
+        if (kind === 'downtown' && Math.abs(vx) <= DOWNTOWN_HALF && Math.abs(vz) <= DOWNTOWN_HALF) positions[k * 3 + 1] = h + PATIO_LIFT;
       }
     }
     const indices: number[] = [];
@@ -266,9 +310,14 @@ export class ChunkManager {
       for (let x = 0; x < cells; x++) {
         const wx = hm.origin + (ix0 + x) * hm.spacing;
         const wz = hm.origin + (iz0 + z) * hm.spacing;
-        // células inteiramente no centro ficam sob o espelho
-        if (wx >= -DOWNTOWN_HALF && wx + hm.spacing <= DOWNTOWN_HALF && wz >= -DOWNTOWN_HALF && wz + hm.spacing <= DOWNTOWN_HALF) continue;
         const a = z * side + x;
+        // células inteiramente no centro ficam sob o espelho, menos o pátio do miolo (block-fill):
+        // cada triângulo com os 3 vértices no miolo é desenhado
+        if (wx >= -DOWNTOWN_HALF && wx + hm.spacing <= DOWNTOWN_HALF && wz >= -DOWNTOWN_HALF && wz + hm.spacing <= DOWNTOWN_HALF) {
+          if (interior[a] && interior[a + side] && interior[a + 1]) indices.push(a, a + side, a + 1);
+          if (interior[a + 1] && interior[a + side] && interior[a + side + 1]) indices.push(a + 1, a + side, a + side + 1);
+          continue;
+        }
         indices.push(a, a + side, a + 1, a + 1, a + side, a + side + 1);
       }
     }
@@ -277,6 +326,8 @@ export class ChunkManager {
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('aBounce', new THREE.BufferAttribute(bounce, 1));
+    geometry.setAttribute('aZone', new THREE.BufferAttribute(zones, 1));
     geometry.setIndex(indices);
     geometry.computeBoundingSphere();
     const mesh = new THREE.Mesh(geometry, this.materials.terrain);

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-// free-roam-city C39 (door 1) + visual-upgrade C26 + city-terrain C45 + car-handling C27 + yaw-assist C9 - table-driven over the 25 pure modules
+// free-roam-city C39 (door 1) + visual-upgrade C26 + city-terrain C45 + car-handling C27 + yaw-assist C9 + block-fill C7 - table-driven over the 28 pure modules
 const PURE_MODULES = [
   'src/world/CityGenerator.ts',
   'src/vehicle/drivetrain.ts',
@@ -32,6 +32,10 @@ const PURE_MODULES = [
   'src/vehicle/carSpec.ts',
   // yaw-assist C9 (door 1)
   'src/vehicle/yawAssist.ts',
+  // block-fill C7 (doors 1 e 2; interiorMotion.ts guarda também a cor do terreno, `terrainColor`)
+  'src/world/interiors/BlockInteriors.ts',
+  'src/world/interiors/InteriorProps.ts',
+  'src/world/interiors/interiorMotion.ts',
 ];
 
 // cobre `import x from 'three'`, `import 'three'`, `import('three')` e `require('three')`
@@ -39,7 +43,7 @@ const FORBIDDEN = /(from\s+|import\s+|import\s*\(\s*|require\s*\(\s*)['"](three|
 
 describe('pure modules', () => {
   it('pure modules do not import three or rapier', () => {
-    expect(PURE_MODULES.length).toBe(25);
+    expect(PURE_MODULES.length).toBe(28);
     for (const rel of PURE_MODULES) {
       const source = readFileSync(resolve(process.cwd(), rel), 'utf8');
       expect(FORBIDDEN.test(source), rel).toBe(false);

@@ -11,6 +11,9 @@ import type { RoadNetwork } from './roads/RoadGenerator';
 import type { Lamp } from './roads/roadMesh';
 import type { Heightmap } from './terrain/TerrainGenerator';
 import { Water } from './Water';
+import type { BlockInteriors } from './interiors/BlockInteriors';
+import type { InteriorProps } from './interiors/InteriorProps';
+import { InteriorScene } from './interiors/InteriorScene';
 import { DOWNTOWN_HALF } from './worldMath';
 
 /**
@@ -41,6 +44,9 @@ export interface WorldData {
   lots: Lot[];
   signs: LotSign[];
   lamps: Lamp[];
+  /** miolo das quadras e seus objetos (block-fill, doors 1 e 2) */
+  interiors: BlockInteriors;
+  props: InteriorProps;
 }
 
 export class CityScene {
@@ -69,6 +75,7 @@ export class CityScene {
   readonly reflectorSize = DOWNTOWN_HALF * 2;
   readonly water: Water;
   readonly chunks: ChunkManager;
+  readonly interiors: InteriorScene;
   readonly group = new THREE.Group();
 
   constructor(
@@ -108,6 +115,10 @@ export class CityScene {
     worldUv(this.sidewalkMaterial, 'sidewalk');
 
     this.terrainMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
+    // block-fill: luz rebatida das janelas no chão do miolo
+    this.interiors = new InteriorScene(data.interiors, data.props, data.seed, quality, data.carved);
+    this.interiors.patchTerrainMaterial(this.terrainMaterial);
+    scene.add(this.interiors.group);
     const concrete = assets.textures[FACADE_SETS[0]!];
     this.bridgeMaterial = new THREE.MeshStandardMaterial({ color: concrete ? '#9a9890' : '#4a4b52', roughness: 0.8 });
     if (concrete) applySet(this.bridgeMaterial, concrete);
@@ -146,7 +157,7 @@ export class CityScene {
       roadOuter: this.roadOuterMaterial,
       sidewalk: this.sidewalkMaterial,
       bridge: this.bridgeMaterial,
-    });
+    }, data.interiors, data.seed);
   }
 
   private buildFacadeMesh(lots: Lot[], material: THREE.MeshStandardMaterial): THREE.InstancedMesh {
