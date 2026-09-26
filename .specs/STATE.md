@@ -9,7 +9,9 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 1. `free-roam-city` - carro dirigível, cidade noturna procedural, HUD, som (concluída)
    - 1.1 `engine-sound` - motor sintetizado mais baixo e menos irritante (concluída)
    - 1.2 `visual-upgrade` - PBR CC0, chuva, neon calmo, marcas, fumaça, faíscas, câmera de velocidade, pós moderno (concluída)
-   - 1.3 `city-terrain` - cidade de 3 km com morros, rio, baía, rodovia em anel, pontes e streaming por chunks (em build)
+   - 1.3 `city-terrain` - cidade de 3 km com morros, rio, baía, rodovia em anel, pontes e streaming por chunks (verificação round 1 FAIL por lacunas de teste; corrigindo)
+   - 1.4 `car-handling` - mecânica do carro: não capota, aderência, direção, câmbio, freios e motor de carro real (em plano)
+   - 1.5 `facade-glint` - farol não faz fachada piscar (antialiasing de especular no shader da fachada) (checks escritos, aguardando ok)
 2. corridas - checkpoints, cronômetro, sprint/circuito, IA oponente por waypoints
 3. garagem + tuning visual - pintura, rodas, vinil, body kit, underglow
 4. tuning de performance - motor, turbo, pneus alterando parâmetros do Rapier
