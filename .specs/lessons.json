@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 10,
+  "next_id": 12,
   "lessons": [
     {
       "id": "L-001",
@@ -166,6 +166,42 @@
       ],
       "created": "2026-09-26T18:38:18Z",
       "last_seen": "2026-09-26T18:38:18Z"
+    },
+    {
+      "id": "L-010",
+      "key": "spec_deviation::a behaviour rule added while building that changes what the player can do not just how is a user decision record it in the plan before the code never only in a comment",
+      "text": "A behaviour rule added while building that changes what the player can do (not just how) is a user decision; record it in the plan before the code, never only in a comment.",
+      "signal": "spec_deviation",
+      "scope": "vehicle",
+      "status": "candidate",
+      "features": [
+        "car-handling"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "round1 drivetrain.ts:192 (vehicle)"
+      ],
+      "created": "2026-09-26T18:50:06Z",
+      "last_seen": "2026-09-26T18:50:06Z"
+    },
+    {
+      "id": "L-011",
+      "key": "ac_gap::every branch in a state machine step function owes an asserted case enumerate branches from the code s if else ladder when writing coverage not from the plan s regimes",
+      "text": "Every branch in a state-machine step function owes an asserted case; enumerate branches from the code's if/else ladder when writing coverage, not from the plan's regimes.",
+      "signal": "ac_gap",
+      "scope": "vehicle",
+      "status": "candidate",
+      "features": [
+        "car-handling"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "round1 drivetrain.ts:176 (vehicle)"
+      ],
+      "created": "2026-09-26T18:50:06Z",
+      "last_seen": "2026-09-26T18:50:06Z"
     }
   ]
 }

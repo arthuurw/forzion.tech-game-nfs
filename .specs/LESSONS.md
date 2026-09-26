@@ -68,6 +68,18 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: round2 C27 WorldPhysics.ts:50 (physics)
 - last seen: 2026-09-26T18:38:18Z
 
+### L-010 - A behaviour rule added while building that changes what the player can do (not just how) is a user decision; record it in the plan before the code, never only in a comment.
+- signal: `spec_deviation` · recurrence: 1 feature(s) · scope: `vehicle` · harmful: 0
+- features: car-handling
+- evidence: round1 drivetrain.ts:192 (vehicle)
+- last seen: 2026-09-26T18:50:06Z
+
+### L-011 - Every branch in a state-machine step function owes an asserted case; enumerate branches from the code's if/else ladder when writing coverage, not from the plan's regimes.
+- signal: `ac_gap` · recurrence: 1 feature(s) · scope: `vehicle` · harmful: 0
+- features: car-handling
+- evidence: round1 drivetrain.ts:176 (vehicle)
+- last seen: 2026-09-26T18:50:06Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.
