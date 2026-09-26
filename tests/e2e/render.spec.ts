@@ -8,10 +8,50 @@ test.describe('render', () => {
   });
 
   // visual-upgrade C8 (supersede free-roam-city C21: reflector + GTAO + pós somam passes)
-  test('draw calls at most 120', async ({ page }) => {
-    const calls = await page.evaluate(() => (window as any).__game.render.calls as number);
-    expect(calls).toBeGreaterThan(0);
-    expect(calls).toBeLessThanOrEqual(120);
+  // city-terrain C38 (AC 31), supersede visual-upgrade C8: ≤ 220 em 5 lugares do mundo
+  test('draw calls at most 220 across the world', async ({ page }) => {
+    const places = await page.evaluate(() => {
+      const w = (window as any).__game.world;
+      const g = (window as any).__game;
+      const along = (road: number, i: number) => {
+        const p = w.roadPoint(road, i);
+        const q = w.roadPoint(road, i + 1);
+        return { x: p.x, y: p.y, z: p.z, h: Math.atan2(q.x - p.x, q.z - p.z) };
+      };
+      const ring = w.roads[0];
+      const pts: number[] = w.roadPoints(0);
+      const n = ring.count;
+      const bridge = ring.bridges.find((b: any) => {
+        for (let i = b.from; i <= b.to; i++) if (Math.abs(pts[i * 3]! - w.riverCenterX(pts[i * 3 + 2]!)) < 20) return true;
+        return false;
+      });
+      let south = 0;
+      let ne = 0;
+      for (let i = 0; i < n; i++) {
+        if (pts[i * 3 + 2]! > pts[south * 3 + 2]!) south = i;
+        if (pts[i * 3]! - pts[i * 3 + 2]! > pts[ne * 3]! - pts[ne * 3 + 2]!) ne = i;
+      }
+      let peak = { road: 0, i: 0, y: -Infinity };
+      for (const r of w.roads.filter((x: any) => x.kind === 'hill')) {
+        const rp: number[] = w.roadPoints(r.id);
+        for (let i = 0; i < r.count - 1; i++) if (rp[i * 3 + 1]! > peak.y) peak = { road: r.id, i, y: rp[i * 3 + 1]! };
+      }
+      const pos = g.car.position;
+      return {
+        spawn: { x: pos.x, y: pos.y - 1.2, z: pos.z, h: g.car.heading },
+        hill: along(peak.road, peak.i),
+        bridge: along(0, Math.floor((bridge.from + bridge.to) / 2)),
+        bay: along(0, south),
+        northeast: along(0, ne),
+      };
+    });
+    for (const [name, p] of Object.entries(places)) {
+      await page.evaluate((p) => (window as any).__game.car.teleport(p.x, p.y + 1.2, p.z, p.h), p);
+      await advanceSim(page, 3);
+      const calls = await page.evaluate(() => (window as any).__game.render.calls as number);
+      expect(calls, name).toBeGreaterThan(0);
+      expect(calls, name).toBeLessThanOrEqual(220);
+    }
   });
 
   // C22 (AC 17)

@@ -1,14 +1,16 @@
-import type { CityLayout } from '../world/CityGenerator';
 import type { CarState } from '../vehicle/Car';
-import { MINIMAP_SCALE, MINIMAP_SIZE_PX, worldToMinimap } from './minimapMath';
+import type { RoadNetwork } from '../world/roads/RoadGenerator';
+import { MINIMAP_SIZE_PX, minimapSegments } from './minimapMath';
 
-/** Minimapa 2D: quarteirões como retângulos, carro como triângulo no centro (AC 23). */
+export const MINIMAP_ROAD_COLOR = '#4a5068';
+
+/** Minimapa 2D: estradas da janela de 320 m como linhas, carro como triângulo no centro (city-terrain AC 34). */
 export class Minimap {
   private readonly ctx: CanvasRenderingContext2D;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
-    private readonly layout: CityLayout,
+    private readonly network: RoadNetwork,
   ) {
     canvas.width = MINIMAP_SIZE_PX;
     canvas.height = MINIMAP_SIZE_PX;
@@ -22,13 +24,15 @@ export class Minimap {
     ctx.fillStyle = 'rgba(5, 6, 13, 0.75)';
     ctx.fillRect(0, 0, size, size);
 
-    const half = (this.layout.blockSize / 2) * MINIMAP_SCALE;
-    ctx.fillStyle = '#2b2d3d';
-    for (const block of this.layout.blocks) {
-      const p = worldToMinimap(block.x, block.z, state);
-      if (p.x < -half || p.x > size + half || p.y < -half || p.y > size + half) continue;
-      ctx.fillRect(p.x - half, p.y - half, half * 2, half * 2);
+    ctx.strokeStyle = MINIMAP_ROAD_COLOR;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (const [x1, y1, x2, y2] of minimapSegments(this.network, state)) {
+      ctx.moveTo(x1!, y1!);
+      ctx.lineTo(x2!, y2!);
     }
+    ctx.stroke();
 
     // carro: triângulo apontando na direção do heading (+z do mundo = para baixo no mapa)
     ctx.save();

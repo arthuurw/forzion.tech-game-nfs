@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { advanceSim, gotoGame, heading, holdKeySim, position, speedKmh, teleport, waitSimUntil } from './helpers';
+import { advanceSim, buildingScenario, gotoGame, heading, holdKeySim, insideLot, position, speedKmh, teleport, waitSimUntil } from './helpers';
 
 test.describe('drive', () => {
   test.beforeEach(async ({ page }) => {
@@ -55,38 +55,55 @@ test.describe('drive', () => {
     await page.keyboard.up('KeyA');
     await page.keyboard.up('KeyW');
     const h1 = await heading(page);
-    expect(h1 - h0).toBeGreaterThan(0.15);
+    // diferença normalizada em (−π, π]: o spawn da city-terrain não é em heading 0
+    const d = Math.atan2(Math.sin(h1 - h0), Math.cos(h1 - h0));
+    expect(d).toBeGreaterThan(0.15);
   });
 
-  // C9 (AC 7)
+  // C9 (AC 7); city-terrain C44: o prédio agora vem de `__game.world.lots`
   test('building blocks the chassis', async ({ page }) => {
-    // quarteirão da 2ª fileira (z = -130): o carro parte da rua ao sul (z = -156)
-    const target = await page.evaluate(() => {
-      const city = (window as any).__game.city;
-      const block = city.blocks.find((b: any) => Math.abs(b.z - -130) < 1e-6 && Math.abs(b.x - -26) < 1e-6);
-      const b = block.buildings.reduce((best: any, cur: any) =>
-        cur.z - cur.depth / 2 < best.z - best.depth / 2 ? cur : best,
-      );
-      return { x: b.x, zMin: b.z - b.depth / 2, zMax: b.z + b.depth / 2, xMin: b.x - b.width / 2, xMax: b.x + b.width / 2 };
-    });
-    await teleport(page, target.x, 1.2, -156, 0);
+    const s = await buildingScenario(page);
+    await teleport(page, s.x, s.y, s.z, s.heading);
     await holdKeySim(page, 'KeyW', 3);
     const p = await position(page);
-    const insideX = p.x > target.xMin && p.x < target.xMax;
-    const insideZ = p.z > target.zMin && p.z < target.zMax;
-    expect(insideX && insideZ).toBe(false);
-    // e o carro chegou perto o bastante para ter encostado
-    expect(target.zMin - p.z).toBeLessThan(6);
+    expect(insideLot(s.lot, p.x, p.z)).toBe(false);
+    // e o carro chegou perto o bastante para ter encostado na fachada
+    const dx = p.x - s.lot.x;
+    const dz = p.z - s.lot.z;
+    const v = Math.abs(dx * Math.cos(s.lot.rotation) - dz * Math.sin(s.lot.rotation));
+    expect(v - s.lot.depth / 2).toBeLessThan(6);
   });
 
-  // C10 (AC 8)
-  test('invisible wall keeps chassis inside city', async ({ page }) => {
-    await teleport(page, 192, 1.2, 0, Math.PI / 2);
-    await holdKeySim(page, 'KeyW', 3);
-    const p = await position(page);
-    expect(Math.abs(p.x)).toBeLessThanOrEqual(202);
-    expect(Math.abs(p.z)).toBeLessThanOrEqual(202);
-    expect(p.x).toBeGreaterThan(195);
+  // city-terrain C42 (AC 35), supersede free-roam C10: paredes em ±1536
+  test('invisible walls at 1536', async ({ page }) => {
+    const walls = await page.evaluate(() => (window as any).__game.world.walls as Array<{ x: number; z: number; hx: number; hz: number }>);
+    expect(walls.length).toBe(4);
+    const faces = walls.map((w) => (w.hx < w.hz ? `x${Math.sign(w.x)}:${Math.abs(w.x) - w.hx}` : `z${Math.sign(w.z)}:${Math.abs(w.z) - w.hz}`)).sort();
+    expect(faces).toEqual(['x-1:1536', 'x1:1536', 'z-1:1536', 'z1:1536']);
+    // +x, -x e -z: 12 m da borda, de frente para ela (a borda +z é a baía: o carro volta pela água antes, C10)
+    for (const edge of ['+x', '-x', '-z'] as const) {
+      const start = await page.evaluate((edge) => {
+        const w = (window as any).__game.world;
+        const lots = w.lots as Array<{ x: number; z: number; width: number; depth: number }>;
+        for (let t = -1000; t <= 1000; t += 40) {
+          const [x, z, h] =
+            edge === '+x' ? [1524, t, Math.PI / 2] : edge === '-x' ? [-1524, t, -Math.PI / 2] : [t, -1524, Math.PI];
+          const ground = w.heightAt(x, z);
+          if (ground < 0) continue;
+          const near = w.nearestRoad(x, z);
+          if (near.distance < near.width / 2 + 8) continue;
+          if (lots.some((l) => Math.hypot(l.x - x, l.z - z) < Math.hypot(l.width, l.depth) / 2 + 20)) continue;
+          return { x, z, y: ground + 1.5, h };
+        }
+        return null;
+      }, edge);
+      expect(start, edge).not.toBeNull();
+      await teleport(page, start!.x, start!.y, start!.z, start!.h);
+      await holdKeySim(page, 'KeyW', 3);
+      const p = await position(page);
+      expect(Math.abs(p.x), edge).toBeLessThanOrEqual(1536);
+      expect(Math.abs(p.z), edge).toBeLessThanOrEqual(1536);
+    }
   });
 
   // C11 (AC 9)

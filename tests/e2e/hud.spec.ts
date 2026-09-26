@@ -95,8 +95,8 @@ test.describe('hud - rodada 2', () => {
     await expect(page.locator('#loading')).toBeHidden();
   });
 
-  // C42 (AC 23) - o canvas real do minimapa tem quarteirões e o carro desenhados
-  test('minimap draws blocks and car', async ({ page }) => {
+  // C42 (AC 23) - o canvas real do minimapa tem as estradas e o carro desenhados (city-terrain C41)
+  test('minimap draws roads and car', async ({ page }) => {
     await gotoGame(page);
     await page.waitForTimeout(200);
     const result = await page.evaluate(() => {
@@ -104,25 +104,26 @@ test.describe('hud - rodada 2', () => {
       const ctx = canvas.getContext('2d')!;
       const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
       let car = 0;
-      let blocks = 0;
+      let roads = 0;
       for (let y = 0; y < canvas.height; y++) {
         for (let x = 0; x < canvas.width; x++) {
           const i = (y * canvas.width + x) * 4;
           const [r, g, b] = [data[i], data[i + 1], data[i + 2]];
           const nearCenter = Math.abs(x - 80) <= 10 && Math.abs(y - 80) <= 10;
           if (nearCenter && r === 255 && g === 122 && b === 26) car++;
-          if (r === 43 && g === 45 && b === 61) blocks++;
+          if (r === 0x4a && g === 0x50 && b === 0x68) roads++;
         }
       }
-      return { width: canvas.width, height: canvas.height, car, blocks };
+      return { width: canvas.width, height: canvas.height, car, roads };
     });
     expect(result.width).toBe(160);
     expect(result.height).toBe(160);
     expect(result.car).toBeGreaterThanOrEqual(10);
-    expect(result.blocks).toBeGreaterThanOrEqual(100);
+    expect(result.roads).toBeGreaterThanOrEqual(200);
 
     // rotação pelo heading: frente = +x do mundo => ponta do triângulo à direita do centro
-    await teleport(page, 0, 1.2, 0, Math.PI / 2);
+    const here = await page.evaluate(() => (window as any).__game.car.position);
+    await teleport(page, here.x, here.y + 0.2, here.z, Math.PI / 2);
     await advanceSim(page, 0.1);
     await page.waitForTimeout(100);
     const tip = await page.evaluate(() => {

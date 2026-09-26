@@ -1,51 +1,74 @@
-import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import type { Assets, PbrSet } from '../core/Loader';
 import { FACADE_SETS, ROAD_SET, SIDEWALK_SET } from '../core/textureSets';
 import type { QualityPreset } from '../core/quality';
-import { FACADE_TYPES, NEON_PALETTE, type Building, type CityLayout } from './CityGenerator';
+import { FACADE_TYPES, NEON_PALETTE } from './CityGenerator';
+import { ChunkManager } from './ChunkManager';
+import type { Lot, LotSign } from './lots/LotGenerator';
+import { bridgeParts } from './roads/bridges';
+import type { RoadNetwork } from './roads/RoadGenerator';
+import type { Lamp } from './roads/roadMesh';
+import type { Heightmap } from './terrain/TerrainGenerator';
+import { Water } from './Water';
+import { DOWNTOWN_HALF } from './worldMath';
 
 /**
- * Transforma o `CityLayout` (dados) em meshes instanciados e colliders fixos.
+ * Transforma os dados do mundo da city-terrain em malhas: materiais, o
+ * `Reflector` só sobre o quadrado do centro (door 3 da visual-upgrade intacta),
+ * a água, prédios / postes / letreiros instanciados para o mundo inteiro, e o
+ * `ChunkManager` que monta terreno, asfalto, calçadas e pontes perto do carro.
  *
- * Instancing mantém a cidade em poucas draw calls: um `InstancedMesh` por tipo
- * de peça. As fachadas usam um patch de shader (door 2 do visual-upgrade): cada
- * instância recebe `aRepeat` (largura/4, altura/4) e `aRepeatZ` (profundidade/4)
- * para a textura não esticar, e `aSeed` para decidir quais janelas de 4 m estão
- * acesas. A rua é um `Reflector` (espelho real) com asfalto PBR semitransparente
- * por cima (door 3).
+ * As fachadas usam o patch de shader da visual-upgrade (door 2): cada
+ * instância recebe `aRepeat` (largura/4, altura/4) e `aRepeatZ`
+ * (profundidade/4) e `aSeed` para decidir quais janelas de 4 m estão acesas.
  */
 export const TILE_M = 4;
 const WINDOW_COLOR = new THREE.Color('#ffd9a0');
 /** brilho percebido das janelas acesas (pedido do usuário: um pouco menos claras); a intensidade emissiva continua 2.2 para o bloom */
 const WINDOW_BRIGHTNESS = 0.7;
+const LAMP_POST_HEIGHT = 6;
+
+export interface WorldData {
+  seed: number;
+  raw: Heightmap;
+  carved: Heightmap;
+  network: RoadNetwork;
+  lots: Lot[];
+  signs: LotSign[];
+  lamps: Lamp[];
+}
 
 export class CityScene {
+  /** asfalto do centro, semitransparente sobre o espelho */
   readonly roadMaterial: THREE.MeshStandardMaterial;
+  /** asfalto fora do centro, opaco */
+  readonly roadOuterMaterial: THREE.MeshStandardMaterial;
   readonly sidewalkMaterial: THREE.MeshStandardMaterial;
+  readonly terrainMaterial: THREE.MeshStandardMaterial;
+  readonly bridgeMaterial: THREE.MeshStandardMaterial;
   readonly facadeMaterials: THREE.MeshStandardMaterial[] = [];
   readonly facadeMeshes: THREE.InstancedMesh[] = [];
-  /** prédios de cada malha de fachada, na ordem das instâncias */
-  readonly facadeBuildings: Building[][] = [];
+  /** lotes de cada malha de fachada, na ordem das instâncias */
+  readonly facadeLots: Lot[][] = [];
   readonly signMaterials: THREE.MeshStandardMaterial[] = [];
   readonly lampMaterial: THREE.MeshStandardMaterial;
+  readonly lampMeshes: THREE.InstancedMesh[];
   readonly reflector: Reflector | null;
-  readonly laneMarks: THREE.InstancedMesh;
+  readonly reflectorSize = DOWNTOWN_HALF * 2;
+  readonly water: Water;
+  readonly chunks: ChunkManager;
   readonly group = new THREE.Group();
-  readonly roadRepeat: number;
 
   constructor(
-    readonly layout: CityLayout,
+    readonly data: WorldData,
     scene: THREE.Scene,
-    world: RAPIER.World,
     assets: Pick<Assets, 'textures'>,
     quality: QualityPreset,
   ) {
-    const size = layout.bounds * 2 + 40; // 444 m
-    this.roadRepeat = size / TILE_M; // 111
+    const size = this.reflectorSize;
 
-    // --- rua: reflector + asfalto PBR semitransparente por cima ---
+    // --- centro: reflector (ou chão escuro em `low`) sob o asfalto semitransparente ---
     if (quality.reflector) {
       // door 3: render target = metade da viewport em pixels CSS (sem devicePixelRatio)
       this.reflector = new Reflector(new THREE.PlaneGeometry(size, size), {
@@ -65,40 +88,30 @@ export class CityScene {
     }
 
     const asphalt = assets.textures[ROAD_SET];
-    this.roadMaterial = new THREE.MeshStandardMaterial({
-      color: asphalt ? '#ffffff' : '#0c0d14',
-      roughness: 0.2,
-      metalness: 0.1,
-      envMapIntensity: 1.2,
-      transparent: true,
-      opacity: 0.65,
-    });
-    if (asphalt) this.applySet(this.roadMaterial, asphalt, this.roadRepeat);
-    // o asfalto é escuro; a cor multiplica o albedo para não ficar cinza-claro
-    this.roadMaterial.color.set('#5b5e66');
-    const road = new THREE.Mesh(new THREE.PlaneGeometry(size, size), this.roadMaterial);
-    road.rotation.x = -Math.PI / 2;
-    road.position.y = 0.02;
-    this.group.add(road);
+    this.roadMaterial = makeRoadMaterial(asphalt, true);
+    this.roadOuterMaterial = makeRoadMaterial(asphalt, false);
 
-    // --- calçadas ---
     const paving = assets.textures[SIDEWALK_SET];
     this.sidewalkMaterial = new THREE.MeshStandardMaterial({ color: paving ? '#8a8c94' : '#1c1d26', roughness: 0.85 });
-    if (paving) this.applySet(this.sidewalkMaterial, paving, layout.blockSize / TILE_M);
-    this.group.add(this.buildSidewalks(layout));
+    if (paving) applySet(this.sidewalkMaterial, paving);
+    worldUv(this.sidewalkMaterial, 'sidewalk');
 
-    // --- faixas ---
-    this.laneMarks = this.buildLaneMarks(layout);
-    this.group.add(this.laneMarks);
+    this.terrainMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
+    const concrete = assets.textures[FACADE_SETS[0]!];
+    this.bridgeMaterial = new THREE.MeshStandardMaterial({ color: concrete ? '#9a9890' : '#4a4b52', roughness: 0.8 });
+    if (concrete) applySet(this.bridgeMaterial, concrete);
+    worldUv(this.bridgeMaterial, 'bridge');
 
-    // --- prédios ---
+    this.water = new Water(scene);
+
+    // --- prédios: 4 malhas instanciadas para o mundo todo ---
     for (let type = 0; type < FACADE_TYPES; type++) {
       const set = assets.textures[FACADE_SETS[type]!];
       const material = makeFacadeMaterial(set, type);
       this.facadeMaterials.push(material);
-      const buildings = layout.blocks.flatMap((b) => b.buildings).filter((b) => b.facadeType === type);
-      this.facadeBuildings.push(buildings);
-      const mesh = this.buildFacadeMesh(buildings, material);
+      const lots = data.lots.filter((l) => l.facadeType === type);
+      this.facadeLots.push(lots);
+      const mesh = this.buildFacadeMesh(lots, material);
       this.facadeMeshes.push(mesh);
       this.group.add(mesh);
     }
@@ -108,85 +121,34 @@ export class CityScene {
       emissive: '#ffd9a0',
       emissiveIntensity: 2.5,
     });
-    this.group.add(...this.buildLamps(layout));
-    this.group.add(...this.buildSigns(layout));
+    this.lampMeshes = this.buildLamps(data.lamps);
+    this.group.add(...this.lampMeshes);
+    this.group.add(...this.buildSigns(data.signs));
     scene.add(this.group);
 
-    this.buildColliders(layout, world);
-  }
-
-  /** Conta de instâncias de faixa (C7 do visual-upgrade). */
-  get laneMarkCount(): number {
-    return this.laneMarks.count;
-  }
-
-  private applySet(material: THREE.MeshStandardMaterial, set: PbrSet, repeat: number): void {
-    const clone = (t: THREE.Texture): THREE.Texture => {
-      const c = t.clone();
-      c.repeat.set(repeat, repeat);
-      c.needsUpdate = true;
-      return c;
-    };
-    material.map = clone(set.map);
-    material.normalMap = clone(set.normalMap);
-    material.roughnessMap = clone(set.roughnessMap);
-    material.needsUpdate = true;
-  }
-
-  private buildSidewalks(layout: CityLayout): THREE.InstancedMesh {
-    const height = 0.15;
-    const geometry = new THREE.BoxGeometry(layout.blockSize, height, layout.blockSize);
-    const mesh = new THREE.InstancedMesh(geometry, this.sidewalkMaterial, layout.blocks.length);
-    const m = new THREE.Matrix4();
-    layout.blocks.forEach((block, i) => {
-      m.makeTranslation(block.x, height / 2, block.z);
-      mesh.setMatrixAt(i, m);
+    const bridges = data.network.roads.flatMap((road) =>
+      road.bridges.map((range) => ({ road, parts: bridgeParts(road, range, data.raw) })),
+    );
+    this.chunks = new ChunkManager(scene, data.carved, data.network, bridges, {
+      terrain: this.terrainMaterial,
+      roadDowntown: this.roadMaterial,
+      roadOuter: this.roadOuterMaterial,
+      sidewalk: this.sidewalkMaterial,
+      bridge: this.bridgeMaterial,
     });
-    return mesh;
   }
 
-  private buildLaneMarks(layout: CityLayout): THREE.InstancedMesh {
-    const geometry = new THREE.PlaneGeometry(0.15, 2.5);
-    geometry.rotateX(-Math.PI / 2); // deitado no chão, comprimento ao longo de Z
-    const material = new THREE.MeshStandardMaterial({
-      color: '#d8d2b8',
-      roughness: 0.6,
-      emissive: '#2a2820',
-      emissiveIntensity: 0.4,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-    });
-    const total = layout.streets.reduce((n, s) => n + s.laneMarks.length, 0);
-    const mesh = new THREE.InstancedMesh(geometry, material, total);
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const up = new THREE.Vector3(0, 1, 0);
-    const one = new THREE.Vector3(1, 1, 1);
-    const p = new THREE.Vector3();
-    let i = 0;
-    for (const street of layout.streets) {
-      q.setFromAxisAngle(up, street.axis === 'x' ? Math.PI / 2 : 0);
-      for (const along of street.laneMarks) {
-        if (street.axis === 'x') p.set(along, 0.03, street.at);
-        else p.set(street.at, 0.03, along);
-        m.compose(p, q, one);
-        mesh.setMatrixAt(i++, m);
-      }
-    }
-    return mesh;
-  }
-
-  private buildFacadeMesh(buildings: Building[], material: THREE.MeshStandardMaterial): THREE.InstancedMesh {
+  private buildFacadeMesh(lots: Lot[], material: THREE.MeshStandardMaterial): THREE.InstancedMesh {
     const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const count = Math.max(1, buildings.length);
+    const count = Math.max(1, lots.length);
     const repeat = new Float32Array(count * 2);
     const repeatZ = new Float32Array(count);
     const seed = new Float32Array(count);
-    buildings.forEach((b, i) => {
-      repeat[i * 2] = b.width / TILE_M;
-      repeat[i * 2 + 1] = b.height / TILE_M;
-      repeatZ[i] = b.depth / TILE_M;
-      seed[i] = ((b.x * 12.9898 + b.z * 78.233) % 1000) / 1000;
+    lots.forEach((l, i) => {
+      repeat[i * 2] = l.width / TILE_M;
+      repeat[i * 2 + 1] = l.height / TILE_M;
+      repeatZ[i] = l.depth / TILE_M;
+      seed[i] = ((l.x * 12.9898 + l.z * 78.233) % 1000) / 1000;
     });
     geometry.setAttribute('aRepeat', new THREE.InstancedBufferAttribute(repeat, 2));
     geometry.setAttribute('aRepeatZ', new THREE.InstancedBufferAttribute(repeatZ, 1));
@@ -197,42 +159,45 @@ export class CityScene {
     const q = new THREE.Quaternion();
     const s = new THREE.Vector3();
     const p = new THREE.Vector3();
-    buildings.forEach((b, i) => {
-      p.set(b.x, b.height / 2, b.z);
-      s.set(b.width, b.height, b.depth);
+    const up = new THREE.Vector3(0, 1, 0);
+    lots.forEach((l, i) => {
+      // eixo local x ao longo da rua: yaw = heading − 90°
+      q.setFromAxisAngle(up, l.rotation - Math.PI / 2);
+      p.set(l.x, l.y + l.height / 2, l.z);
+      s.set(l.width, l.height, l.depth);
       m.compose(p, q, s);
       mesh.setMatrixAt(i, m);
     });
-    mesh.count = buildings.length;
+    mesh.count = lots.length;
+    mesh.frustumCulled = false;
     return mesh;
   }
 
-  private buildLamps(layout: CityLayout): THREE.InstancedMesh[] {
-    const postHeight = 6;
+  private buildLamps(lamps: Lamp[]): THREE.InstancedMesh[] {
+    const count = Math.max(1, lamps.length);
     const posts = new THREE.InstancedMesh(
-      new THREE.CylinderGeometry(0.08, 0.1, postHeight, 6),
+      new THREE.CylinderGeometry(0.08, 0.1, LAMP_POST_HEIGHT, 6),
       new THREE.MeshStandardMaterial({ color: '#2a2b33', roughness: 0.6, metalness: 0.6 }),
-      layout.lamps.length,
+      count,
     );
-    const heads = new THREE.InstancedMesh(
-      new THREE.BoxGeometry(0.5, 0.2, 0.5),
-      this.lampMaterial,
-      layout.lamps.length,
-    );
+    const heads = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.2, 0.5), this.lampMaterial, count);
     const m = new THREE.Matrix4();
-    layout.lamps.forEach((lamp, i) => {
-      m.makeTranslation(lamp.x, postHeight / 2, lamp.z);
+    lamps.forEach((lamp, i) => {
+      m.makeTranslation(lamp.x, lamp.y + LAMP_POST_HEIGHT / 2, lamp.z);
       posts.setMatrixAt(i, m);
-      m.makeTranslation(lamp.x, postHeight, lamp.z);
+      m.makeTranslation(lamp.x, lamp.y + LAMP_POST_HEIGHT, lamp.z);
       heads.setMatrixAt(i, m);
     });
+    posts.count = lamps.length;
+    heads.count = lamps.length;
+    posts.frustumCulled = false;
+    heads.frustumCulled = false;
     return [posts, heads];
   }
 
   /** Um InstancedMesh por cor da paleta: o emissive (e o flicker) é por material. */
-  private buildSigns(layout: CityLayout): THREE.InstancedMesh[] {
+  private buildSigns(signs: LotSign[]): THREE.InstancedMesh[] {
     const geometry = new THREE.PlaneGeometry(1, 1);
-    const signs = layout.blocks.flatMap((b) => b.signs);
     const meshes: THREE.InstancedMesh[] = [];
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
@@ -257,34 +222,120 @@ export class CityScene {
         mesh.setMatrixAt(i, m);
       });
       mesh.count = mine.length;
+      mesh.frustumCulled = false;
       meshes.push(mesh);
     }
     return meshes;
   }
+}
 
-  private buildColliders(layout: CityLayout, world: RAPIER.World): void {
-    const ground = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-    const extent = layout.bounds + 40;
-    world.createCollider(RAPIER.ColliderDesc.cuboid(extent, 0.5, extent).setTranslation(0, -0.5, 0), ground);
+function applySet(material: THREE.MeshStandardMaterial, set: PbrSet): void {
+  const clone = (t: THREE.Texture): THREE.Texture => {
+    const c = t.clone();
+    c.wrapS = c.wrapT = THREE.RepeatWrapping;
+    c.repeat.set(1, 1);
+    c.needsUpdate = true;
+    return c;
+  };
+  material.map = clone(set.map);
+  material.normalMap = clone(set.normalMap);
+  material.roughnessMap = clone(set.roughnessMap);
+  material.needsUpdate = true;
+}
 
-    for (const block of layout.blocks) {
-      for (const b of block.buildings) {
-        world.createCollider(
-          RAPIER.ColliderDesc.cuboid(b.width / 2, b.height / 2, b.depth / 2).setTranslation(b.x, b.height / 2, b.z),
-          ground,
-        );
-      }
-    }
+/** UV pelo mundo (1 tile a cada 4 m no plano xz) para malhas sem atributo `uv`. */
+function worldUv(material: THREE.MeshStandardMaterial, key: string): void {
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <project_vertex>',
+      `#include <project_vertex>
+vec2 worldTile = (modelMatrix * vec4(transformed, 1.0)).xz / ${TILE_M.toFixed(1)};
+#ifdef USE_MAP
+vMapUv = worldTile;
+#endif
+#ifdef USE_NORMALMAP
+vNormalMapUv = worldTile;
+#endif
+#ifdef USE_ROUGHNESSMAP
+vRoughnessMapUv = worldTile;
+#endif`,
+    );
+  };
+  material.customProgramCacheKey = () => `world-uv-${key}`;
+}
 
-    // paredes invisíveis nos 4 limites (free-roam-city AC 8)
-    const wallH = 20;
-    const wallT = 1;
-    const at = layout.bounds + wallT;
-    world.createCollider(RAPIER.ColliderDesc.cuboid(wallT, wallH, extent).setTranslation(at, wallH, 0), ground);
-    world.createCollider(RAPIER.ColliderDesc.cuboid(wallT, wallH, extent).setTranslation(-at, wallH, 0), ground);
-    world.createCollider(RAPIER.ColliderDesc.cuboid(extent, wallH, wallT).setTranslation(0, wallH, at), ground);
-    world.createCollider(RAPIER.ColliderDesc.cuboid(extent, wallH, wallT).setTranslation(0, wallH, -at), ground);
-  }
+/**
+ * Asfalto com as faixas desenhadas no shader (AC 18): `uv` em tiles de 4 m
+ * (u atravessando, v ao longo) e `aWidth` em metros. Linha central tracejada
+ * (3 m pintados a cada 6 m) e linhas de borda contínuas a 0.45 m das bordas.
+ */
+function makeRoadMaterial(set: PbrSet | undefined, translucent: boolean): THREE.MeshStandardMaterial {
+  const material = new THREE.MeshStandardMaterial({
+    color: set ? '#ffffff' : '#0c0d14',
+    // fora do centro não há espelho: um pouco mais áspero e com mais env map, para o molhado ainda aparecer
+    roughness: translucent ? 0.2 : 0.3,
+    metalness: 0.1,
+    envMapIntensity: translucent ? 1.2 : 1.8,
+    transparent: translucent,
+    opacity: translucent ? 0.65 : 1,
+  });
+  if (set) applySet(material, set);
+  // o asfalto é escuro; a cor multiplica o albedo para não ficar cinza-claro
+  material.color.set('#5b5e66');
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+attribute float aWidth;
+varying vec2 vRoadUv;
+varying float vRoadWidth;`,
+      )
+      .replace(
+        '#include <uv_vertex>',
+        `#include <uv_vertex>
+vRoadUv = uv;
+vRoadWidth = aWidth;`,
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+varying vec2 vRoadUv;
+varying float vRoadWidth;
+// cobertura de uma linha de meia largura hw a distância d, filtrada por um pixel de largura fw
+float laneLine(float d, float hw, float fw) {
+  float lo = clamp((abs(d) - hw) / fw + 0.5, 0.0, 1.0);
+  return (1.0 - lo) * min(1.0, 2.0 * hw / fw);
+}`,
+      )
+      .replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>
+float acrossM = vRoadUv.x * ${TILE_M.toFixed(1)};
+float alongM = vRoadUv.y * ${TILE_M.toFixed(1)};
+// filtradas pelo tamanho do pixel: linha mais fina que um pixel vira cobertura parcial e o
+// tracejado vira a média (0.5) quando o traço fica menor que um pixel, sem cintilar com a câmera andando
+float fwA = max(fwidth(acrossM), 1e-4);
+float fwL = max(fwidth(alongM), 1e-4);
+float f = fract(alongM / 6.0);
+float e = fwL / 6.0;
+float dash = smoothstep(-e, e, f) * (1.0 - smoothstep(0.5 - e, 0.5 + e, f)) + smoothstep(1.0 - e, 1.0 + e, f);
+dash = mix(dash, 0.5, smoothstep(0.08, 0.25, e));
+float centerLine = laneLine(acrossM - vRoadWidth * 0.5, 0.12, fwA) * dash;
+float edgeLine = laneLine(acrossM - 0.45, 0.1, fwA) + laneLine(acrossM - (vRoadWidth - 0.45), 0.1, fwA);
+float laneMark = clamp(centerLine + edgeLine, 0.0, 1.0);
+diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.82, 0.8, 0.7), laneMark);
+diffuseColor.a = mix(diffuseColor.a, 1.0, laneMark);`,
+      )
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+totalEmissiveRadiance += vec3(0.16, 0.155, 0.13) * laneMark;`,
+      );
+  };
+  material.customProgramCacheKey = () => (translucent ? 'road-downtown' : 'road-outer');
+  return material;
 }
 
 /**
