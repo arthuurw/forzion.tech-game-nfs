@@ -13,6 +13,8 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
    - 1.4 `car-handling` - mecânica do carro: não capota, aderência, direção, câmbio, freios e motor de carro real (concluída)
    - 1.5 `facade-glint` - farol não faz fachada piscar (antialiasing de especular no shader da fachada, metal e tijolo mais foscos) (concluída)
    - 1.6 `car-feel` - balanço da carroceria, volante mais rápido, menos aderência, câmera inclinando junto (checks escritos, em build)
+   - 1.7 `block-fill` - miolo das quadras: mapa em zonas, grama nova, luz rebatida, quintais, árvores ao vento, vagalumes, obras com guindaste, pedestres (checks escritos, em build)
+   - 1.8 `block-life-extras` - vapor de dutos, holofotes para o céu, estacionamentos, gatos, trem de superfície
 2. corridas - checkpoints, cronômetro, sprint/circuito, IA oponente por waypoints
 3. garagem + tuning visual - pintura, rodas, vinil, body kit, underglow
 4. tuning de performance - motor, turbo, pneus alterando parâmetros do Rapier
@@ -34,6 +36,7 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 | AD-009 | Assets 3D só CC0 (Kenney) em `public/models/`; sempre com fallback procedural quando o arquivo falta | zero atribuição obrigatória; jogo nunca quebra por asset ausente | active | 2026-09-25 |
 | AD-010 | Mundo da city-terrain: terreno por heightfield 769 × 769 a cada 4 m, estradas como polilinhas 3D a cada 2 m (`RoadNetwork`, door 2), prédios por lote ao longo das ruas; física toda no boot, malhas por chunks de 512 m | mapa grande e orgânico sem perder a colisão; o formato das estradas será lido pelas corridas | active | 2026-09-25 |
 | AD-011 | Estende a AD-005: provas de dirigibilidade com física real em `tests/physics/*.test.ts` no vitest (node) - `RAPIER.init()`, `World` com chão plano de 8 km e rampa de 9 %, o `Car` real com assets placeholder, passo de 1/60 s em loop (door 3 da car-handling) | o SwiftShader do Playwright leva ~1 min por manobra e o mapa não tem 200 m planos livres para curva a 150 km/h; 240 passos rodam em ~74 ms | active | 2026-09-26 |
+| AD-012 | Miolo das quadras: `findBlockInteriors` (puro, `src/world/interiors/BlockInteriors.ts`) marca o chão livre na grade de 4 m do heightmap (fora de estrada `w/2 + 2 m`, de lote + 1 m e de água), agrupa em zonas por vizinhança de 4 (mínimo 400 m²), classifica `downtown` / `outer` e guarda a distância ao prédio; todo conteúdo do miolo (render, física, pedestres, features futuras) lê esse mapa | um único critério de "chão livre" evita objeto em cima de estrada ou dentro de prédio; mesma grade da AD-010 | active | 2026-09-26 |
 
 ## Handoff
 
