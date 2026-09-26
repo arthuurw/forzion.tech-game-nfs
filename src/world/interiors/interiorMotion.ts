@@ -1,0 +1,415 @@
+/**
+ * Tudo o que se mexe ou muda de cor no miolo das quadras (block-fill), em
+ * função do tempo e sem three: a cor do terreno, o peso e o nível da luz
+ * rebatida, o balanço das lâmpadas e das copas, os vagalumes, o guindaste, o
+ * farol, os holofotes e os pedestres. Os shaders repetem as mesmas contas
+ * (`InteriorScene`), então o que o teste prova aqui é o que a tela mostra.
+ *
+ * Ritmos calmos de propósito ("low-cortisol", pedido do usuário em 2026-09-25).
+ */
+import { mulberry32 } from '../CityGenerator';
+import { valueNoise } from '../terrain/noise';
+import { nearestVertex, type BlockInteriors, type InteriorZone } from './BlockInteriors';
+import type { WalkerSpawn } from './InteriorProps';
+
+// ---------------------------------------------------------------- cor do chão
+
+export const GRASS_HEX = '#3f5e36';
+export const PATIO_HEX = '#55555a';
+export const ROCK_HEX = '#4d473d';
+export const SAND_HEX = '#5a5242';
+/** variação de brilho da grama e do pátio (±8 %) */
+export const GROUND_VARIATION = 0.08;
+/** escala do ruído da grama (m) */
+export const GROUND_NOISE_SCALE = 8;
+
+export type GroundKind = 'none' | 'downtown' | 'outer';
+
+/** Componente sRGB (0..1) para linear, a mesma curva do three. */
+export function srgbToLinear(c: number): number {
+  return c < 0.04045 ? c * 0.0773993808 : Math.pow(c * 0.9478672986 + 0.0521327014, 2.4);
+}
+
+/** '#rrggbb' em RGB linear, como `THREE.Color` guarda. */
+export function hexToLinear(hex: string): [number, number, number] {
+  const v = parseInt(hex.slice(1), 16);
+  return [srgbToLinear(((v >> 16) & 255) / 255), srgbToLinear(((v >> 8) & 255) / 255), srgbToLinear((v & 255) / 255)];
+}
+
+const GRASS = hexToLinear(GRASS_HEX);
+const PATIO = hexToLinear(PATIO_HEX);
+const ROCK = hexToLinear(ROCK_HEX);
+const SAND = hexToLinear(SAND_HEX);
+
+/** Ruído do seed em escala de 8 m, sempre em [−1, 1]. */
+export function terrainNoise(seed: number, x: number, z: number): number {
+  return 2 * valueNoise(x / GROUND_NOISE_SCALE, z / GROUND_NOISE_SCALE, seed ^ 0x6a55) - 1;
+}
+
+/**
+ * Cor por vértice do terreno (RGB linear): grama (ou pátio de concreto no
+ * miolo do centro) com ±8 % de brilho pelo ruído, misturada com rocha pela
+ * inclinação e com areia perto da água, como antes da block-fill.
+ */
+export function terrainColor(height: number, slope: number, noise: number, kind: GroundKind): [number, number, number] {
+  const base = kind === 'downtown' ? PATIO : GRASS;
+  const k = 1 + GROUND_VARIATION * noise;
+  let r = base[0] * k;
+  let g = base[1] * k;
+  let b = base[2] * k;
+  const rock = Math.min(1, slope * 2.5);
+  r += (ROCK[0] - r) * rock;
+  g += (ROCK[1] - g) * rock;
+  b += (ROCK[2] - b) * rock;
+  if (height < 1) {
+    const sand = Math.min(1, 1 - height);
+    r += (SAND[0] - r) * sand;
+    g += (SAND[1] - g) * sand;
+    b += (SAND[2] - b) * sand;
+  }
+  return [r, g, b];
+}
+
+// ------------------------------------------------------------- luz rebatida
+
+/** alcance da luz rebatida das janelas (m) */
+export const BOUNCE_RANGE = 25;
+
+/** Peso da luz rebatida no vértice: 0 fora do miolo, 1 colado no prédio, 0 a 25 m ou mais. */
+export function bounceWeight(zoneOf: number, facadeDist: number): number {
+  if (zoneOf < 0) return 0;
+  return Math.max(0, 1 - facadeDist / BOUNCE_RANGE);
+}
+
+export const ZONE_HOLD_MIN = 20;
+export const ZONE_HOLD_MAX = 60;
+export const ZONE_RAMP = 3;
+
+interface ZoneSchedule {
+  /** início de cada patamar (s) */
+  starts: number[];
+  /** duração de cada patamar (s) */
+  holds: number[];
+  /** nível de cada patamar (1.0 ou 0.5) */
+  levels: number[];
+  rng: () => number;
+}
+
+const schedules = new Map<string, ZoneSchedule>();
+
+function scheduleFor(zoneId: number, seed: number, until: number): ZoneSchedule {
+  const key = `${seed}:${zoneId}`;
+  let s = schedules.get(key);
+  if (!s) {
+    const rng = mulberry32((seed ^ 0x2f6b1d) + Math.imul(zoneId + 1, 0x9e3779b1));
+    const first = rng() < 0.5 ? 1 : 0.5;
+    s = { starts: [0], holds: [ZONE_HOLD_MIN + rng() * (ZONE_HOLD_MAX - ZONE_HOLD_MIN)], levels: [first], rng };
+    schedules.set(key, s);
+  }
+  for (;;) {
+    const last = s.starts.length - 1;
+    const end = s.starts[last]! + s.holds[last]! + ZONE_RAMP;
+    if (end > until) break;
+    s.starts.push(end);
+    s.holds.push(ZONE_HOLD_MIN + s.rng() * (ZONE_HOLD_MAX - ZONE_HOLD_MIN));
+    s.levels.push(s.levels[last] === 1 ? 0.5 : 1);
+  }
+  return s;
+}
+
+/**
+ * Nível da luz de uma zona no instante `t` (s): patamares de 1.0 e 0.5 que
+ * duram de 20 a 60 s (sorteio pelo PRNG a partir do id da zona), ligados por
+ * rampas lineares de 3 s. Mesmo id e mesmo t dão sempre o mesmo valor.
+ */
+export function zoneLight(zoneId: number, t: number, seed = 1337): number {
+  const time = Math.max(0, t);
+  const s = scheduleFor(zoneId, seed, time);
+  // busca binária do patamar que começou por último antes de t
+  let lo = 0;
+  let hi = s.starts.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (s.starts[mid]! <= time) lo = mid;
+    else hi = mid - 1;
+  }
+  const into = time - s.starts[lo]!;
+  const level = s.levels[lo]!;
+  if (into <= s.holds[lo]!) return level;
+  const next = level === 1 ? 0.5 : 1;
+  return level + (next - level) * ((into - s.holds[lo]!) / ZONE_RAMP);
+}
+
+// ------------------------------------------------------------------ quintais
+
+/** amplitude do balanço das lâmpadas (m) */
+export const BULB_AMPLITUDE = 0.12;
+
+/** Frequência (0.2 a 0.4 Hz) e fase do balanço de uma lâmpada, pela posição. */
+export function bulbSway(x: number, z: number): { freq: number; phase: number } {
+  const h = hash01(x * 0.731 + 11.3, z * 1.137 - 4.1);
+  const p = hash01(z * 0.913 - 7.7, x * 0.577 + 2.9);
+  return { freq: 0.2 + 0.2 * h, phase: p * Math.PI * 2 };
+}
+
+/** Deslocamento horizontal da lâmpada (m): `A · sin(2π f t + fase)`. */
+export function bulbOffset(t: number, phase: number, freq: number): number {
+  return BULB_AMPLITUDE * Math.sin(2 * Math.PI * freq * t + phase);
+}
+
+/** velocidade do deslocamento do normal map da piscina (uv/s) */
+export const POOL_FLOW = [0.02, 0.013] as const;
+
+// ------------------------------------------------------------------- árvores
+
+/** amplitude do balanço da copa (m) */
+export const CROWN_AMPLITUDE = 0.25;
+
+/** Frequência (0.2 a 0.4 Hz), fase e direção do vento na copa, pela posição. */
+export function crownSwayParams(x: number, z: number): { freq: number; phase: number; dirX: number; dirZ: number } {
+  const freq = 0.2 + 0.2 * hash01(x * 0.371 + 3.7, z * 0.529 - 1.3);
+  const phase = hash01(z * 0.211 + 8.1, x * 0.433 + 5.5) * Math.PI * 2;
+  // vento de oeste com ±30° de variação
+  const a = Math.PI / 2 + (hash01(x * 0.137 - 2.2, z * 0.173 + 9.4) - 0.5) * (Math.PI / 3);
+  return { freq, phase, dirX: Math.sin(a), dirZ: Math.cos(a) };
+}
+
+/** Deslocamento horizontal do topo da copa (m) no instante `t`. */
+export function crownSway(t: number, x: number, z: number): { dx: number; dz: number } {
+  const p = crownSwayParams(x, z);
+  const s = CROWN_AMPLITUDE * Math.sin(2 * Math.PI * p.freq * t + p.phase);
+  return { dx: s * p.dirX, dz: s * p.dirZ };
+}
+
+/** Deriva e brilho do vagalume `i` em torno da sua âncora: lento (≤ 0.5 m/s) e pulsando a 0.3-0.6 Hz. */
+export function fireflyMotion(t: number, i: number): { dx: number; dy: number; dz: number; glow: number; pulseHz: number } {
+  const a = hash01(i * 0.618 + 0.3, 1.7);
+  const b = hash01(i * 0.414 + 2.1, 3.9);
+  const c = hash01(i * 0.732 + 4.4, 0.6);
+  const pulseHz = 0.3 + 0.3 * hash01(i * 0.271 + 6.2, 7.1);
+  // |v| ≤ √((1.0·2π·0.05)² + (1.0·2π·0.045)² + (0.4·2π·0.06)²) ≈ 0.45 m/s
+  const dx = 1.0 * Math.sin(2 * Math.PI * 0.05 * t + a * 6.283);
+  const dz = 1.0 * Math.sin(2 * Math.PI * 0.045 * t + b * 6.283);
+  const dy = 0.4 * Math.sin(2 * Math.PI * 0.06 * t + c * 6.283);
+  const glow = 0.5 + 0.5 * Math.sin(2 * Math.PI * pulseHz * t + a * 6.283);
+  return { dx, dy, dz, glow, pulseHz };
+}
+
+/** vagalumes por qualidade */
+export const FIREFLIES_HIGH = 600;
+export const FIREFLIES_LOW = 300;
+
+// --------------------------------------------------------------------- obras
+
+/** Período de uma volta da lança (90 a 150 s), pela posição do canteiro. */
+export function cranePeriod(x: number, z: number): number {
+  return 90 + 60 * hash01(x * 0.0917 + 1.9, z * 0.0731 - 3.3);
+}
+
+/** Ângulo da lança (rad, sem enrolar): uma volta completa a cada `period` s. */
+export function jibAngle(t: number, period: number, phase = 0): number {
+  return phase + (2 * Math.PI * t) / period;
+}
+
+/** Farol vermelho no topo da torre: 1 Hz, aceso 0.2 s de cada segundo. */
+export function beaconOn(t: number): boolean {
+  return ((t % 1) + 1) % 1 < 0.2;
+}
+
+export const FLOOD_SWEEP = Math.PI / 6;
+export const FLOOD_PERIOD = 20;
+
+/** Heading do holofote: ±30° em torno de `base`, num ciclo de 20 s. */
+export function floodSweep(t: number, base: number): number {
+  return base + FLOOD_SWEEP * Math.sin((2 * Math.PI * t) / FLOOD_PERIOD);
+}
+
+// ----------------------------------------------------------------- pedestres
+
+export const WALKER_RANGE = 300;
+export const WALKER_DENSITY = 3 / 1000;
+export const WALKER_CAP_HIGH = 400;
+export const WALKER_CAP_LOW = 200;
+export const WALKER_SPEED_MIN = 1.25;
+export const WALKER_SPEED_MAX = 1.55;
+export const FLEE_SPEED = 3;
+export const FLEE_START = 8;
+export const FLEE_STOP = 15;
+
+/** Quantos pedestres cabem: 3 por 1000 m² das zonas ao alcance, até 400 (high) ou 200 (low). */
+export function walkerBudget(zonesInRange: ReadonlyArray<Pick<InteriorZone, 'areaM2'>>, quality: 'high' | 'low'): number {
+  const cap = quality === 'low' ? WALKER_CAP_LOW : WALKER_CAP_HIGH;
+  let area = 0;
+  for (const z of zonesInRange) area += z.areaM2;
+  return Math.min(cap, Math.floor((area * 3) / 1000));
+}
+
+/** Balanço vertical do corpo (m): ±3 cm a 2 Hz. */
+export function walkerBob(t: number): number {
+  return 0.03 * Math.sin(4 * Math.PI * t);
+}
+
+export interface Walker {
+  zoneId: number;
+  x: number;
+  z: number;
+  /** trecho atual: de (fromX, fromZ) a (toX, toZ) */
+  fromX: number;
+  fromZ: number;
+  toX: number;
+  toZ: number;
+  speed: number;
+  fleeing: boolean;
+  /** fase do balanço do corpo (s) */
+  phase: number;
+  /** estado do PRNG próprio (mulberry32) */
+  rng: number;
+}
+
+function nextRand(w: Walker): number {
+  w.rng = (w.rng + 0x6d2b79f5) >>> 0;
+  let t = w.rng;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+function inZone(bi: BlockInteriors, zoneId: number, x: number, z: number): boolean {
+  return bi.zoneOf[nearestVertex(bi, x, z)] === zoneId;
+}
+
+/** Todo ponto do trecho, a cada 0.25 m (inclui os pontos a cada 1 m), cai num vértice da zona. */
+export function segmentInZone(bi: BlockInteriors, zoneId: number, ax: number, az: number, bx: number, bz: number): boolean {
+  const len = Math.hypot(bx - ax, bz - az);
+  const steps = Math.max(1, Math.ceil(len / 0.25));
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    if (!inZone(bi, zoneId, ax + (bx - ax) * t, az + (bz - az) * t)) return false;
+  }
+  return true;
+}
+
+export function createWalker(spawn: WalkerSpawn, index: number): Walker {
+  const w: Walker = {
+    zoneId: spawn.zoneId,
+    x: spawn.x,
+    z: spawn.z,
+    fromX: spawn.x,
+    fromZ: spawn.z,
+    toX: spawn.x,
+    toZ: spawn.z,
+    speed: WALKER_SPEED_MIN,
+    fleeing: false,
+    phase: 0,
+    rng: (Math.imul(index + 1, 0x9e3779b1) ^ 0x5eed) >>> 0,
+  };
+  w.phase = nextRand(w) * 0.5;
+  w.speed = WALKER_SPEED_MIN + nextRand(w) * (WALKER_SPEED_MAX - WALKER_SPEED_MIN);
+  return w;
+}
+
+/** Escolhe o próximo trecho a partir do vértice (x, z): reto, até outro vértice da mesma zona. */
+function pickSegment(w: Walker, bi: BlockInteriors): void {
+  const sp = bi.spacing;
+  for (let tries = 0; tries < 8; tries++) {
+    const a = nextRand(w) * Math.PI * 2;
+    const len = 4 + nextRand(w) * 12;
+    const v = nearestVertex(bi, w.x + Math.sin(a) * len, w.z + Math.cos(a) * len);
+    const tx = bi.origin + (v % bi.size) * sp;
+    const tz = bi.origin + Math.floor(v / bi.size) * sp;
+    if ((tx === w.x && tz === w.z) || bi.zoneOf[v] !== w.zoneId) continue;
+    if (!segmentInZone(bi, w.zoneId, w.x, w.z, tx, tz)) continue;
+    w.fromX = w.x;
+    w.fromZ = w.z;
+    w.toX = tx;
+    w.toZ = tz;
+    return;
+  }
+  // um vizinho de 4 sempre existe numa zona de 25 vértices ou mais
+  const start = Math.floor(nextRand(w) * 4);
+  for (let k = 0; k < 4; k++) {
+    const [dx, dz] = [[sp, 0], [-sp, 0], [0, sp], [0, -sp]][(start + k) % 4]!;
+    if (!inZone(bi, w.zoneId, w.x + dx!, w.z + dz!)) continue;
+    w.fromX = w.x;
+    w.fromZ = w.z;
+    w.toX = w.x + dx!;
+    w.toZ = w.z + dz!;
+    return;
+  }
+  w.fromX = w.toX = w.x;
+  w.fromZ = w.toZ = w.z;
+}
+
+/** Ponto do trecho (from → to) a distância `r` de (px, pz), além de `to` (círculo × segmento). */
+function pointOnSegmentAt(px: number, pz: number, r: number, w: Walker): [number, number] {
+  const dx = w.toX - w.fromX;
+  const dz = w.toZ - w.fromZ;
+  const fx = w.fromX - px;
+  const fz = w.fromZ - pz;
+  const a = dx * dx + dz * dz;
+  const b = 2 * (fx * dx + fz * dz);
+  const c = fx * fx + fz * fz - r * r;
+  const disc = Math.max(0, b * b - 4 * a * c);
+  const t = Math.min(1, Math.max(0, (-b + Math.sqrt(disc)) / (2 * a)));
+  return [w.fromX + dx * t, w.fromZ + dz * t];
+}
+
+/**
+ * Um passo de `dt` do pedestre. Andando, segue o trecho a `speed` (1.25 a
+ * 1.55 m/s); ao chegar ao fim, sorteia o próximo e continua de modo que o
+ * deslocamento do passo tenha sempre `speed · dt`. Com o carro a menos de 8 m,
+ * foge a 3 m/s (para longe do carro, só por vértices da zona) até ficar a 15 m.
+ */
+export function stepWalker(w: Walker, dt: number, car: { x: number; z: number }, bi: BlockInteriors): void {
+  const toCar = Math.hypot(w.x - car.x, w.z - car.z);
+  if (!w.fleeing && toCar < FLEE_START) w.fleeing = true;
+  if (w.fleeing) {
+    if (toCar >= FLEE_STOP) {
+      w.fleeing = false;
+      // volta a andar a partir do vértice da zona mais próximo
+      const v = nearestVertex(bi, w.x, w.z);
+      w.fromX = w.x;
+      w.fromZ = w.z;
+      w.toX = bi.origin + (v % bi.size) * bi.spacing;
+      w.toZ = bi.origin + Math.floor(v / bi.size) * bi.spacing;
+    } else {
+      const base = toCar > 1e-6 ? Math.atan2(w.x - car.x, w.z - car.z) : nextRand(w) * Math.PI * 2;
+      const step = FLEE_SPEED * dt;
+      for (const turn of [0, 15, -15, 30, -30, 45, -45, 60, -60, 75, -75]) {
+        const a = base + (turn * Math.PI) / 180;
+        const nx = w.x + Math.sin(a) * step;
+        const nz = w.z + Math.cos(a) * step;
+        if (!inZone(bi, w.zoneId, nx, nz)) continue;
+        w.x = nx;
+        w.z = nz;
+        break;
+      }
+      return;
+    }
+  }
+  const step = w.speed * dt;
+  const left = Math.hypot(w.toX - w.x, w.toZ - w.z);
+  if (left > step) {
+    w.x += ((w.toX - w.x) / left) * step;
+    w.z += ((w.toZ - w.z) / left) * step;
+    return;
+  }
+  // chega ao fim do trecho neste passo: o resto vai para o próximo trecho
+  const px = w.x;
+  const pz = w.z;
+  w.x = w.toX;
+  w.z = w.toZ;
+  pickSegment(w, bi);
+  if (w.toX === w.fromX && w.toZ === w.fromZ) return;
+  const [nx, nz] = pointOnSegmentAt(px, pz, step, w);
+  w.x = nx;
+  w.z = nz;
+}
+
+// ------------------------------------------------------------------ util
+
+/** Hash determinístico em [0, 1) de dois números (sem estado). */
+export function hash01(a: number, b: number): number {
+  const s = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453;
+  return s - Math.floor(s);
+}

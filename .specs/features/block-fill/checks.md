@@ -23,7 +23,7 @@ Plan: `.specs/features/block-fill/plan.md`
 
 ### S1 - O jogo sabe onde fica o miolo · 7 files · 70 KB · ~18k
 
-**C1** - Regra de interior (AC 1), mapa sintético com uma estrada reta `avenue` (w = 16) no eixo z, um lote 10 × 10 sem rotação com centro em (40, 0) e o chão plano:
+**C1** - ✅ Regra de interior (AC 1), mapa sintético com uma estrada reta `avenue` (w = 16) no eixo z, um lote 10 × 10 sem rotação com centro em (40, 0) e o chão plano:
 - vértice a 9.9 m do eixo (w/2 + 1.9) não é interior; a 10.1 m é.
 - vértice a 0.9 m fora do footprint do lote não é interior; a 1.1 m é.
 - com o chão em `WATER_Y + 0.4` o vértice não é interior; em `WATER_Y + 0.6` é.
@@ -32,7 +32,7 @@ Plan: `.specs/features/block-fill/plan.md`
 No seed 1337, todo vértice com `zoneOf` ≥ 0 cumpre as 4 condições, recalculadas no teste contra os segmentos de estrada e os footprints (busca exaustiva sobre os vértices interiores).
 Proof: `npx vitest run tests/unit/interiors.test.ts -t "interior vertex rule"`
 
-**C2** - Zonas por vizinhança de 4 (AC 2), mapa sintético sem estrada, com lotes que isolam grupos:
+**C2** - ✅ Zonas por vizinhança de 4 (AC 2), mapa sintético sem estrada, com lotes que isolam grupos:
 - um grupo em L de 30 vértices vira 1 zona com `cells` 30.
 - dois grupos de 30 que só se tocam na diagonal viram 2 zonas.
 - um grupo de 24 fica com `zoneOf` −1 em todos os 24.
@@ -40,19 +40,19 @@ Proof: `npx vitest run tests/unit/interiors.test.ts -t "interior vertex rule"`
 No seed 1337: para cada zona, `cells` = número de vértices com `zoneOf` = id, `cells` ≥ 25, e uma busca em largura de 4 vizinhos a partir de um vértice da zona alcança exatamente esses vértices.
 Proof: `npx vitest run tests/unit/interiors.test.ts -t "zones are 4-connected groups of at least 25"`
 
-**C3** - Tipo e medidas da zona (AC 3): em mapa sintético, zona com centroide em (500, 0) é `downtown` e com centroide em (500.1, 0) é `outer`. No seed 1337, para toda zona: `kind` segue a regra do centroide, `centroid` é a média dos vértices (± 1e-6), `areaM2` = `cells` × 16 e `bbox` contém todos os vértices.
+**C3** - ✅ Tipo e medidas da zona (AC 3): em mapa sintético, zona com centroide em (500, 0) é `downtown` e com centroide em (500.1, 0) é `outer`. No seed 1337, para toda zona: `kind` segue a regra do centroide, `centroid` é a média dos vértices (± 1e-6), `areaM2` = `cells` × 16 e `bbox` contém todos os vértices.
 Proof: `npx vitest run tests/unit/interiors.test.ts -t "zone kind and measures"`
 
-**C4** - `facadeDist` (AC 4): em mapa sintético com um lote 10 × 10 girado 30° em (0, 0), um vértice interior a 12 m da borda (medido no teste por geometria) tem `facadeDist` 12 ± 0.01, e um a 80 m tem 60. No seed 1337, 200 vértices interiores sorteados pelo teste batem com a distância exata ao footprint mais próximo ± 0.01 (ou 60 quando passa de 60).
+**C4** - ✅ `facadeDist` (AC 4): em mapa sintético com um lote 10 × 10 girado 30° em (0, 0), um vértice interior a 12 m da borda (medido no teste por geometria) tem `facadeDist` 12 ± 0.01, e um a 80 m tem 60. No seed 1337, 200 vértices interiores sorteados pelo teste batem com a distância exata ao footprint mais próximo ± 0.01 (ou 60 quando passa de 60).
 Proof: `npx vitest run tests/unit/interiors.test.ts -t "facade distance"`
 
-**C5** - Determinismo (AC 5): duas gerações do seed 1337 dão `zoneOf`, `facadeDist`, `zones` e `InteriorProps` iguais campo a campo; o seed 1338 dá `zoneOf` diferente em pelo menos 1000 vértices.
+**C5** - ✅ Determinismo (AC 5): duas gerações do seed 1337 dão `zoneOf`, `facadeDist`, `zones` e `InteriorProps` iguais campo a campo; o seed 1338 dá `zoneOf` diferente em pelo menos 1000 vértices.
 Proof: `npx vitest run tests/unit/interiors.test.ts -t "interiors and props are deterministic"`
 
-**C6** - Seed 1337 tem pelo menos 1 zona `downtown` e 1 `outer` (AC 6).
+**C6** - ✅ Seed 1337 tem pelo menos 1 zona `downtown` e 1 `outer` (AC 6).
 Proof: `npx vitest run tests/unit/interiors.test.ts -t "seed 1337 has both zone kinds"`
 
-**C7** - Os módulos novos `BlockInteriors.ts`, `InteriorProps.ts`, `interiorMotion.ts` e a função pura de cor do terreno estão na lista de módulos puros e não importam `three` nem `@dimforge/rapier3d-compat` (door 1, door 2).
+**C7** - ✅ Os módulos novos `BlockInteriors.ts`, `InteriorProps.ts`, `interiorMotion.ts` e a função pura de cor do terreno estão na lista de módulos puros e não importam `three` nem `@dimforge/rapier3d-compat` (door 1, door 2).
 Proof: `npx vitest run tests/unit/purity.test.ts -t "pure modules do not import three or rapier"`
 
 ### S2 - O chão deixa de ser preto · 9 files · 116 KB · ~29k
