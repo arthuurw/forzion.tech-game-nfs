@@ -63,6 +63,28 @@ describe('CityGenerator', () => {
     expect(used.size).toBe(4);
   });
 
+  // visual-upgrade C5 (AC 5, AC 7)
+  it('facade types and lane marks', () => {
+    const city = generateCity(1337);
+    const types = new Set<number>();
+    for (const block of city.blocks) {
+      for (const b of block.buildings) {
+        expect(Number.isInteger(b.facadeType)).toBe(true);
+        expect(b.facadeType).toBeGreaterThanOrEqual(0);
+        expect(b.facadeType).toBeLessThanOrEqual(3);
+        types.add(b.facadeType);
+      }
+    }
+    expect([...types].sort()).toEqual([0, 1, 2, 3]);
+    expect(city.streets.length).toBe(14);
+    for (const street of city.streets) {
+      expect(street.laneMarks.length).toBe(67);
+      for (let i = 1; i < street.laneMarks.length; i++) {
+        expect(street.laneMarks[i]! - street.laneMarks[i - 1]!).toBeCloseTo(6, 2);
+      }
+    }
+  });
+
   // C20 (AC 16)
   it('lamp posts every 20 m on both sides', () => {
     const city = generateCity(1337);

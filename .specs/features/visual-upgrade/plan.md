@@ -25,7 +25,7 @@ prova; o `Reflector`, `GTAOPass`, `SMAAPass` e `ShaderPass` vêm de `three/addon
 
 1. boot -> `core/Loader` (exists) - além do Rapier e do GLB, carrega os 6 sets de textura de `public/textures/<Set>/` (door 1) via `TextureLoader`; um set que falhar vira material de cor chapada com `console.warn`; lê `QualitySettings` de `?quality=` (door 5)
 2. `world/CityGenerator` (exists) - cada `Building` ganha `facadeType` 0..3 pelo PRNG; cada `Street` ganha `laneMarks` (posições dos traços)
-3. `world/CityScene` (exists) - 4 `InstancedMesh` de fachada, um por `facadeType`, com atributo por instância `aRepeat` e janelas desenhadas no shader (door 2); chão = `Reflector` + malha PBR de asfalto semitransparente (door 3); calçadas PBR; traços de faixa como um `InstancedMesh`
+3. `world/CityScene` (exists) - 4 `InstancedMesh` de fachada, um por `facadeType`, com atributo por instância `aRepeat` e janelas desenhadas no shader (door 2); chão = `Reflector` + malha PBR de asfalto semitransparente (door 3), com o render do espelho escondendo chuva, partículas, cones e faixas (menos draw calls); calçadas PBR; traços de faixa como um `InstancedMesh`; janelas distantes trocam o padrão pela média da célula (antialias por `fwidth`)
 4. `world/Rain` (door 4) - `Points` com `ShaderMaterial` que anima a queda na GPU dentro de uma caixa que segue o carro
 5. `vehicle/Car` (exists) - o collider do chassi passa a emitir eventos de força de contato (door 6); expõe `isSkidding` (freio de mão + velocidade) e a posição das rodas traseiras
 6. `vehicle/Effects` (door 4) - marcas de derrapagem (ring buffer), fumaça de pneu e faíscas (partículas CPU), lê `Car` a cada passo fixo

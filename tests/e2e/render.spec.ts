@@ -7,17 +7,18 @@ test.describe('render', () => {
     await page.waitForTimeout(500);
   });
 
-  // C21 (AC 17)
-  test('draw calls at most 60', async ({ page }) => {
+  // visual-upgrade C8 (supersede free-roam-city C21: reflector + GTAO + pós somam passes)
+  test('draw calls at most 120', async ({ page }) => {
     const calls = await page.evaluate(() => (window as any).__game.render.calls as number);
     expect(calls).toBeGreaterThan(0);
-    expect(calls).toBeLessThanOrEqual(60);
+    expect(calls).toBeLessThanOrEqual(120);
   });
 
   // C22 (AC 17)
   test('neon emissive intensity at least 2', async ({ page }) => {
     const m = await page.evaluate(() => (window as any).__game.materials);
     expect(m.windowEmissiveIntensity).toBeGreaterThanOrEqual(2);
+    // visual-upgrade C29: com o flicker ativo os 4 letreiros continuam >= 2.0
     expect(m.lampEmissiveIntensity).toBeGreaterThanOrEqual(2);
     expect(m.signEmissiveIntensities.length).toBe(4);
     for (const v of m.signEmissiveIntensities) expect(v).toBeGreaterThanOrEqual(2);
@@ -69,7 +70,8 @@ test.describe('render', () => {
         seed: g.city.seed,
       };
     });
-    expect(info.passes).toEqual(['RenderPass', 'UnrealBloomPass', 'OutputPass']);
+    // visual-upgrade C21 amplia a pilha; a ordem relativa de Render, Bloom e Output continua
+    expect(info.passes).toEqual(['RenderPass', 'GTAOPass', 'UnrealBloomPass', 'ShaderPass', 'SMAAPass', 'OutputPass']);
     expect(info.bloom.strength).toBeCloseTo(0.8, 6);
     expect(info.bloom.radius).toBeCloseTo(0.4, 6);
     expect(info.bloom.threshold).toBeCloseTo(0.7, 6);
