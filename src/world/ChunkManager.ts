@@ -28,6 +28,11 @@ export class ChunkManager {
   readonly loaded = new Map<number, THREE.Group>();
   maxBuildsInOneFrame = 0;
   builds = 0;
+  /**
+   * Últimos chunks descartados: quantas geometrias cada um tinha e quantas já
+   * emitiram o evento `dispose` do three (door 7; lido por C37).
+   */
+  readonly dropped: Array<{ id: number; geometries: number; disposed: number }> = [];
   private readonly bridges: Array<{ road: Road; parts: BridgeParts }>;
   /** pontos de estrada por célula de 32 m: [x, z, meia largura, id da estrada, ...] */
   private readonly grid = new Map<number, number[]>();
@@ -55,6 +60,8 @@ export class ChunkManager {
     const plan = planChunks(carX, carZ, new Set(this.loaded.keys()));
     for (const id of plan.dispose) {
       const group = this.loaded.get(id)!;
+      this.dropped.push(group.userData.disposal);
+      if (this.dropped.length > 64) this.dropped.shift();
       this.scene.remove(group);
       group.traverse((o) => {
         if (o instanceof THREE.Mesh) o.geometry.dispose();
@@ -137,6 +144,13 @@ export class ChunkManager {
       mesh.name = name;
       group.add(mesh);
     }
+    const disposal = { id, geometries: 0, disposed: 0 };
+    group.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      disposal.geometries++;
+      o.geometry.addEventListener('dispose', () => disposal.disposed++);
+    });
+    group.userData.disposal = disposal;
     return group;
   }
 

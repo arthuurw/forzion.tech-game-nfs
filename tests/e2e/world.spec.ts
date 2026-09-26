@@ -359,6 +359,15 @@ test.describe('city-terrain - mundo', () => {
     for (let id = 0; id < 36; id++) if (dist(id) <= 900) expect(r.chunks.loaded, `chunk ${id}`).toContain(id);
     for (const id of r.chunks.loaded) expect(dist(id), `chunk ${id}`).toBeLessThanOrEqual(1200);
     expect(r.chunks.maxBuildsInOneFrame).toBe(1);
+    // door 7: o teleporte deixa chunks do spawn a > 1200 m; cada um saiu de `loaded` com todas as geometrias descartadas
+    const dropped = r.chunks.dropped as Array<{ id: number; geometries: number; disposed: number }>;
+    expect(dropped.length).toBeGreaterThan(0);
+    for (const d of dropped) {
+      expect(dist(d.id), `dropped chunk ${d.id}`).toBeGreaterThan(1200);
+      expect(r.chunks.loaded, `dropped chunk ${d.id}`).not.toContain(d.id);
+      expect(d.geometries, `dropped chunk ${d.id}`).toBeGreaterThan(0);
+      expect(d.disposed, `dropped chunk ${d.id} geometries disposed`).toBe(d.geometries);
+    }
   });
 
   // C40 (AC 33)

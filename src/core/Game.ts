@@ -770,6 +770,7 @@ export class Game {
           loaded: [...game.city.chunks.loaded.keys()].sort((a, b) => a - b),
           maxBuildsInOneFrame: game.city.chunks.maxBuildsInOneFrame,
           builds: game.city.chunks.builds,
+          dropped: game.city.chunks.dropped.map((d) => ({ ...d })),
         };
       },
       walls: game.physics.walls.map((w) => ({ ...w })),
