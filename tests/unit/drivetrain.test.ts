@@ -314,6 +314,23 @@ describe('drivetrain - engine and gearbox', () => {
     expect(fwd.cmd.brakeFront + fwd.cmd.brakeRear).toBeCloseTo(both, 9);
   });
 
+  // C38 - decisão do usuário (2026-09-26): de ré sem input, freio-motor como nas marchas para frente
+  it('engine braking in reverse with no input', () => {
+    const back = stepDrivetrain(spec, settled({ gear: -1 }), idle, -20 / 3.6, DT);
+    expect(back.state.gear).toBe(-1);
+    expect(back.state.rpm).toBeGreaterThan(spec.idleRpm);
+    expect(back.cmd.engineForce).toBeGreaterThan(0);
+    expect(back.cmd.brakeFront + back.cmd.brakeRear).toBe(0);
+    const t = (back.state.rpm - spec.idleRpm) / (spec.redlineRpm - spec.idleRpm);
+    // mesma lei do freio-motor para frente: proporcional ao giro acima da marcha lenta
+    const fwd = stepDrivetrain(spec, settled({ gear: 1 }), idle, speedFor(1, back.state.rpm), DT).cmd.engineForce;
+    const ratio = spec.reverseRatio / spec.gearRatios[0]!;
+    expect(back.cmd.engineForce).toBeCloseTo(-fwd * ratio, 6);
+    expect(t).toBeGreaterThan(0);
+    // parado em ré, nada
+    expect(Math.abs(stepDrivetrain(spec, settled({ gear: -1 }), idle, 0, DT).cmd.engineForce)).toBe(0);
+  });
+
   // C26 (door 2)
   it('drivetrain step is pure', () => {
     const cases: Array<[DrivetrainState, DriveInput, number]> = [

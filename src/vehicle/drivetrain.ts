@@ -175,6 +175,10 @@ export function stepDrivetrain(
       if (kmh > -REVERSE_CUTOFF_KMH && rawRpm < spec.redlineRpm) engineForce = -torqueAt(spec, rpm) * toWheel;
     } else if (input.brake || (input.throttle && kmh < -1)) {
       brakeAll();
+    } else {
+      // freio-motor na ré: segura o carro contra o sentido em que ele rola
+      const t = (rpm - spec.idleRpm) / (spec.redlineRpm - spec.idleRpm);
+      engineForce = -Math.sign(wheelSpeedMs) * ENGINE_BRAKE_NM * t * toWheel;
     }
   } else if (input.brake) {
     brakeAll();

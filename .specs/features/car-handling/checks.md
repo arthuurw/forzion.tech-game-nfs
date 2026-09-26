@@ -3,7 +3,7 @@
 Profile: standard
 Plan: `.specs/features/car-handling/plan.md`
 
-37 checks in 4 slices · 3 one-way doors · 0 open
+38 checks in 4 slices · 3 one-way doors · 0 open
 
 ## Comandos de prova
 
@@ -320,6 +320,14 @@ Proof: `npx vitest run tests/physics/grip.test.ts -t "throttle keeps pushing wit
 (free-roam-city AC 3, door 2)
 Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "service brake while in reverse gear"`
 
+**C38** - ✅ Freio-motor na ré, em `stepDrivetrain`, sem input:
+- `gear` −1 a −20 km/h: continua em ré, `rpm` > `idleRpm`, `engineForce` > 0 (contra o movimento para trás) e sem freio de serviço.
+- A força segue a mesma lei do freio-motor para frente: no mesmo `rpm`, `engineForce` na ré = −(`engineForce` na 1ª) × `reverseRatio` / `gearRatios[0]`.
+- Parado em ré, `engineForce` = 0.
+
+(Assumption "freio de mão com acelerador" do plano, parte da ré; decisão do usuário depois do round 2)
+Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "engine braking in reverse with no input"`
+
 ## Coverage
 
 | Set (size) | Member -> proof | Unproven |
@@ -331,7 +339,7 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "service brake while in 
 | understeer cases, 5 velocidades × 2 (10) | C10, table-driven over all 10 | - |
 | gearbox transitions (8) | up 2→3 C17 · no up from 6th C17 · power cut during shift C17 · down 4→3 C18 · down blocked by overrev C18 · hold 0.6 s C18 · no down from 1st C18 · into and out of R C24 | - |
 | rpm regimes (5) | wheel-driven C16 · idle floor C16 · clutch floor in 1st C16 · clutch floor in R C16 · redline cap C16, C15 | - |
-| drive input regimes (8) | throttle C15, C19 · brake forward C14, C22 · reverse C24 · brake in reverse C37 · handbrake C25, C11 · handbrake + throttle C36 · coast C21, C15 · steer C6, C7 | - |
+| drive input regimes (9) | throttle C15, C19 · brake forward C14, C22 · reverse C24 · brake in reverse C37 · coast in reverse C38 · handbrake C25, C11 · handbrake + throttle C36 · coast C21, C15 · steer C6, C7 | - |
 | steering target cases (7) | v=0 C7 · v<1 guard C7 · min cut C7 · 10 m/s C7 · 27.78 m/s C7 · 55.56 m/s C7 · reverse C7 | - |
 | skidding table (6) | slip 2.6 C30 · slip 2.5 C30 · slip at 5 km/h C30 · handbrake 21 C30 · handbrake 20 C30 · nothing C30 | - |
 | superseded free-roam checks (7) | C2 → C14 · C4 → C24 · C6 → C6, C7 · C7 → C25 · C8 → C20 · C27 → C17, C18 · C28 → C16 | - |
@@ -366,7 +374,7 @@ Evidence (forma prevista; o Verifier reconta sobre o diff):
   - freio de mão
   - divisão de freio
 
-  Próprias: C6, C7, C14-C18, C20 (unit), C24-C26. Fronteira: C8-C13, C19-C23 (harness) e C32.
+  Próprias: C6, C7, C14-C18, C20 (unit), C24-C26, C36-C38. Fronteira: C8-C13, C19-C23 (harness) e C32.
 - **`src/vehicle/effectsMath.ts` `isSkidding`** → decides, reached across a boundary. Tem 2 regras (escorregamento e freio de mão) com arestas. Própria: C30. Fronteira: C31 (harness) e visual C13/C14 (browser).
 - **`src/vehicle/Car.ts`** → decide pouco. Aplica massa e centro de massa da ficha, o comando nas rodas e o arrasto no corpo, e mede o escorregamento lateral por roda. Provado na fronteira pelo harness: C1, C28, C29, C31.
 - **`src/vehicle/carSpec.ts`** → dados. Os valores estão em C28.
