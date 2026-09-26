@@ -54,7 +54,7 @@ export function createNightEnvironment(renderer: THREE.WebGLRenderer, scene: THR
 export function addNightLights(scene: THREE.Scene): void {
   const hemi = new THREE.HemisphereLight('#3a4a9a', '#0a0a10', 0.35);
   scene.add(hemi);
-  const moon = new THREE.DirectionalLight('#8aa0ff', 0.25);
+  const moon = new THREE.DirectionalLight('#8aa0ff', 0.35);
   moon.position.set(-60, 120, 40);
   scene.add(moon);
 }

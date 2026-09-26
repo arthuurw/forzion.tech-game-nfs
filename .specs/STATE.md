@@ -6,7 +6,10 @@ Jogo de corrida de rua no browser, estilo Need for Speed Underground 2.
 
 Cada sub-projeto é uma feature própria (plan → checks → build → verify), nesta ordem:
 
-1. `free-roam-city` - carro dirigível, cidade noturna procedural, HUD, som
+1. `free-roam-city` - carro dirigível, cidade noturna procedural, HUD, som (concluída)
+   - 1.1 `engine-sound` - motor sintetizado mais baixo e menos irritante (concluída)
+   - 1.2 `visual-upgrade` - PBR CC0, chuva, neon calmo, marcas, fumaça, faíscas, câmera de velocidade, pós moderno (concluída)
+   - 1.3 `city-terrain` - cidade de 3 km com morros, rio, baía, rodovia em anel, pontes e streaming por chunks (em build)
 2. corridas - checkpoints, cronômetro, sprint/circuito, IA oponente por waypoints
 3. garagem + tuning visual - pintura, rodas, vinil, body kit, underglow
 4. tuning de performance - motor, turbo, pneus alterando parâmetros do Rapier
@@ -26,15 +29,16 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 | AD-007 | Unidades: metros, segundos, Y para cima, velocidade interna em m/s (exibida × 3.6), heading em rad com 0 = `+Z`; frente do carro = `+Z` local | uma convenção para todo cálculo; segue glTF | active | 2026-09-25 |
 | AD-008 | Geração procedural determinística por `seed` com PRNG `mulberry32`; nunca `Math.random` em lógica de mundo | layouts reproduzíveis e testáveis | active | 2026-09-25 |
 | AD-009 | Assets 3D só CC0 (Kenney) em `public/models/`; sempre com fallback procedural quando o arquivo falta | zero atribuição obrigatória; jogo nunca quebra por asset ausente | active | 2026-09-25 |
+| AD-010 | Mundo da city-terrain: terreno por heightfield 769 × 769 a cada 4 m, estradas como polilinhas 3D a cada 2 m (`RoadNetwork`, door 2), prédios por lote ao longo das ruas; física toda no boot, malhas por chunks de 512 m | mapa grande e orgânico sem perder a colisão; o formato das estradas será lido pelas corridas | active | 2026-09-25 |
 
 ## Handoff
 
-**Feature**: free-roam-city - CONCLUÍDA (Verifier rodada 3: PASS, 46/46 checks, 15/15 mutantes mortos, gate exit 0)
-**Where**: tudo commitado em `main`; `verification.md` é o relatório final; usuário testando no browser
-**In progress**: nenhum
-**Next step**: coletar feedback de jogabilidade (feeling do carro, FPS, visual, som) e ajustar parâmetros; depois sub-projeto 2 (corridas) em `.specs/features/races/`
+**Feature**: city-terrain - build em andamento no worktree `../Jogo-terrain` (branch `city-terrain`)
+**Where**: plano e checks aprovados e commitados (157cd02); geradores puros commitados (14f6176, 5dd4f08); integração (física, água, chunks, `CityScene`, `Game`, minimapa, specs e2e) sem commit enquanto a suíte e2e roda
+**In progress**: rodar a suíte e2e completa, commitar a integração, merge em `main`, Verifier da city-terrain
+**Next step**: depois do PASS, usuário testa o mapa novo; então sub-projeto 2 (corridas) em `.specs/features/races/`, lendo o `RoadNetwork`
 **Blockers**: none
-**Uncommitted**: nenhum
-**Branch**: main
+**Branch**: city-terrain (worktree); `main` com visual-upgrade (rodada 4 PASS) e free-roam-city (rodada 4 PASS)
 
-Achados residuais menores (não bloqueiam): C46 afirma a ordem do grafo pela ordem dos campos de `graph()`, e `masterConnected` não detecta `master` desconectado do destino; C42 mata o mutante "sem rotate" por 1 px; `InputManager` ignora `event.repeat` sem prova própria.
+Concluídas: free-roam-city (PASS rodada 4, escopada ao espaçamento de 40 m dos postes), engine-sound (PASS rodada 3), visual-upgrade (PASS rodada 4, escopada à cintilação das janelas).
+Resíduos conhecidos: o reflexo da rua (door 3 da visual-upgrade, render target a meia viewport) ainda cintila um pouco com a câmera andando; mudar exige reabrir a door 3.

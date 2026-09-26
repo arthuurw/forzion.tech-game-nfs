@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { advanceSim, holdKeySim, position, teleport } from './helpers';
+import { advanceSim, buildingScenario, holdKeySim, insideLot, position, teleport } from './helpers';
 
 const SETS = ['Asphalt012', 'PavingStones070', 'Concrete034', 'MetalPlates006', 'Bricks059', 'PaintedPlaster017'];
 const KINDS = ['Color', 'NormalGL', 'Roughness'];
@@ -49,7 +49,7 @@ test.describe('visual - S2 materiais', () => {
     expect(road.roughness).toBeLessThanOrEqual(0.25);
     expect(road.transparent).toBe(true);
     expect(road.opacity).toBeCloseTo(0.65, 6);
-    expect(road.repeat).toBeCloseTo(111, 6);
+    // city-terrain supersede C3: o repeat 111 do plano de 444 m saiu (fitas com 1 tile a cada 4 m, C21/C22)
     // C37: a rua usa o set Asphalt012
     expect(road.mapSrc).toContain('/textures/Asphalt012/');
   });
@@ -66,6 +66,12 @@ test.describe('visual - S2 materiais', () => {
     expect(high.r.size).toEqual([Math.floor(high.w * 0.5), Math.floor(high.h * 0.5)]);
     // C39: plano do espelho em y = 0
     expect(high.r.y).toBe(0);
+    // city-terrain C43 (AC 36): o espelho cobre só o quadrado do centro
+    expect(high.r.planeSize).toEqual([1000, 1000]);
+    expect(high.r.position[0]).toBe(0);
+    expect(high.r.position[2]).toBe(0);
+    expect(high.r.position[1]).toBeGreaterThanOrEqual(0);
+    expect(high.r.position[1]).toBeLessThanOrEqual(0.05);
     await open(page, '?quality=low');
     const low = await page.evaluate(() => (window as any).__game.scene.reflector);
     expect(low.present).toBe(false);
@@ -93,13 +99,12 @@ test.describe('visual - S2 materiais', () => {
     await open(page);
     const info = await page.evaluate(() => ({
       sidewalk: (window as any).__game.materials.sidewalk,
-      lanes: (window as any).__game.city.laneMarkCount,
     }));
     expect(info.sidewalk.hasMap).toBe(true);
     expect(info.sidewalk.hasNormalMap).toBe(true);
     // C37: a calçada usa o set PavingStones070
     expect(info.sidewalk.mapSrc).toContain('/textures/PavingStones070/');
-    expect(info.lanes).toBe(938);
+    // city-terrain supersede C7: as 938 faixas instanciadas viraram faixas no shader da fita (C23)
   });
 });
 
@@ -219,19 +224,12 @@ test.describe('visual - S3 movimento', () => {
     expect(ev.threshold).toBe(2000);
   });
 
-  // C15 + C19 (AC 15, AC 16, AC 19) - mesmo cenário de free-roam-city C9
+  // C15 + C19 (AC 15, AC 16, AC 19) - mesmo cenário de free-roam-city C9 (city-terrain C44: prédio do centro)
   test('collision throws sparks', async ({ page }) => {
     await open(page);
     expect(await page.evaluate(() => (window as any).__game.effects.lastCollision)).toBeNull();
-    const target = await page.evaluate(() => {
-      const city = (window as any).__game.city;
-      const block = city.blocks.find((b: any) => Math.abs(b.z - -130) < 1e-6 && Math.abs(b.x - -26) < 1e-6);
-      const b = block.buildings.reduce((best: any, cur: any) =>
-        cur.z - cur.depth / 2 < best.z - best.depth / 2 ? cur : best,
-      );
-      return { x: b.x };
-    });
-    await teleport(page, target.x, 1.2, -156, 0);
+    const s = await buildingScenario(page);
+    await teleport(page, s.x, s.y, s.z, s.heading);
     await page.keyboard.down('KeyW');
     await page.waitForFunction(() => (window as any).__game.effects.lastCollision !== null, null, { timeout: 90_000 });
     const hit = await page.evaluate(() => ({
@@ -247,7 +245,7 @@ test.describe('visual - S3 movimento', () => {
     expect(await page.evaluate(() => (window as any).__game.camera.shake)).toBeLessThan(0.01);
     // o carro não atravessou o prédio (free-roam-city C9 segue valendo)
     const p = await position(page);
-    expect(p.z).toBeLessThan(-130);
+    expect(insideLot(s.lot, p.x, p.z)).toBe(false);
   });
 });
 
@@ -363,11 +361,12 @@ test.describe('visual - S5 pós', () => {
     expect(s.gtao.height).toBe(Math.floor(s.h / 2));
     expect(s.gtao.blendIntensity).toBeCloseTo(0.7, 6);
     expect(s.gtao.output).toBe(0);
-    expect(s.box.min[0]).toBeLessThanOrEqual(-202);
-    expect(s.box.min[2]).toBeLessThanOrEqual(-202);
-    expect(s.box.max[0]).toBeGreaterThanOrEqual(202);
-    expect(s.box.max[2]).toBeGreaterThanOrEqual(202);
-    expect(s.box.max[1]).toBeGreaterThanOrEqual(60);
+    // city-terrain C44: a caixa cobre o mundo de 3 km e a altura dos morros com casas
+    expect(s.box.min[0]).toBeLessThanOrEqual(-1536);
+    expect(s.box.min[2]).toBeLessThanOrEqual(-1536);
+    expect(s.box.max[0]).toBeGreaterThanOrEqual(1536);
+    expect(s.box.max[2]).toBeGreaterThanOrEqual(1536);
+    expect(s.box.max[1]).toBeGreaterThanOrEqual(160);
   });
 
   // C18 (parte browser) + C23 (AC 18, AC 23)

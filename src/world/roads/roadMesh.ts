@@ -67,9 +67,10 @@ export function roadStripGeometry(road: Road, from = 0, to = road.points.length 
     uvs.set([0, v, road.width / TILE_M, v], k * 4);
   }
   const indices = new Uint32Array(Math.max(0, count - 1) * 6);
+  // anti-horário visto de cima: a normal aponta para +y (a esquerda é o vértice par)
   for (let k = 0; k < count - 1; k++) {
     const a = k * 2;
-    indices.set([a, a + 2, a + 1, a + 1, a + 2, a + 3], k * 6);
+    indices.set([a, a + 1, a + 2, a + 1, a + 3, a + 2], k * 6);
   }
   return { positions, uvs, widths, indices };
 }

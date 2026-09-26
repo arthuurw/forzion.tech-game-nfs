@@ -3,7 +3,7 @@
 Profile: standard
 Plan: `.specs/features/city-terrain/plan.md`
 
-43 checks in 5 slices · 9 one-way doors · 0 open
+46 checks in 5 slices · 9 one-way doors · 0 open (C46 adicionado no build: a pista só aparecia refletida no espelho)
 
 Comandos de prova: unitário `npx vitest run <arquivo> -t "<nome>"`; integração
 `npx playwright test <arquivo> -g "<nome>"` (chromium headless contra `vite dev`, lendo
@@ -89,6 +89,9 @@ Proof: `npx playwright test tests/e2e/world.spec.ts -g "lane marks drawn in the 
 **C24** - `generateLamps(network)` devolve `{ lamps, skipped }`: para cada trecho contínuo fora de ponte de comprimento `L`, os dois lados recebem juntos `2 × floor(L / 40)` posições a `width/2 + 1.5` m do eixo, espaçadas de 40 m ± 0.5 ao longo do trecho; nenhuma posição fica num trecho de ponte; cada posição vai para `skipped` se cai a ≤ `width/2 + 1` do eixo de outra estrada (cruzamento) e para `lamps` caso contrário, e `lamps.length + skipped.length` = soma de `2 × floor(L / 40)` (AC 19)
 Proof: `npx vitest run tests/unit/roads.test.ts -t "lamp posts every 40 m on both sides"`
 
+**C46** - Todo triângulo de `roadStripGeometry` de toda estrada tem normal com `y` > 0 (anti-horário visto de cima), e todo triângulo do tabuleiro e dos guarda-corpos de `bridgeMeshes` tem normal apontando para fora da caixa (AC 18, AC 21)
+Proof: `npx vitest run tests/unit/roadMesh.test.ts -t "road strip faces up and bridge boxes face out"`
+
 **C25** - No browser, `__game.world.lamps` reporta exatamente 1 `InstancedMesh` de postes e 1 de cabeças, ambos com `count` igual ao número de postes de `generateLamps` (AC 19)
 Proof: `npx playwright test tests/e2e/world.spec.ts -g "lamp posts are two instanced meshes"`
 
@@ -166,7 +169,7 @@ Proof: `npx vitest run tests/unit/purity.test.ts -t "pure modules do not import 
 
 | Set (size) | Member -> proof | Unproven |
 | --- | --- | --- |
-| plan ACs (36) | 1 C1 · 2 C2 · 3 C3 · 4 C4 · 5 C5 · 6 C6 · 7 C7, C8 · 8 C9, C10 · 9 C11 · 10 C12 · 11 C14 · 12 C15 · 13 C16 · 14 C17 · 15 C18 · 16 C19 · 17 C20 · 18 C21, C22, C23 · 19 C24, C25 · 20 C26 · 21 C27 · 22 C28 · 23 C29 · 24 C30 · 25 C31 · 26 C32 · 27 C33 · 28 C34 · 29 C35 · 30 C36, C37 · 31 C38 · 32 C39 · 33 C40 · 34 C41 · 35 C42 · 36 C43 | - |
+| plan ACs (36) | 1 C1 · 2 C2 · 3 C3 · 4 C4 · 5 C5 · 6 C6 · 7 C7, C8 · 8 C9, C10 · 9 C11 · 10 C12 · 11 C14 · 12 C15 · 13 C16 · 14 C17 · 15 C18 · 16 C19 · 17 C20 · 18 C21, C22, C23, C46 · 19 C24, C25 · 20 C26 · 21 C27, C46 · 22 C28 · 23 C29 · 24 C30 · 25 C31 · 26 C32 · 27 C33 · 28 C34 · 29 C35 · 30 C36, C37 · 31 C38 · 32 C39 · 33 C40 · 34 C41 · 35 C42 · 36 C43 | - |
 | landing doors (9) | 1 C2, C3, C4, C6 · 2 C13, C17 · 3 C1, C12, C30, C45 · 4 C7, C8 · 5 C18, C20 · 6 C26, C27 · 7 C36, C37 · 8 C11 · 9 C9, C10 | - |
 | road kinds in `ROAD_SPECS` (4) | highway C13, C14 · avenue C13, C15 · hill C13, C16 · street C13 | - |
 | road kinds with buildings (3) | avenue C31 · street C31 · hill C31 | - |
@@ -232,4 +235,9 @@ Cost: 26 provas unitárias em 7 arquivos e 22 provas Playwright em 6 arquivos. S
 - Estimativa por `wc -c` dos arquivos existentes tocados (Game 23 KB, CityScene 16 KB, visual.spec 18 KB, hud.spec 7 KB, drive.spec 5 KB, render.spec 4 KB, Minimap 2 KB) mais os novos previstos no tamanho dos análogos (CityGenerator 8 KB por gerador), dividido por 4
 - O `CityGenerator` fica no repositório (mulberry32 e paleta são reusados; seus testes unitários continuam verdes), mas deixa de alimentar o jogo; free-roam C17-C19 e visual C5 passam a ser histórico, superados como diz `## Coverage`
 - **Settled mid-build:** (autor, antes do código) C24 contava `2 × floor(L / 40)` postes por estrada, mas um poste que cai sobre outra estrada num cruzamento seria um obstáculo no meio da pista; o check passou a separar `lamps` e `skipped` e a provar a soma, sem afrouxar o espaçamento.
+- **Settled mid-build (terreno e estradas):** para as estradas de morro cumprirem C18-C20 ao mesmo tempo (rampa ≤ 10 %, curva ≥ 180° e degrau ≤ 1.5 m na mistura de 6 m), o terreno ficou mais largo e mais baixo do que o rascunho do plano sugeria: rampa convexa até a borda e pico de 95 m (AC 4 pede 80-140, então nada muda no contrato). Encosta lateral acima de ~17 % torna C20 impossível com amostras a cada 4 m; o gerador de estradas de morro só anda onde a inclinação lateral é ≤ 15 %, em zigue-zague, mirando 6.5 % de rampa a 20 m à frente. Os corredores sob rodovia e avenidas usam média gaussiana dos pontos próximos (o ponto mais próximo criava paredões onde dois corredores se encontram).
+- **Settled mid-build (pontes):** a ponte sobre água liga o alto de uma margem ao alto da outra (até 80 m antes e depois da água), e cada trecho de ponte se estende até a pista voltar a ficar a ≤ 1.5 m do terreno; sem isso a rampa de 9 % cortava o barranco e C20 falhava. C26 continua valendo como escrito (todo ponto com a condição está numa ponte; toda ponte contém um ponto com a condição).
+- **Settled mid-build (lotes):** lote de esquina cujo ponto de estrada mais próximo é de outra rua é descartado, para C33 (rotação = heading da estrada mais próxima) valer em todo lote.
+- **Settled mid-build (render):** a fita da estrada, as caixas extrudadas e os pilares estavam com os triângulos no sentido horário visto de fora; com `FrontSide` a pista sumia vista de cima e só aparecia no reflexo do espelho (a câmera virtual fica abaixo do plano), então fora do centro e em `?quality=low` não havia pista visível. Nenhum check pegava isso; C46 foi adicionado e mata o mutante do sentido invertido. A sonda de C23 renderiza no canvas (num render target a noite em cor linear quantiza para preto).
+- **Settled mid-build (C8):** um raio exatamente vertical sobre um vértice do heightfield atravessa o collider no Parry (caso de borda medido: 0 m de desvio erra, 0.01 m acerta); a prova usa pontos fora dos vértices da grade, onde a interpolação bilinear e a do triângulo diferem menos de 0.01 m.
 - AC 19 mudou de 25 m para 40 m entre postes antes destes checks, a pedido do usuário ("pode diminuir a quantidade de postes na via", 2026-09-25)

@@ -102,14 +102,15 @@ export function extrudeAlong(road: Road, indices: number[], offset: number, half
   for (let k = 0; k < m - 1; k++) {
     const a = k * 4;
     const b = (k + 1) * 4;
-    // cada face da seção (0-1 topo, 1-2 direita, 2-3 fundo, 3-0 esquerda) vira um quad entre k e k+1
+    // cada face da seção (0-1 topo, 1-2 direita, 2-3 fundo, 3-0 esquerda) vira um quad entre k e k+1,
+    // com as normais para fora da caixa
     for (const [u, v] of [[0, 1], [1, 2], [2, 3], [3, 0]] as const) {
-      tris.push(a + u, b + u, a + v, a + v, b + u, b + v);
+      tris.push(a + u, a + v, b + u, a + v, b + v, b + u);
     }
   }
-  // tampas nas pontas
+  // tampas nas pontas (a do começo olha para trás, a do fim para a frente)
   const e = (m - 1) * 4;
-  tris.push(0, 1, 2, 0, 2, 3, e, e + 2, e + 1, e, e + 3, e + 2);
+  tris.push(0, 2, 1, 0, 3, 2, e, e + 1, e + 2, e, e + 2, e + 3);
   return { positions, indices: new Uint32Array(tris) };
 }
 

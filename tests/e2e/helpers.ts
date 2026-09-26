@@ -77,3 +77,41 @@ export function teleport(page: Page, x: number, y: number, z: number, headingRad
     [x, y, z, headingRad] as const,
   );
 }
+
+/**
+ * Cenário de batida da city-terrain (C44): o primeiro prédio do centro em
+ * `__game.world.lots`, com o carro a 8 m da fachada voltada para a rua, de
+ * frente para ela. Devolve o lote e a pose do carro.
+ */
+export async function buildingScenario(page: Page): Promise<{
+  lot: { x: number; z: number; y: number; width: number; depth: number; height: number; rotation: number; side: number };
+  x: number;
+  y: number;
+  z: number;
+  heading: number;
+}> {
+  return page.evaluate(() => {
+    const w = (window as any).__game.world;
+    const lot = w.lots.find((l: any) => l.downtown && Math.abs(l.x) < 400 && Math.abs(l.z) < 400);
+    // a rua fica do lado −side·esquerda do centro do lote; esquerda do heading r = (cos r, −sin r)
+    const lx = Math.cos(lot.rotation) * lot.side;
+    const lz = -Math.sin(lot.rotation) * lot.side;
+    const d = lot.depth / 2 + 8;
+    const x = lot.x - lx * d;
+    const z = lot.z - lz * d;
+    return { lot, x, y: w.heightAt(x, z) + 1.2, z, heading: Math.atan2(lx, lz) };
+  });
+}
+
+/** O chassi está dentro do retângulo (orientado) do lote? */
+export function insideLot(
+  lot: { x: number; z: number; width: number; depth: number; rotation: number },
+  x: number,
+  z: number,
+): boolean {
+  const dx = x - lot.x;
+  const dz = z - lot.z;
+  const u = dx * Math.sin(lot.rotation) + dz * Math.cos(lot.rotation);
+  const v = dx * Math.cos(lot.rotation) - dz * Math.sin(lot.rotation);
+  return Math.abs(u) <= lot.width / 2 && Math.abs(v) <= lot.depth / 2;
+}
