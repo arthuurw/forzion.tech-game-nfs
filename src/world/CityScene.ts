@@ -49,6 +49,11 @@ export class CityScene {
   readonly bridgeMaterial: THREE.MeshStandardMaterial;
   readonly facadeMaterials: THREE.MeshStandardMaterial[] = [];
   readonly facadeMeshes: THREE.InstancedMesh[] = [];
+  /**
+   * `uSpecularAA` das 4 fachadas (um só objeto): 1 = antialiasing de especular ligado.
+   * Em produção fica sempre 1; só a sonda DEV `render.headlightShimmer` muda o valor.
+   */
+  readonly facadeSpecularAA = { value: 1 };
   /** lotes de cada malha de fachada, na ordem das instâncias */
   readonly facadeLots: Lot[][] = [];
   readonly signMaterials: THREE.MeshStandardMaterial[] = [];
@@ -107,7 +112,7 @@ export class CityScene {
     // --- prédios: 4 malhas instanciadas para o mundo todo ---
     for (let type = 0; type < FACADE_TYPES; type++) {
       const set = assets.textures[FACADE_SETS[type]!];
-      const material = makeFacadeMaterial(set, type);
+      const material = makeFacadeMaterial(set, type, this.facadeSpecularAA);
       this.facadeMaterials.push(material);
       const lots = data.lots.filter((l) => l.facadeType === type);
       this.facadeLots.push(lots);
@@ -345,7 +350,11 @@ totalEmissiveRadiance += vec3(0.16, 0.155, 0.13) * laneMark;`,
  * janela por célula de 4 m: vidro escuro no albedo, luz quente no emissive
  * quando o hash (seed, célula) diz que está acesa.
  */
-function makeFacadeMaterial(set: PbrSet | undefined, type: number): THREE.MeshStandardMaterial {
+function makeFacadeMaterial(
+  set: PbrSet | undefined,
+  type: number,
+  specularAA: { value: number },
+): THREE.MeshStandardMaterial {
   const tint = ['#b8b4ac', '#9aa0a8', '#a0776a', '#c8c0b0'][type] ?? '#aaaaaa';
   const material = new THREE.MeshStandardMaterial({
     color: set ? tint : '#2a2c36',
@@ -362,6 +371,7 @@ function makeFacadeMaterial(set: PbrSet | undefined, type: number): THREE.MeshSt
   const litRatio = [0.14, 0.18, 0.12, 0.16][type] ?? 0.14;
 
   material.onBeforeCompile = (shader) => {
+    shader.uniforms.uSpecularAA = specularAA;
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
@@ -401,6 +411,7 @@ vRoughnessMapUv *= faceRepeat;
 varying vec2 vCell;
 flat varying float vSeedF;
 varying float vRoof;
+uniform float uSpecularAA;
 float windowHash(vec2 c, float s) { return fract(sin(dot(c + s * 97.0, vec2(12.9898, 78.233))) * 43758.5453); }`,
       )
       .replace(
@@ -434,9 +445,23 @@ totalEmissiveRadiance *= lit * warm;`,
         '#include <roughnessmap_fragment>',
         `#include <roughnessmap_fragment>
 roughnessFactor = mix(roughnessFactor, 0.08, glass);`,
+      )
+      .replace(
+        '#include <lights_physical_fragment>',
+        `#include <lights_physical_fragment>
+// antialiasing de especular (Tokuyoshi e Kaplanyan): o normal map repetido muda de direção dentro
+// de um pixel, e o brilho do farol caía em pontos menores que um pixel que piscavam com o carro
+// andando. A variância da normal perturbada na tela soma na rugosidade², limitada.
+vec3 nDx = dFdx(normal);
+vec3 nDy = dFdy(normal);
+float nVariance = 0.25 * (dot(nDx, nDx) + dot(nDy, nDy));
+float kernelR2 = min(2.0 * nVariance, 0.18);
+float aaRoughness = sqrt(clamp(material.roughness * material.roughness + kernelR2, 0.0, 1.0));
+material.roughness = mix(material.roughness, aaRoughness, uSpecularAA);`,
       );
   };
   // chave única por tipo para o three não reaproveitar o programa de outro material
+  material.userData.specularAA = specularAA;
   material.customProgramCacheKey = () => `facade-${type}-${set ? 'pbr' : 'flat'}`;
   return material;
 }

@@ -107,3 +107,10 @@ Cost: 5 provas Playwright em 1 arquivo.
 - **Estimativa:** S1 = `CityScene.ts` 17 KB + `Game.ts` ~30 KB + `visual.spec.ts` 18 KB lido em parte ≈ 55 KB / 4 ≈ 14k, abaixo do budget de 150k - one builder.
 - **Antes da correção:** o build mede e registra aqui o `flicker` dos 4 tipos sem AA, com o número exato.
 - **Se a correção não bastar:** se o antialiasing de especular sozinho não fizer C1 passar sem quebrar C3, stop-and-ask antes de trocar a abordagem (por exemplo, baixar o `metalness` do metal ou o `normalScale`), porque isso muda a aparência das fachadas.
+- **Medido no build (antes da correção, `specularAA: false`, `flicker` farol ligado / desligado / diferença):**
+  - 0 Concrete034: 0.006439 / 0.003916 / **0.002523**
+  - 1 MetalPlates006: 0.026073 / 0.003761 / **0.022313**
+  - 2 Bricks059: 0.009730 / 0.002668 / **0.007063**
+  - 3 PaintedPlaster017: 0.004071 / 0.002246 / **0.001826**
+- **Com `specularAA: true` (Tokuyoshi-Kaplanyan, σ² 0.25, κ 0.18), diferença:** 0 ≈ 0.0023-0.0030 · 1 0.0183 · 2 0.0038 · 3 0.0018. C1 falha. `litMean` ligado/desligado: 1.47 · 2.28 · 1.31 · 1.27 (C3 passa).
+- **Stop (build parado):** sem especular nenhum (só difuso), a diferença ainda é 0 0.0023 · 1 0.0000 · 2 0.0003 · 3 0.0016; sem especular e sem textura (parede lisa + janelas) é 0 0.0040 · 3 0.0024. O que a sonda conta nos tipos 0 e 3 são as bordas das janelas escuras passando sob o foco do farol (a segunda diferença acima de 0.15 marca qualquer borda de contraste > 0.15 andando ~2.5 px por quadro). Nenhum antialiasing de especular chega a 0.0010 nesses tipos; C1 precisa de decisão do usuário.

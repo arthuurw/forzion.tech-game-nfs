@@ -411,3 +411,55 @@ test.describe('visual - S5 pós', () => {
     expect(s).toEqual({ ready: true, rain: 1000, refl: false });
   });
 });
+
+test.describe('facade-glint', () => {
+  const FACADE_TYPES = [0, 1, 2, 3];
+  type Probe = { flicker: number; litMean: number };
+  const headlightShimmer = (page: Page, type: number, headlight: boolean, specularAA: boolean): Promise<Probe> =>
+    page.evaluate(
+      ([type, headlight, specularAA]) =>
+        (window as any).__game.render.headlightShimmer(type, { headlight, specularAA }) as Probe,
+      [type, headlight, specularAA] as const,
+    );
+
+  // C1: com antialiasing de especular, o farol não acrescenta cintilação em nenhum dos 4 tipos
+  test('headlight adds no facade glint', async ({ page }) => {
+    await open(page);
+    await advanceSim(page, 1);
+    for (const type of FACADE_TYPES) {
+      const on = await headlightShimmer(page, type, true, true);
+      const off = await headlightShimmer(page, type, false, true);
+      expect(on.flicker - off.flicker, `facade type ${type}`).toBeLessThanOrEqual(0.001);
+    }
+  });
+
+  // C2: sem o antialiasing (shader de antes), a sonda enxerga o brilho em pelo menos um tipo
+  test('probe detects glint without specular antialiasing', async ({ page }) => {
+    await open(page);
+    await advanceSim(page, 1);
+    const diffs: number[] = [];
+    for (const type of FACADE_TYPES) {
+      const on = await headlightShimmer(page, type, true, false);
+      const off = await headlightShimmer(page, type, false, false);
+      diffs.push(on.flicker - off.flicker);
+    }
+    expect(Math.max(...diffs)).toBeGreaterThan(0.001);
+  });
+
+  // C3: com antialiasing, o farol continua iluminando a fachada
+  test('headlight still lights the facade', async ({ page }) => {
+    await open(page);
+    await advanceSim(page, 1);
+    for (const type of FACADE_TYPES) {
+      const on = await headlightShimmer(page, type, true, true);
+      const off = await headlightShimmer(page, type, false, true);
+      expect(on.litMean, `facade type ${type}`).toBeGreaterThanOrEqual(1.2 * off.litMean);
+    }
+  });
+
+  // C5: antialiasing de especular ligado por padrão, logo depois de ready e antes de qualquer sonda
+  test('specular antialiasing on by default', async ({ page }) => {
+    await open(page);
+    expect(await page.evaluate(() => (window as any).__game.materials.facadeSpecularAA)).toBe(true);
+  });
+});
