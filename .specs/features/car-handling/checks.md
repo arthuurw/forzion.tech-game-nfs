@@ -35,7 +35,7 @@ Os testes de física usam o harness de `tests/physics/`:
 
 ### S1 - O carro não capota em chão plano · 6 files · 26 KB · ~7k
 
-**C1** - No harness, parado e assentado:
+**C1** - ✅ No harness, parado e assentado:
 - `body.mass()` está em `[1249, 1251]` kg.
 - O centro de massa no mundo (`body.worldCom()`) fica no máximo 0.50 m acima do plano `y = 0`.
 - `DEFAULT_CAR.trackM / (2 × essa altura)` ≥ 1.6.
@@ -43,7 +43,7 @@ Os testes de física usam o harness de `tests/physics/`:
 (AC 1, door 1)
 Proof: `npx vitest run tests/physics/stability.test.ts -t "mass and low center of mass"`
 
-**C2** - Matriz table-driven de 54 casos: 6 manobras × velocidade inicial 40, 60, 80, 100, 120, 140, 160, 180 e 200 km/h. Cada caso dura 3 s, e a inclinação fica em no máximo 15° em todo passo. As 6 manobras:
+**C2** - ✅ Matriz table-driven de 54 casos: 6 manobras × velocidade inicial 40, 60, 80, 100, 120, 140, 160, 180 e 200 km/h. Cada caso dura 3 s, e a inclinação fica em no máximo 15° em todo passo. As 6 manobras:
 - `steer +1`
 - `steer −1`
 - zigue-zague, trocando o sinal de `steer` a cada 30 passos
@@ -54,7 +54,7 @@ Proof: `npx vitest run tests/physics/stability.test.ts -t "mass and low center o
 (AC 2)
 Proof: `npx vitest run tests/physics/stability.test.ts -t "no rollover across the maneuver matrix"`
 
-**C3** - Nos mesmos 54 casos, depois dos 3 s com todas as entradas soltas, as 4 rodas estão em contato (`wheelIsInContact`) em algum passo dentro de 60 passos (1.0 s) (AC 3)
+**C3** - ✅ Nos mesmos 54 casos, depois dos 3 s com todas as entradas soltas, as 4 rodas estão em contato (`wheelIsInContact`) em algum passo dentro de 60 passos (1.0 s) (AC 3)
 Proof: `npx vitest run tests/physics/stability.test.ts -t "all four wheels back on the ground after release"`
 
 **C4** - Curva à esquerda (`steer +1`) a partir de 80 km/h, com `throttle` ligado sempre que a velocidade está abaixo de 80 km/h, por 3 s:
@@ -64,7 +64,7 @@ Proof: `npx vitest run tests/physics/stability.test.ts -t "all four wheels back 
 (AC 4)
 Proof: `npx vitest run tests/physics/stability.test.ts -t "body roll leans out of the turn"`
 
-**C5** - Com `brake` a partir de 100 km/h, a menor arfagem nos primeiros 30 passos (0.5 s) está entre −4.0° e −0.5°, com a frente para baixo (AC 5)
+**C5** - ✅ Com `brake` a partir de 100 km/h, a menor arfagem nos primeiros 30 passos (0.5 s) está entre −4.0° e −0.5°, com a frente para baixo (AC 5)
 Proof: `npx vitest run tests/physics/stability.test.ts -t "nose dives under braking"`
 
 ### S2 - Aderência, direção e derrapagem · 5 files · 22 KB · ~6k

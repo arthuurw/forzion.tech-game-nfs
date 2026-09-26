@@ -1,14 +1,23 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import type { Assets } from '../core/Loader';
+import { DEFAULT_CAR, type CarSpec } from './carSpec';
 import { isSkidding } from './effectsMath';
-import { computeDrive, gearFor, rpmFor, type DriveInput } from './drivetrain';
+import {
+  airDragN,
+  initialDrivetrain,
+  rollingResistanceN,
+  stepDrivetrain,
+  type DriveInput,
+  type DrivetrainState,
+} from './drivetrain';
 
 /**
  * O carro: um corpo rígido (chassi) + 4 rodas por raycast do Rapier (door 2).
  * O Rapier não desenha nada; este módulo mantém o mesh do three grudado no
- * corpo físico a cada frame (`sync`). Todas as decisões numéricas vêm de
- * `drivetrain.ts`; aqui só aplicamos.
+ * corpo físico a cada frame (`sync`). Massa, geometria, arrasto e aderência
+ * vêm da ficha (`carSpec.ts`); motor, câmbio, freios e volante vêm de
+ * `drivetrain.ts`. Aqui só aplicamos e medimos.
  */
 export interface CarState {
   x: number;
@@ -29,13 +38,19 @@ export interface ResetSnapshot {
 }
 
 const CHASSIS_HALF = { x: 0.9, y: 0.35, z: 2.1 };
-const CHASSIS_MASS = 1200;
-const WHEEL_RADIUS = 0.45;
 const WHEEL_REST = 0.35;
-const WHEEL_X = 0.85;
-const WHEEL_Z = 1.3;
 const WHEEL_Y = -0.2;
-const BASE_FRICTION_SLIP = 10;
+/** rigidez da mola por unidade de massa do chassi (o Rapier multiplica pela massa) */
+const SUSPENSION_STIFFNESS = 32;
+const SUSPENSION_COMPRESSION = 2.4;
+const SUSPENSION_RELAXATION = 2.8;
+/** caixa usada só para a inércia do chassi: largura, altura e comprimento (m) */
+const INERTIA_BOX = { x: 1.8, y: 0.9, z: 4.2 };
+const GRAVITY = 9.81;
+/** fração da altura do contato em que o Rapier aplica a força lateral (medido: a rolagem saía 10 % da esperada) */
+const RAPIER_ROLL_INFLUENCE = 0.1;
+/** passos na janela da aceleração lateral (0.5 s) */
+const LATERAL_G_WINDOW = 30;
 const MODEL_SCALE = 1.8;
 const FRONT = [0, 1];
 const REAR = [2, 3];
@@ -49,12 +64,22 @@ export class Car {
   readonly placeholder: boolean;
   lastReset: ResetSnapshot | null = null;
   readonly chassisCollider: RAPIER.Collider;
-  /** freio de mão acima de 20 km/h (visual-upgrade AC 13) */
+  /** escorregamento lateral real ou freio de mão acima de 20 km/h (car-handling AC 23) */
   skidding = false;
+  /** câmbio e volante (door 2 da car-handling) */
+  drive: DrivetrainState;
+  /** aceleração lateral (g), média dos últimos 30 passos */
+  lateralG = 0;
 
   private readonly wheelMeshes: THREE.Object3D[] = [];
   private wheelSpin = 0;
+  private readonly lateralSamples: number[] = [];
+  private readonly wheelX: number;
+  private readonly wheelZ: number;
+  private readonly wheelRadius: number;
   private readonly forward = new THREE.Vector3();
+  private readonly axis = new THREE.Vector3();
+  private readonly scratch = new THREE.Vector3();
   private readonly quat = new THREE.Quaternion();
 
   constructor(
@@ -62,31 +87,42 @@ export class Car {
     scene: THREE.Scene,
     assets: Assets,
     spawn: { x: number; y: number; z: number },
+    readonly spec: CarSpec = DEFAULT_CAR,
   ) {
     this.placeholder = assets.placeholder;
+    this.drive = initialDrivetrain(spec);
+    this.wheelX = spec.trackM / 2;
+    this.wheelZ = spec.wheelbaseM / 2;
+    this.wheelRadius = spec.wheelRadiusM;
 
+    // Massa, centro de massa e inércia vêm da ficha, não dos colliders (densidade 0).
+    // O centro de massa fica `comHeightM` acima do chão com a suspensão assentada,
+    // abaixo do chassi: o carro derrapa antes de capotar (AC 1).
+    const rideHeight = -WHEEL_Y + (WHEEL_REST - GRAVITY / (4 * SUSPENSION_STIFFNESS)) + spec.wheelRadiusM;
+    const m = spec.massKg;
+    const b = INERTIA_BOX;
     this.body = world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
         .setTranslation(spawn.x, spawn.y, spawn.z)
-        .setLinearDamping(0.08)
         .setAngularDamping(1.2)
+        .setAdditionalMassProperties(
+          m,
+          { x: 0, y: spec.comHeightM - rideHeight, z: 0 },
+          {
+            x: (m / 12) * (b.y * b.y + b.z * b.z),
+            y: (m / 12) * (b.x * b.x + b.z * b.z),
+            z: (m / 12) * (b.x * b.x + b.y * b.y),
+          },
+          { x: 0, y: 0, z: 0, w: 1 },
+        )
         .setCcdEnabled(true),
     );
-    // Casco leve + lastro pesado e baixo: desce o centro de massa para o carro
-    // não empinar ao acelerar nem tombar em curva (o Rapier aplica a força do
-    // motor no ponto de contato da roda, abaixo do centro do chassi).
     this.chassisCollider = world.createCollider(
       RAPIER.ColliderDesc.cuboid(CHASSIS_HALF.x, CHASSIS_HALF.y, CHASSIS_HALF.z)
-        .setMass(CHASSIS_MASS * 0.3)
+        .setDensity(0)
         .setFriction(0.4)
         .setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS)
         .setContactForceEventThreshold(CONTACT_FORCE_THRESHOLD),
-      this.body,
-    );
-    world.createCollider(
-      RAPIER.ColliderDesc.cuboid(0.6, 0.05, 1.5)
-        .setTranslation(0, -0.3, 0)
-        .setMass(CHASSIS_MASS * 0.7),
       this.body,
     );
 
@@ -95,20 +131,14 @@ export class Car {
     this.controller.indexUpAxis = 1;
     const down = { x: 0, y: -1, z: 0 };
     const axle = { x: -1, y: 0, z: 0 };
-    const positions = [
-      { x: WHEEL_X, y: WHEEL_Y, z: WHEEL_Z },
-      { x: -WHEEL_X, y: WHEEL_Y, z: WHEEL_Z },
-      { x: WHEEL_X, y: WHEEL_Y, z: -WHEEL_Z },
-      { x: -WHEEL_X, y: WHEEL_Y, z: -WHEEL_Z },
-    ];
-    positions.forEach((p, i) => {
-      this.controller.addWheel(p, down, axle, WHEEL_REST, WHEEL_RADIUS);
-      this.controller.setWheelSuspensionStiffness(i, 32);
-      this.controller.setWheelSuspensionCompression(i, 2.4);
-      this.controller.setWheelSuspensionRelaxation(i, 2.8);
+    this.wheelLocal().forEach((p, i) => {
+      this.controller.addWheel({ x: p.x, y: WHEEL_Y, z: p.z }, down, axle, WHEEL_REST, spec.wheelRadiusM);
+      this.controller.setWheelSuspensionStiffness(i, SUSPENSION_STIFFNESS);
+      this.controller.setWheelSuspensionCompression(i, SUSPENSION_COMPRESSION);
+      this.controller.setWheelSuspensionRelaxation(i, SUSPENSION_RELAXATION);
       this.controller.setWheelMaxSuspensionTravel(i, 0.3);
       this.controller.setWheelMaxSuspensionForce(i, 40000);
-      this.controller.setWheelFrictionSlip(i, BASE_FRICTION_SLIP);
+      this.controller.setWheelFrictionSlip(i, spec.tireGrip);
       this.controller.setWheelSideFrictionStiffness(i, 1.0);
     });
 
@@ -119,21 +149,51 @@ export class Car {
 
   /** Um passo fixo de física: aplica o input e integra o veículo. */
   fixedUpdate(input: DriveInput, dt: number): void {
-    const kmh = this.speedKmh();
-    this.skidding = isSkidding(input.handbrake, kmh);
-    const cmd = computeDrive(input, kmh);
+    const spec = this.spec;
+    const speedMs = this.speedMs();
+    this.skidding = isSkidding(input.handbrake, speedMs * 3.6, this.maxLateralSlip());
+    const { state, cmd } = stepDrivetrain(spec, this.drive, input, speedMs, dt);
+    this.drive = state;
+    // o comando é por eixo e o Rapier recebe por roda; o freio do Rapier é um impulso máximo por passo
     for (const i of REAR) {
-      this.controller.setWheelEngineForce(i, cmd.engineForce);
-      this.controller.setWheelBrake(i, cmd.brakeRear);
-      this.controller.setWheelFrictionSlip(i, BASE_FRICTION_SLIP * cmd.rearFrictionFactor);
+      this.controller.setWheelEngineForce(i, cmd.engineForce / 2);
+      this.controller.setWheelBrake(i, (cmd.brakeRear / 2) * dt);
+      this.controller.setWheelFrictionSlip(i, spec.tireGrip * spec.rearGripFactor * cmd.rearFrictionFactor);
     }
     for (const i of FRONT) {
       this.controller.setWheelEngineForce(i, 0);
-      this.controller.setWheelBrake(i, cmd.brakeFront);
+      this.controller.setWheelBrake(i, (cmd.brakeFront / 2) * dt);
       this.controller.setWheelSteering(i, cmd.steer);
     }
     this.controller.updateVehicle(dt);
-    this.wheelSpin += (this.speedMs() * dt) / WHEEL_RADIUS;
+    this.restoreRollMoment();
+    this.applyResistance(dt);
+    this.sampleLateralG();
+    this.wheelSpin += (this.speedMs() * dt) / this.wheelRadius;
+  }
+
+  /** Ângulo atual das rodas dianteiras (rad), depois da rampa do volante. */
+  get steerInput(): number {
+    return this.drive.steer;
+  }
+
+  /** Rolagem (rad): asin da componente y do eixo +X do chassi; positiva = lado esquerdo para cima. */
+  get bodyRoll(): number {
+    return Math.asin(Math.max(-1, Math.min(1, this.axisWorld(1, 0, 0).y)));
+  }
+
+  /** Arfagem (rad): asin da componente y do eixo +Z do chassi; negativa = frente para baixo. */
+  get bodyPitch(): number {
+    return Math.asin(Math.max(-1, Math.min(1, this.axisWorld(0, 0, 1).y)));
+  }
+
+  /** Sideslip (rad): ângulo entre a frente no plano e a velocidade horizontal; 0 até 3 m/s. */
+  get sideslip(): number {
+    const v = this.body.linvel();
+    if (Math.hypot(v.x, v.z) <= 3) return 0;
+    const f = this.forwardWorld();
+    const d = Math.atan2(v.x, v.z) - Math.atan2(f.x, f.z);
+    return Math.abs(Math.atan2(Math.sin(d), Math.cos(d)));
   }
 
   /** Posição no mundo (x, z) dos pontos de contato das rodas traseiras. */
@@ -142,8 +202,8 @@ export class Car {
     const r = this.body.rotation();
     this.quat.set(r.x, r.y, r.z, r.w);
     return [
-      { x: WHEEL_X, z: -WHEEL_Z },
-      { x: -WHEEL_X, z: -WHEEL_Z },
+      { x: this.wheelX, z: -this.wheelZ },
+      { x: -this.wheelX, z: -this.wheelZ },
     ].map((w) => {
       const v = new THREE.Vector3(w.x, 0, w.z).applyQuaternion(this.quat);
       return { x: t.x + v.x, z: t.z + v.z };
@@ -178,8 +238,8 @@ export class Car {
       heading: this.heading(),
       speedMs,
       speedKmh,
-      gear: gearFor(speedKmh),
-      rpm: rpmFor(speedKmh),
+      gear: this.drive.gear,
+      rpm: this.drive.rpm,
     };
   }
 
@@ -230,6 +290,112 @@ export class Car {
     this.sync();
   }
 
+  /** Arrasto aerodinâmico contra a velocidade e resistência de rolagem ao longo da frente. */
+  private applyResistance(dt: number): void {
+    const v = this.body.linvel();
+    const speed = Math.hypot(v.x, v.y, v.z);
+    const f = this.forwardWorld();
+    const roll = this.wheelsOnGround() > 0 ? rollingResistanceN(this.spec, this.speedMs()) : 0;
+    const drag = speed > 0 ? airDragN(this.spec, speed) / speed : 0;
+    this.body.applyImpulse(
+      {
+        x: (-drag * v.x - roll * f.x) * dt,
+        y: (-drag * v.y - roll * f.y) * dt,
+        z: (-drag * v.z - roll * f.z) * dt,
+      },
+      true,
+    );
+  }
+
+  /**
+   * O Rapier aplica o impulso lateral de cada roda a só 10 % da altura entre o
+   * ponto de contato e o centro de massa (a "roll influence" do Bullet), e o
+   * carro quase não rola em curva. Aqui devolvemos os outros 90 % do momento,
+   * como se a força lateral agisse no chão: a rolagem sai da altura real do
+   * centro de massa (AC 4).
+   */
+  private restoreRollMoment(): void {
+    const r = this.body.rotation();
+    this.quat.set(r.x, r.y, r.z, r.w);
+    const up = this.axis.set(0, 1, 0).applyQuaternion(this.quat);
+    const com = this.body.worldCom();
+    let tx = 0;
+    let ty = 0;
+    let tz = 0;
+    for (let i = 0; i < 4; i++) {
+      if (!this.controller.wheelIsInContact(i)) continue;
+      const impulse = this.controller.wheelSideImpulse(i) ?? 0;
+      const p = this.controller.wheelContactPoint(i);
+      if (impulse === 0 || !p) continue;
+      const steer = i < 2 ? this.controller.wheelSteering(i) ?? 0 : 0;
+      // eixo da roda (-X local) girado pela direção em torno de +Y, no mundo
+      const f = this.scratch.set(-Math.cos(steer), 0, Math.sin(steer)).applyQuaternion(this.quat).multiplyScalar(impulse);
+      const h = (up.x * (p.x - com.x) + up.y * (p.y - com.y) + up.z * (p.z - com.z)) * (1 - RAPIER_ROLL_INFLUENCE);
+      // torque de deslocar o ponto de aplicação por h ao longo de up: (up × h) × f
+      tx += h * (up.y * f.z - up.z * f.y);
+      ty += h * (up.z * f.x - up.x * f.z);
+      tz += h * (up.x * f.y - up.y * f.x);
+    }
+    this.body.applyTorqueImpulse({ x: tx, y: ty, z: tz }, true);
+  }
+
+  private sampleLateralG(): void {
+    const v = this.body.linvel();
+    this.lateralSamples.push((Math.hypot(v.x, v.z) * Math.abs(this.body.angvel().y)) / GRAVITY);
+    if (this.lateralSamples.length > LATERAL_G_WINDOW) this.lateralSamples.shift();
+    this.lateralG = this.lateralSamples.reduce((a, b) => a + b, 0) / this.lateralSamples.length;
+  }
+
+  private wheelsOnGround(): number {
+    let n = 0;
+    for (let i = 0; i < 4; i++) if (this.controller.wheelIsInContact(i)) n++;
+    return n;
+  }
+
+  /** Maior velocidade lateral (m/s) no ponto de contato das rodas no chão, ao longo do eixo de cada roda. */
+  private maxLateralSlip(): number {
+    const t = this.body.translation();
+    const r = this.body.rotation();
+    this.quat.set(r.x, r.y, r.z, r.w);
+    const com = this.body.worldCom();
+    const v = this.body.linvel();
+    const w = this.body.angvel();
+    let max = 0;
+    this.wheelLocal().forEach((p, i) => {
+      if (!this.controller.wheelIsInContact(i)) return;
+      const susp = this.controller.wheelSuspensionLength(i) ?? WHEEL_REST;
+      const c = this.scratch.set(p.x, WHEEL_Y - susp - this.wheelRadius, p.z).applyQuaternion(this.quat);
+      const rx = t.x + c.x - com.x;
+      const ry = t.y + c.y - com.y;
+      const rz = t.z + c.z - com.z;
+      // velocidade do ponto de contato: v + w × r
+      const px = v.x + w.y * rz - w.z * ry;
+      const py = v.y + w.z * rx - w.x * rz;
+      const pz = v.z + w.x * ry - w.y * rx;
+      const steer = i < 2 ? this.controller.wheelSteering(i) ?? 0 : 0;
+      // eixo lateral da roda: +X local girado pelo ângulo de direção em torno de +Y
+      const side = this.scratch.set(Math.cos(steer), 0, -Math.sin(steer)).applyQuaternion(this.quat);
+      max = Math.max(max, Math.abs(px * side.x + py * side.y + pz * side.z));
+    });
+    return max;
+  }
+
+  /** Posição (x, z) local das rodas: frente-esq, frente-dir, trás-esq, trás-dir. */
+  private wheelLocal(): Array<{ x: number; z: number }> {
+    return [
+      { x: this.wheelX, z: this.wheelZ },
+      { x: -this.wheelX, z: this.wheelZ },
+      { x: this.wheelX, z: -this.wheelZ },
+      { x: -this.wheelX, z: -this.wheelZ },
+    ];
+  }
+
+  private axisWorld(x: number, y: number, z: number): THREE.Vector3 {
+    const r = this.body.rotation();
+    this.quat.set(r.x, r.y, r.z, r.w);
+    return this.axis.set(x, y, z).applyQuaternion(this.quat);
+  }
+
   private forwardWorld(): THREE.Vector3 {
     const r = this.body.rotation();
     this.quat.set(r.x, r.y, r.z, r.w);
@@ -259,14 +425,9 @@ export class Car {
     const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.5, 2.0), cabinMat);
     cabin.position.set(0, 0.45, -0.2);
     this.mesh.add(bodyMesh, cabin);
-    const wheelGeo = new THREE.CylinderGeometry(WHEEL_RADIUS, WHEEL_RADIUS, 0.3, 12);
+    const wheelGeo = new THREE.CylinderGeometry(this.wheelRadius, this.wheelRadius, 0.3, 12);
     wheelGeo.rotateZ(Math.PI / 2);
-    for (const p of [
-      { x: WHEEL_X, z: WHEEL_Z },
-      { x: -WHEEL_X, z: WHEEL_Z },
-      { x: WHEEL_X, z: -WHEEL_Z },
-      { x: -WHEEL_X, z: -WHEEL_Z },
-    ]) {
+    for (const p of this.wheelLocal()) {
       const w = new THREE.Mesh(wheelGeo, wheelMat);
       w.position.set(p.x, WHEEL_Y - WHEEL_REST * 0.5, p.z);
       this.mesh.add(w);

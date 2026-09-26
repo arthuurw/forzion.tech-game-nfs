@@ -32,6 +32,7 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 | AD-008 | Geração procedural determinística por `seed` com PRNG `mulberry32`; nunca `Math.random` em lógica de mundo | layouts reproduzíveis e testáveis | active | 2026-09-25 |
 | AD-009 | Assets 3D só CC0 (Kenney) em `public/models/`; sempre com fallback procedural quando o arquivo falta | zero atribuição obrigatória; jogo nunca quebra por asset ausente | active | 2026-09-25 |
 | AD-010 | Mundo da city-terrain: terreno por heightfield 769 × 769 a cada 4 m, estradas como polilinhas 3D a cada 2 m (`RoadNetwork`, door 2), prédios por lote ao longo das ruas; física toda no boot, malhas por chunks de 512 m | mapa grande e orgânico sem perder a colisão; o formato das estradas será lido pelas corridas | active | 2026-09-25 |
+| AD-011 | Estende a AD-005: provas de dirigibilidade com física real em `tests/physics/*.test.ts` no vitest (node) - `RAPIER.init()`, `World` com chão plano de 8 km e rampa de 9 %, o `Car` real com assets placeholder, passo de 1/60 s em loop (door 3 da car-handling) | o SwiftShader do Playwright leva ~1 min por manobra e o mapa não tem 200 m planos livres para curva a 150 km/h; 240 passos rodam em ~74 ms | active | 2026-09-26 |
 
 ## Handoff
 

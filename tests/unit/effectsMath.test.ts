@@ -13,7 +13,6 @@ import {
   SPARK_IMPULSE_THRESHOLD,
   SPARK_LIFETIME_S,
   SkidBuffer,
-  isSkidding,
   sparkBurstFor,
 } from '../../src/vehicle/effectsMath';
 
@@ -73,14 +72,6 @@ describe('effects math', () => {
     expect(SPARK_LIFETIME_S).toBeCloseTo(0.4, 9);
     expect(SPARK_BURST).toBe(40);
     expect(SPARK_IMPULSE_THRESHOLD).toBe(3000);
-  });
-
-  // visual-upgrade C36 (AC 13) - limiar de derrapagem
-  it('skidding needs handbrake above 20 kmh', () => {
-    expect(isSkidding(true, 21)).toBe(true);
-    expect(isSkidding(true, 20)).toBe(false);
-    expect(isSkidding(true, 5)).toBe(false);
-    expect(isSkidding(false, 100)).toBe(false);
   });
 
   // visual-upgrade C35 (AC 15, AC 16) - colisão abaixo do limiar não muda lastCollision

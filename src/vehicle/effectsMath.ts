@@ -87,9 +87,15 @@ export const SPARK_LIFETIME_S = 0.4;
 export const SKID_CAP = 400;
 export const SKID_MIN_KMH = 20;
 
-/** Derrapagem visível: freio de mão acima de 20 km/h (AC 13). */
-export function isSkidding(handbrake: boolean, speedKmh: number): boolean {
-  return handbrake && speedKmh > SKID_MIN_KMH;
+/** escorregamento lateral (m/s) no contato de uma roda acima do qual o pneu está derrapando */
+export const SKID_LATERAL_SLIP_MS = 2.5;
+
+/**
+ * Derrapagem visível (car-handling AC 23): escorregamento lateral de alguma
+ * roda acima de 2.5 m/s, ou freio de mão acima de 20 km/h.
+ */
+export function isSkidding(handbrake: boolean, speedKmh: number, lateralSlipMs: number): boolean {
+  return lateralSlipMs > SKID_LATERAL_SLIP_MS || (handbrake && speedKmh > SKID_MIN_KMH);
 }
 
 /** Um quad de marca por roda traseira por passo fixo (AC 13). */
