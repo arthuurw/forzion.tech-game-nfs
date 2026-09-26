@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { QualityPreset } from '../../core/quality';
+import { heightAt, type Heightmap } from '../terrain/TerrainGenerator';
 import type { BlockInteriors } from './BlockInteriors';
 import type { InteriorProps } from './InteriorProps';
 import { waveNormalMap } from '../Water';
@@ -9,11 +10,19 @@ import {
   FIREFLIES_HIGH,
   FIREFLIES_LOW,
   POOL_FLOW,
+  WALKER_CAP_HIGH,
+  WALKER_CAP_LOW,
+  WALKER_RANGE,
+  activeWalkerSpawns,
   beaconOn,
   bulbSway,
   cranePeriod,
+  createWalker,
   floodSweep,
   jibAngle,
+  stepWalker,
+  walkerBob,
+  type Walker,
   crownSwayParams,
   fireflyMotion,
   zoneLight,
@@ -90,14 +99,19 @@ export class InteriorScene {
   readonly fireflyCount: number;
   /** centro (x, z) usado na última escolha das árvores com vagalumes */
   private fireflyCenter: { x: number; z: number } | null = null;
-  /** pedestres ativos */
-  readonly walkers: unknown[] = [];
+  /** pedestres ativos, pelo índice do ponto de partida em `props.walkers` */
+  readonly active = new Map<number, Walker>();
+  readonly walkerMesh: THREE.InstancedMesh;
+  /** tempo de física da última escolha dos pedestres ativos */
+  private walkerPlanAt = -Infinity;
+  private walkerPlanCar = { x: Infinity, z: Infinity };
 
   constructor(
     readonly interiors: BlockInteriors,
     readonly props: InteriorProps,
     readonly seed: number,
     readonly quality: QualityPreset,
+    private readonly carved: Heightmap,
   ) {
     const count = Math.max(1, interiors.zones.length);
     this.zoneLevels = new Float32Array(count);
@@ -151,7 +165,19 @@ export class InteriorScene {
     const head = new THREE.BoxGeometry(0.9, 0.6, 0.5);
     this.floodHeads = this.instanced(head, headMaterial, sites.length * 2, 'flood-heads');
     this.terrainUniforms.uFloodCount.value = Math.min(MAX_FLOODS, sites.length * 2);
-    this.group.add(this.yardLamps, this.bulbs, this.pools, this.trees, this.fireflies, this.towers, this.jibs, this.beacons, this.floodHeads);
+    this.walkerMesh = this.buildWalkers();
+    this.group.add(
+      this.yardLamps,
+      this.bulbs,
+      this.pools,
+      this.trees,
+      this.fireflies,
+      this.towers,
+      this.jibs,
+      this.beacons,
+      this.floodHeads,
+      this.walkerMesh,
+    );
     this.setSiteBounds();
     this.update(0);
   }
@@ -214,6 +240,74 @@ export class InteriorScene {
     mesh.name = 'pools';
     mesh.computeBoundingSphere();
     return mesh;
+  }
+
+  /** Pedestre: silhueta low-poly (corpo em cápsula e cabeça), cores escuras por instância. */
+  private buildWalkers(): THREE.InstancedMesh {
+    const body = new THREE.CapsuleGeometry(0.22, 0.95, 3, 8);
+    body.translate(0, 0.22 + 0.95 / 2, 0);
+    const head = new THREE.SphereGeometry(0.14, 8, 6);
+    head.translate(0, 1.62, 0);
+    const geometry = mergeWithGlow([
+      [body, 0],
+      [head, 0],
+    ]);
+    const cap = this.quality.level === 'low' ? WALKER_CAP_LOW : WALKER_CAP_HIGH;
+    const material = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.85, metalness: 0 });
+    const mesh = new THREE.InstancedMesh(geometry, material, cap);
+    const palette = ['#2b2f3a', '#3a2f2b', '#2f3a30', '#3b3b44', '#40302f', '#262a33', '#4a4440'];
+    const c = new THREE.Color();
+    for (let i = 0; i < cap; i++) mesh.setColorAt(i, c.set(palette[i % palette.length]!));
+    mesh.count = 0;
+    mesh.name = 'walkers';
+    // os pedestres ficam sempre perto do carro: sem culling pela esfera (ela muda a cada quadro)
+    mesh.frustumCulled = false;
+    return mesh;
+  }
+
+  /**
+   * Passo fixo dos pedestres (chamado no passo de física): a cada 0.5 s ou 20 m
+   * de carro, escolhe quais ficam ativos (`activeWalkerSpawns`); cada ativo anda
+   * ou foge do carro (`stepWalker`); quem passa de 300 m do carro sai.
+   */
+  stepWalkers(dt: number, car: { x: number; z: number }, time: number): void {
+    const moved = Math.hypot(car.x - this.walkerPlanCar.x, car.z - this.walkerPlanCar.z);
+    if (time - this.walkerPlanAt >= 0.5 || moved > 20) {
+      this.walkerPlanAt = time;
+      this.walkerPlanCar = { x: car.x, z: car.z };
+      const keep = new Set(activeWalkerSpawns(this.props.walkers, this.interiors.zones, car, this.quality.level));
+      for (const i of [...this.active.keys()]) if (!keep.has(i)) this.active.delete(i);
+      for (const i of keep) if (!this.active.has(i)) this.active.set(i, createWalker(this.props.walkers[i]!, i));
+    }
+    for (const [i, w] of this.active) {
+      stepWalker(w, dt, car, this.interiors);
+      if (Math.hypot(w.x - car.x, w.z - car.z) > WALKER_RANGE) this.active.delete(i);
+    }
+  }
+
+  /** Matrizes dos pedestres ativos: altura do chão + balanço do corpo, virados para onde andam. */
+  private updateWalkerMesh(time: number): void {
+    const mesh = this.walkerMesh;
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0);
+    const one = new THREE.Vector3(1, 1, 1);
+    const p = new THREE.Vector3();
+    let k = 0;
+    for (const w of this.active.values()) {
+      if (k >= mesh.instanceMatrix.count) break;
+      const yaw = Math.atan2(w.toX - w.fromX, w.toZ - w.fromZ) || 0;
+      q.setFromAxisAngle(up, yaw);
+      p.set(w.x, heightAt(this.carved, w.x, w.z) + walkerBob(time + w.phase), w.z);
+      mesh.setMatrixAt(k++, m.compose(p, q, one));
+    }
+    mesh.count = k;
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  /** Pedestres ativos (para as provas). */
+  get walkers(): Walker[] {
+    return [...this.active.values()];
   }
 
   private instanced(geometry: THREE.BufferGeometry, material: THREE.Material, count: number, name: string): THREE.InstancedMesh {
@@ -458,6 +552,7 @@ totalEmissiveRadiance += diffuseColor.rgb * uFloodColor * min(floodLight, 1.5);`
     this.swayTime.value = time;
     this.poolMaterial.normalMap!.offset.set((time * POOL_FLOW[0]) % 1, (time * POOL_FLOW[1]) % 1);
     if (this.towers) this.updateSites(time);
+    if (this.walkerMesh) this.updateWalkerMesh(time);
   }
 
   /** Objetos do miolo (o espelho da rua e a sonda do chão os escondem). */

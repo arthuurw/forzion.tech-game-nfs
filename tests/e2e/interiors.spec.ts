@@ -389,3 +389,98 @@ test.describe('block-fill - obras', () => {
     expect(r.beam).toBeGreaterThan(1.5 * r.outside);
   });
 });
+
+test.describe('block-fill - pedestres', () => {
+  // C31 (AC 29) - parte browser
+  test('walkers near the car', async ({ page }) => {
+    await gotoGame(page);
+    await advanceSim(page, 2);
+    const r = await page.evaluate(() => {
+      const g = (window as any).__game;
+      const it = g.world.interiors;
+      return { car: g.car.position, walkers: it.walkers() as Array<{ x: number; z: number }>, active: it.summary().walkersActive as number };
+    });
+    expect(r.active).toBeGreaterThan(0);
+    expect(r.active).toBeLessThanOrEqual(400);
+    expect(r.walkers.length).toBe(r.active);
+    for (const w of r.walkers) expect(Math.hypot(w.x - r.car.x, w.z - r.car.z)).toBeLessThanOrEqual(300);
+  });
+
+  // C34 (AC 32) - parte browser
+  test('walkers step away from the car', async ({ page }) => {
+    await gotoGame(page);
+    await advanceSim(page, 1);
+    // pedestre ativo com 15 m de chão da zona atrás dele, do lado oposto ao carro
+    const pick = await page.evaluate(() => {
+      const g = (window as any).__game;
+      const w = g.world;
+      const it = w.interiors;
+      const zoneAt = (x: number, z: number) => it.cell(Math.round((x - it.origin) / it.spacing), Math.round((z - it.origin) / it.spacing)).zoneOf;
+      const walkers = it.walkers() as Array<{ x: number; z: number; zoneId: number; fleeing: boolean }>;
+      for (let i = 0; i < walkers.length; i++) {
+        const p = walkers[i]!;
+        if (p.fleeing) continue;
+        for (let k = 0; k < 8; k++) {
+          const a = (k * Math.PI) / 4;
+          const dx = Math.sin(a);
+          const dz = Math.cos(a);
+          let ok = true;
+          for (let d = 0; d <= 20 && ok; d += 1) if (zoneAt(p.x - dx * d, p.z - dz * d) !== p.zoneId) ok = false;
+          if (!ok) continue;
+          const cx = p.x + dx * 5;
+          const cz = p.z + dz * 5;
+          return { i, walker: p, car: { x: cx, y: w.heightAt(cx, cz) + 1.2, z: cz, heading: a } };
+        }
+      }
+      throw new Error('no walker with room to step away');
+    });
+    await page.evaluate(({ car }) => (window as any).__game.car.teleport(car.x, car.y, car.z, car.heading), pick);
+    const before = await page.evaluate(() => {
+      const g = (window as any).__game;
+      return { car: g.car.position, walkers: g.world.interiors.walkers() };
+    });
+    // o mesmo pedestre: o mais perto da posição lida antes do teleporte
+    const nearest = (list: Array<{ x: number; z: number }>, x: number, z: number) =>
+      list.reduce((a, b) => (Math.hypot(b.x - x, b.z - z) < Math.hypot(a.x - x, a.z - z) ? b : a));
+    const w0 = nearest(before.walkers, pick.walker.x, pick.walker.z);
+    const d0 = Math.hypot(w0.x - before.car.x, w0.z - before.car.z);
+    expect(d0).toBeLessThanOrEqual(5.5);
+    let last = { x: w0.x, z: w0.z };
+    const start = await simTime(page);
+    // segue o pedestre de 0.25 s em 0.25 s (anda no máximo 0.75 m por leitura)
+    while ((await simTime(page)) < start + 4) {
+      await advanceSim(page, 0.25);
+      const list = await page.evaluate(() => (window as any).__game.world.interiors.walkers());
+      last = nearest(list, last.x, last.z);
+    }
+    const car = await page.evaluate(() => (window as any).__game.car.position);
+    const dist = Math.hypot(last.x - car.x, last.z - car.z);
+    console.log(`C34 start ${d0.toFixed(2)} m, after 4 s ${dist.toFixed(2)} m`);
+    expect(dist).toBeGreaterThanOrEqual(12);
+  });
+
+  // C35 (AC 33)
+  test('walkers have no colliders', async ({ page }) => {
+    await gotoGame(page);
+    await advanceSim(page, 1);
+    const read = () =>
+      page.evaluate(() => {
+        const it = (window as any).__game.world.interiors;
+        return { c: it.colliders(), s: it.summary(), roads: (window as any).__game.world.roads.length, lots: (window as any).__game.world.lots.length };
+      });
+    const a = await read();
+    expect(a.s.walkersActive).toBeGreaterThan(0);
+    // terreno, estradas, guarda-corpos, pilares, prédios, paredes, troncos, torres (+ o carro)
+    expect(a.c.roads).toBe(a.roads);
+    expect(a.c.lots).toBe(a.lots);
+    expect(a.c.walls).toBe(4);
+    expect(a.c.trees).toBe(a.s.trees);
+    expect(a.c.cranes).toBe(a.s.sites);
+    const expected = a.c.terrain + a.c.roads + a.c.rails + a.c.pillars + a.c.lots + a.c.walls + a.c.trees + a.c.cranes + a.c.car;
+    expect(a.c.total).toBe(expected);
+    await advanceSim(page, 5);
+    const b = await read();
+    expect(b.s.walkersActive).toBeGreaterThan(0);
+    expect(b.c.total).toBe(a.c.total);
+  });
+});

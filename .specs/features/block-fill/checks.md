@@ -157,21 +157,21 @@ Proof: `npx vitest run tests/physics/interiors.test.ts -t "one collider per cran
 
 ### S6 - Pedestres · 6 files · 90 KB · ~23k
 
-**C31** - Orçamento (AC 29): `walkerBudget(zonesInRange, quality)` = `min(cap, floor(Σ areaM2 × 3 / 1000))`, com `cap` 400 em high e 200 em low; casos: 10 000 m² → 30; 200 000 m² high → 400; 200 000 m² low → 200; 0 → 0. No browser, depois de 2 s parado no spawn, todo pedestre ativo está a ≤ 300 m do carro e `walkersActive` ≤ 400 e > 0.
+**C31** - ✅ Orçamento (AC 29): `walkerBudget(zonesInRange, quality)` = `min(cap, floor(Σ areaM2 × 3 / 1000))`, com `cap` 400 em high e 200 em low; casos: 10 000 m² → 30; 200 000 m² high → 400; 200 000 m² low → 200; 0 → 0. No browser, depois de 2 s parado no spawn, todo pedestre ativo está a ≤ 300 m do carro e `walkersActive` ≤ 400 e > 0.
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "walker budget"`
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "walkers near the car"`
 
-**C32** - Caminhada (AC 30): simulando 20 pedestres do seed 1337 por 60 s em passos de 1/60 com o carro longe, todo trecho liga dois vértices interiores da mesma zona, todo ponto do trecho amostrado a cada 1 m arredonda para vértice interior dessa zona, e a velocidade em todo passo fora da fuga está em [1.2, 1.6] m/s.
+**C32** - ✅ Caminhada (AC 30): simulando 20 pedestres do seed 1337 por 60 s em passos de 1/60 com o carro longe, todo trecho liga dois vértices interiores da mesma zona, todo ponto do trecho amostrado a cada 1 m arredonda para vértice interior dessa zona, e a velocidade em todo passo fora da fuga está em [1.2, 1.6] m/s.
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "walkers stay inside their zone"`
 
-**C33** - Balanço do corpo (AC 31): `walkerBob(t)` fica em [−0.03, 0.03] m e repete a cada 0.5 s (± 1e-9).
+**C33** - ✅ Balanço do corpo (AC 31): `walkerBob(t)` fica em [−0.03, 0.03] m e repete a cada 0.5 s (± 1e-9).
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "walker bob"`
 
-**C34** - Fuga (AC 32): num mapa sintético com uma zona 60 × 60 m, um pedestre em (0, 0) e o carro parado em (5, 0): a cada passo a velocidade dele é 3 m/s (± 0.01) e a distância ao carro cresce, até chegar a ≥ 15 m; depois volta a andar a [1.2, 1.6] m/s; todo ponto dele fica em vértice interior da zona. No browser, com o carro teleportado a 5 m de um pedestre ativo e parado, depois de 4 s a distância entre os dois é ≥ 12 m.
+**C34** - ✅ Fuga (AC 32): num mapa sintético com uma zona 60 × 60 m, um pedestre em (0, 0) e o carro parado em (5, 0): a cada passo a velocidade dele é 3 m/s (± 0.01) e a distância ao carro cresce, até chegar a ≥ 15 m; depois volta a andar a [1.2, 1.6] m/s; todo ponto dele fica em vértice interior da zona. No browser, com o carro teleportado a 5 m de um pedestre ativo e parado, depois de 4 s a distância entre os dois é ≥ 12 m.
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "walker flees the car"`
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "walkers step away from the car"`
 
-**C35** - Sem collider de pedestre (AC 33): o número de colliders do mundo no browser é igual à soma dos colliders esperados (terreno, estradas, guarda-corpos, pilares, prédios, paredes, troncos, torres) e não muda depois de 5 s com pedestres ativos.
+**C35** - ✅ Sem collider de pedestre (AC 33): o número de colliders do mundo no browser é igual à soma dos colliders esperados (terreno, estradas, guarda-corpos, pilares, prédios, paredes, troncos, torres) e não muda depois de 5 s com pedestres ativos.
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "walkers have no colliders"`
 
 ### S7 - Leve como antes · 4 files · 18 KB · ~5k

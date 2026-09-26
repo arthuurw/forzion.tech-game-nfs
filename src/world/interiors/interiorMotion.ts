@@ -252,6 +252,36 @@ export function walkerBob(t: number): number {
   return 0.03 * Math.sin(4 * Math.PI * t);
 }
 
+/**
+ * Quais pontos de partida de pedestre ficam ativos com o carro em (x, z): as
+ * zonas cuja caixa chega a 300 m do carro dão o orçamento (`walkerBudget`), e
+ * entram os pontos dessas zonas a até 300 m, do mais perto para o mais longe,
+ * até o orçamento. Devolve os índices em `spawns`.
+ */
+export function activeWalkerSpawns(
+  spawns: ReadonlyArray<WalkerSpawn>,
+  zones: ReadonlyArray<InteriorZone>,
+  car: { x: number; z: number },
+  quality: 'high' | 'low',
+): number[] {
+  const inRange = zones.filter((z) => {
+    const dx = Math.max(z.bbox.minX - car.x, 0, car.x - z.bbox.maxX);
+    const dz = Math.max(z.bbox.minZ - car.z, 0, car.z - z.bbox.maxZ);
+    return Math.hypot(dx, dz) <= WALKER_RANGE;
+  });
+  const budget = walkerBudget(inRange, quality);
+  if (budget === 0) return [];
+  const ids = new Set(inRange.map((z) => z.id));
+  const near: Array<{ i: number; d: number }> = [];
+  spawns.forEach((s, i) => {
+    if (!ids.has(s.zoneId)) return;
+    const d = Math.hypot(s.x - car.x, s.z - car.z);
+    if (d <= WALKER_RANGE) near.push({ i, d });
+  });
+  near.sort((a, b) => a.d - b.d || a.i - b.i);
+  return near.slice(0, budget).map((n) => n.i);
+}
+
 export interface Walker {
   zoneId: number;
   x: number;

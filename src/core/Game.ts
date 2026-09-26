@@ -287,6 +287,9 @@ export class Game {
     );
     this.world.step(this.eventQueue);
     this.simTime += dt;
+    // pedestres do miolo (block-fill): sem collider, só leem a posição do carro
+    const carNow = this.car.body.translation();
+    this.city.interiors.stepWalkers(dt, { x: carNow.x, z: carNow.z }, this.simTime);
 
     // caiu na água (door 9): volta em pé, parado, 1 m acima do ponto de estrada mais próximo
     const pos = this.car.body.translation();
@@ -928,6 +931,21 @@ export class Game {
         return { intensity: scene.beaconMaterial.emissiveIntensity, time: scene.time };
       },
       beamProbe: (siteIndex: number) => game.probeBeam(siteIndex),
+      /** pedestres ativos: posição, zona e se está fugindo do carro */
+      walkers: () => scene.walkers.map((w) => ({ x: w.x, z: w.z, zoneId: w.zoneId, fleeing: w.fleeing })),
+      /** colliders do mundo no Rapier, e o que cada parte do mundo criou */
+      colliders: () => ({
+        total: game.world.colliders.len(),
+        terrain: 1,
+        roads: game.city.data.network.roads.length,
+        rails: game.physics.rails,
+        pillars: game.physics.pillars.length,
+        lots: game.city.data.lots.length,
+        walls: game.physics.walls.length,
+        trees: game.physics.trees.length,
+        cranes: game.physics.cranes.length,
+        car: game.car.body.numColliders(),
+      }),
       /** posição da lâmpada `i` lida da malha: matriz da instância + balanço com o `uTime` aplicado */
       bulbPosition: (i: number) => scene.bulbPosition(i),
     };

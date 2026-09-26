@@ -116,7 +116,7 @@ export class CityScene {
 
     this.terrainMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
     // block-fill: luz rebatida das janelas no chão do miolo
-    this.interiors = new InteriorScene(data.interiors, data.props, data.seed, quality);
+    this.interiors = new InteriorScene(data.interiors, data.props, data.seed, quality, data.carved);
     this.interiors.patchTerrainMaterial(this.terrainMaterial);
     scene.add(this.interiors.group);
     const concrete = assets.textures[FACADE_SETS[0]!];

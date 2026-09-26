@@ -9,8 +9,12 @@ import {
   floodSweep,
   jibAngle,
   bulbSway,
+  createWalker,
   crownSway,
   fireflyMotion,
+  stepWalker,
+  walkerBob,
+  walkerBudget,
   terrainColor,
   terrainNoise,
   zoneLight,
@@ -262,5 +266,113 @@ describe('interior motion', () => {
       expect(hi).toBeLessThanOrEqual(base + deg30 + 1e-12);
       expect(hi - lo).toBeGreaterThan(deg30);
     }
+  });
+
+  // C31 (AC 29) - parte pura
+  it('walker budget', () => {
+    expect(walkerBudget([{ areaM2: 10_000 }], 'high')).toBe(30);
+    expect(walkerBudget([{ areaM2: 200_000 }], 'high')).toBe(400);
+    expect(walkerBudget([{ areaM2: 120_000 }, { areaM2: 80_000 }], 'high')).toBe(400);
+    expect(walkerBudget([{ areaM2: 200_000 }], 'low')).toBe(200);
+    expect(walkerBudget([], 'high')).toBe(0);
+    expect(walkerBudget([{ areaM2: 0 }], 'low')).toBe(0);
+  });
+
+  // C32 (AC 30)
+  it('walkers stay inside their zone', () => {
+    const zoneAt = (x: number, z: number) =>
+      interiors.zoneOf[Math.round((z - interiors.origin) / interiors.spacing) * interiors.size + Math.round((x - interiors.origin) / interiors.spacing)]!;
+    const isVertex = (x: number, z: number) =>
+      Math.abs((x - interiors.origin) / 4 - Math.round((x - interiors.origin) / 4)) < 1e-9 &&
+      Math.abs((z - interiors.origin) / 4 - Math.round((z - interiors.origin) / 4)) < 1e-9;
+    // 20 pedestres espalhados pela lista do seed 1337; o carro fica longe de todos
+    const picks = Array.from({ length: 20 }, (_, i) => Math.floor((i * props.walkers.length) / 20));
+    const car = { x: 99_999, z: 99_999 };
+    let segments = 0;
+    for (const idx of picks) {
+      const spawn = props.walkers[idx]!;
+      const w = createWalker(spawn, idx);
+      const seen = new Set<string>();
+      let prev = { x: w.x, z: w.z };
+      for (let step = 0; step < 60 * 60; step++) {
+        stepWalker(w, DT, car, interiors);
+        const speed = Math.hypot(w.x - prev.x, w.z - prev.z) / DT;
+        expect(w.fleeing).toBe(false);
+        if (speed < 1.2 - 1e-9 || speed > 1.6 + 1e-9) throw new Error(`walker ${idx} step ${step} speed ${speed}`);
+        prev = { x: w.x, z: w.z };
+        const key = `${w.fromX},${w.fromZ},${w.toX},${w.toZ}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        segments++;
+        // o trecho liga dois vértices interiores da zona do pedestre
+        expect(isVertex(w.fromX, w.fromZ) && isVertex(w.toX, w.toZ)).toBe(true);
+        expect(zoneAt(w.fromX, w.fromZ)).toBe(spawn.zoneId);
+        expect(zoneAt(w.toX, w.toZ)).toBe(spawn.zoneId);
+        // amostrado a cada 1 m (e no fim), cada ponto cai num vértice da zona
+        const len = Math.hypot(w.toX - w.fromX, w.toZ - w.fromZ);
+        for (let d = 0; d <= len; d += 1) {
+          const t = len > 0 ? d / len : 0;
+          if (zoneAt(w.fromX + (w.toX - w.fromX) * t, w.fromZ + (w.toZ - w.fromZ) * t) !== spawn.zoneId) throw new Error(`walker ${idx} leaves zone`);
+        }
+        expect(zoneAt(w.toX, w.toZ)).toBe(spawn.zoneId);
+      }
+    }
+    expect(segments).toBeGreaterThan(20);
+  });
+
+  // C33 (AC 31)
+  it('walker bob', () => {
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let i = 0; i <= 10 * 600; i++) {
+      const t = i / 600;
+      const b = walkerBob(t);
+      lo = Math.min(lo, b);
+      hi = Math.max(hi, b);
+      expect(Math.abs(walkerBob(t + 0.5) - b)).toBeLessThanOrEqual(1e-9);
+    }
+    expect(lo).toBeGreaterThanOrEqual(-0.03);
+    expect(hi).toBeLessThanOrEqual(0.03);
+    expect(hi - lo).toBeGreaterThan(0.05);
+  });
+
+  // C34 (AC 32) - parte pura
+  it('walker flees the car', () => {
+    // zona única de 60 × 60 m (vértices de -30 a 30), chão plano
+    const size = 16;
+    const origin = -30;
+    const hm = { size, spacing: 4, origin, heights: new Float32Array(size * size) };
+    const zone = findBlockInteriors(hm, { roads: [] }, []);
+    expect(zone.zones.length).toBe(1);
+    const inZone = (x: number, z: number) => zone.zoneOf[Math.round((z - origin) / 4) * size + Math.round((x - origin) / 4)] === 0;
+    const w = createWalker({ zoneId: 0, x: 0, z: 0 }, 0);
+    const car = { x: 5, z: 0 };
+    let dist = Math.hypot(w.x - car.x, w.z - car.z);
+    let fled = 0;
+    let walked = 0;
+    let reached = false;
+    for (let step = 0; step < 60 * 20; step++) {
+      const px = w.x;
+      const pz = w.z;
+      stepWalker(w, DT, car, zone);
+      const speed = Math.hypot(w.x - px, w.z - pz) / DT;
+      const now = Math.hypot(w.x - car.x, w.z - car.z);
+      expect(inZone(w.x, w.z), `step ${step}`).toBe(true);
+      if (!reached) {
+        // fugindo: 3 m/s e cada vez mais longe, até 15 m
+        expect(Math.abs(speed - 3), `step ${step}`).toBeLessThanOrEqual(0.01);
+        expect(now).toBeGreaterThan(dist);
+        fled++;
+        if (now >= 15) reached = true;
+      } else if (!w.fleeing) {
+        // de volta a andar
+        if (speed < 1.2 - 1e-9 || speed > 1.6 + 1e-9) throw new Error(`step ${step} speed ${speed}`);
+        walked++;
+      }
+      dist = now;
+    }
+    expect(reached).toBe(true);
+    expect(fled).toBeGreaterThan(100);
+    expect(walked).toBeGreaterThan(60);
   });
 });
