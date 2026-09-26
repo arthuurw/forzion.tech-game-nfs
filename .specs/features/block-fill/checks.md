@@ -57,7 +57,7 @@ Proof: `npx vitest run tests/unit/purity.test.ts -t "pure modules do not import 
 
 ### S2 - O chão deixa de ser preto · 9 files · 116 KB · ~29k
 
-**C8** - Cor do terreno numa função pura `terrainColor(height, slope, noise, kind)` (`kind`: `'none' | 'downtown' | 'outer'`), componentes RGB lineares como o three guarda, tolerância 1e-6 (AC 7, AC 8):
+**C8** - ✅ Cor do terreno numa função pura `terrainColor(height, slope, noise, kind)` (`kind`: `'none' | 'downtown' | 'outer'`), componentes RGB lineares como o three guarda, tolerância 1e-6 (AC 7, AC 8):
 
 | Caso | Resultado |
 | --- | --- |
@@ -71,27 +71,27 @@ Proof: `npx vitest run tests/unit/purity.test.ts -t "pure modules do not import 
 O ruído vem do seed, em escala de 8 m, sempre em [−1, 1] (varredura de 10 000 pontos no teste).
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "terrain color"`
 
-**C9** - O chunk usa essa cor: no browser, a cor por vértice da malha de terreno do chunk do spawn, num vértice `downtown` interior e num vértice fora do miolo com slope < 0.05, é igual a `terrainColor` com os mesmos argumentos (± 1/255) (AC 7, AC 8).
+**C9** - ✅ O chunk usa essa cor: no browser, a cor por vértice da malha de terreno do chunk do spawn, num vértice `downtown` interior e num vértice fora do miolo com slope < 0.05, é igual a `terrainColor` com os mesmos argumentos (± 1/255) (AC 7, AC 8).
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "ground uses the new terrain color"`
 
-**C10** - Peso da luz rebatida `bounceWeight(zoneOf, facadeDist)`: `(−1, 0)` → 0; `(3, 0)` → 1; `(3, 12.5)` → 0.5; `(3, 25)` → 0; `(3, 40)` → 0 (AC 9). No browser, o atributo de peso por vértice do chunk do spawn é igual a `bounceWeight` do vértice em 50 vértices sorteados (± 1e-4).
+**C10** - ✅ Peso da luz rebatida `bounceWeight(zoneOf, facadeDist)`: `(−1, 0)` → 0; `(3, 0)` → 1; `(3, 12.5)` → 0.5; `(3, 25)` → 0; `(3, 40)` → 0 (AC 9). No browser, o atributo de peso por vértice do chunk do spawn é igual a `bounceWeight` do vértice em 50 vértices sorteados (± 1e-4).
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "bounce weight"`
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "ground bounce weight per vertex"`
 
-**C11** - `groundProbe` num vértice interior `downtown` com `facadeDist` ≤ 8 (o primeiro achado a partir do spawn): luminância com `bounce: true` ≥ 2 × a com `bounce: false`, e ≤ 0.35 (AC 10).
+**C11** - ✅ `groundProbe` num vértice interior `downtown` com `facadeDist` ≤ 8 (o primeiro achado a partir do spawn): luminância com `bounce: true` ≥ 2 × a com `bounce: false`, e ≤ 0.35 (AC 10).
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "ground bounce lights the block interior"`
 
-**C12** - `groundProbe` num ponto com `facadeDist` > 40 (ou fora do miolo, a mais de 40 m de qualquer lote): |lum(true) − lum(false)| ≤ 0.05 × lum(false) (AC 11).
+**C12** - ✅ `groundProbe` num ponto com `facadeDist` > 40 (ou fora do miolo, a mais de 40 m de qualquer lote): |lum(true) − lum(false)| ≤ 0.05 × lum(false) (AC 11).
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "ground far from buildings is unchanged"`
 
-**C13** - `zoneLight(zoneId, t)`, para 50 ids e t de 0 a 600 s em passos de 1/60 (AC 12):
+**C13** - ✅ `zoneLight(zoneId, t)`, para 50 ids e t de 0 a 600 s em passos de 1/60 (AC 12):
 - sempre em [0.5, 1.0];
 - fora das rampas o valor é exatamente 1.0 ou 0.5, e cada patamar dura entre 20 e 60 s;
 - cada rampa dura 3 s ± 1/60 e é linear (segunda diferença 0 dentro dela, ± 1e-9);
 - mesmo id e mesmo t dão sempre o mesmo valor.
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "zone light holds and ramps"`
 
-**C14** - Calma e troca garantida (AC 13): na mesma varredura de C13, |zoneLight(t + 0.5) − zoneLight(t)| ≤ 0.1 sempre; e para todas as zonas do seed 1337, entre t = 0 e t = 180 há pelo menos uma troca de patamar. No browser, o valor que o shader do terreno recebe para a zona do spawn muda entre t e t + 60 s de simulação, ou já trocou em algum ponto desses 60 s.
+**C14** - ✅ Calma e troca garantida (AC 13): na mesma varredura de C13, |zoneLight(t + 0.5) − zoneLight(t)| ≤ 0.1 sempre; e para todas as zonas do seed 1337, entre t = 0 e t = 180 há pelo menos uma troca de patamar. No browser, o valor que o shader do terreno recebe para a zona do spawn muda entre t e t + 60 s de simulação, ou já trocou em algum ponto desses 60 s.
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "zone light is calm and always changes"`
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "ground light changes over time"`
 

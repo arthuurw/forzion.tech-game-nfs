@@ -28,6 +28,8 @@ import { generateLamps } from '../world/roads/roadMesh';
 import { carveRoads } from '../world/terrain/carveRoads';
 import { generateTerrain, heightAt, riverCenterX } from '../world/terrain/TerrainGenerator';
 import { WorldPhysics } from '../world/WorldPhysics';
+import { findBlockInteriors } from '../world/interiors/BlockInteriors';
+import { placeInteriorProps } from '../world/interiors/InteriorProps';
 import { WORLD_HALF, nearestRoadPoint, needsWaterReset } from '../world/worldMath';
 import { addNightLights, createNightEnvironment } from '../world/Environment';
 import { GameLoop } from './GameLoop';
@@ -148,7 +150,10 @@ export class Game {
     const carved = carveRoads(raw, network);
     const { lots, signs } = generateLots(seed, network, carved);
     const { lamps } = generateLamps(network);
-    const data: WorldData = { seed, raw, carved, network, lots, signs, lamps };
+    // block-fill: miolo das quadras (door 1) e o que existe nele (door 2), do mesmo seed
+    const interiors = findBlockInteriors(carved, network, lots);
+    const props = placeInteriorProps(seed, interiors, lots, carved);
+    const data: WorldData = { seed, raw, carved, network, lots, signs, lamps, interiors, props };
     this.physics = new WorldPhysics(this.world, carved, raw, network, lots);
     this.city = new CityScene(data, this.scene, assets, quality);
 
@@ -213,6 +218,7 @@ export class Game {
           ...this.headlightCones,
           this.city.water.mesh,
           ...this.city.chunks.outerObjects(),
+          ...this.city.interiors.objects(),
         ];
         const was = skip.map((o) => o.visible);
         skip.forEach((o) => (o.visible = false));
@@ -324,6 +330,7 @@ export class Game {
     this.chase.update(dt, state, this.car.yawRate(), this.car.bodyRoll);
     this.city.chunks.update(state.x, state.z);
     this.city.water.update(this.simTime);
+    this.city.interiors.update(this.simTime);
     this.rain.update(this.simTime, { x: state.x, y: state.y, z: state.z });
     this.effects.render();
     this.city.signMaterials.forEach((m, i) => {
@@ -840,10 +847,109 @@ export class Game {
       get waterResets() {
         return game.waterResets;
       },
+      interiors: game.interiorsDebug(),
       get lastWaterReset() {
         return game.lastWaterReset;
       },
     };
+  }
+
+  /** `__game.world.interiors` (só DEV): miolo das quadras, contagens e sondas (block-fill). */
+  private interiorsDebug(): unknown {
+    const game = this;
+    const bi = this.city.data.interiors;
+    const props = this.city.data.props;
+    const scene = this.city.interiors;
+    return {
+      summary() {
+        return {
+          zones: bi.zones.length,
+          downtown: bi.zones.filter((z) => z.kind === 'downtown').length,
+          outer: bi.zones.filter((z) => z.kind === 'outer').length,
+          yards: props.yards.length,
+          pools: props.pools.length,
+          trees: props.trees.length,
+          sites: props.sites.length,
+          fireflies: scene.fireflyCount,
+          walkersActive: scene.walkers.length,
+        };
+      },
+      zones: bi.zones.map((z) => ({ ...z, centroid: { ...z.centroid }, bbox: { ...z.bbox } })),
+      spacing: bi.spacing,
+      origin: bi.origin,
+      size: bi.size,
+      /** zona e distância à fachada do vértice (ix, iz) */
+      cell: (ix: number, iz: number) => ({ zoneOf: bi.zoneOf[iz * bi.size + ix]!, facadeDist: bi.facadeDist[iz * bi.size + ix]! }),
+      /** o que a malha de terreno carregada guarda no vértice (ix, iz): cor, peso da luz rebatida e zona; null se o chunk não está carregado */
+      terrainVertex: (ix: number, iz: number) => game.city.chunks.terrainVertex(ix, iz),
+      /** nível da luz da zona que o shader do terreno recebe agora */
+      zoneLevel: (id: number) => scene.zoneLevels[id]!,
+      get time() {
+        return scene.time;
+      },
+      groundProbe: (x: number, z: number, opts: { bounce: boolean }) => game.probeGround(x, z, opts),
+    };
+  }
+
+  /** Luminância média do quarto central da tela no último `composer.render` (lida com `readPixels`). */
+  private centralLuminance(): number {
+    const gl = this.renderer.getContext();
+    const w = gl.drawingBufferWidth;
+    const h = gl.drawingBufferHeight;
+    const px = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    let sum = 0;
+    let count = 0;
+    for (let y = Math.floor(h / 4); y < Math.floor((3 * h) / 4); y++) {
+      for (let x = Math.floor(w / 4); x < Math.floor((3 * w) / 4); x++) {
+        const k = (y * w + x) * 4;
+        sum += (0.2126 * px[k]! + 0.7152 * px[k + 1]! + 0.0722 * px[k + 2]!) / 255;
+        count++;
+      }
+    }
+    return sum / count;
+  }
+
+  /**
+   * Só DEV/testes (block-fill C11, C12): câmera 3 m acima de (x, z) olhando
+   * para baixo; carro, farol, cones, chuva, partículas, espelho da rua e os
+   * objetos do miolo escondidos; `bounce: false` zera só a luz rebatida. Um
+   * quadro pelo composer e a luminância média do quarto central da tela.
+   * Restaura tudo ao sair.
+   */
+  probeGround(x: number, z: number, opts: { bounce: boolean }): number {
+    const y = heightAt(this.city.data.carved, x, z);
+    const cam = this.chase.camera;
+    const camPos = cam.position.clone();
+    const camQuat = cam.quaternion.clone();
+    const hidden: THREE.Object3D[] = [
+      this.car.mesh,
+      this.rain.points,
+      ...this.effects.objects,
+      ...this.headlightCones,
+      ...this.city.interiors.objects(),
+    ];
+    if (this.city.reflector) hidden.push(this.city.reflector);
+    const was = hidden.map((o) => o.visible);
+    hidden.forEach((o) => (o.visible = false));
+    const intensity = this.headlight.intensity;
+    this.headlight.intensity = 0;
+    const bounce = this.city.interiors.terrainUniforms.uBounce.value;
+    this.city.interiors.terrainUniforms.uBounce.value = opts.bounce ? 1 : 0;
+
+    cam.position.set(x, y + 3, z);
+    cam.quaternion.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+    cam.updateMatrixWorld();
+    this.composer.render(0);
+    const lum = this.centralLuminance();
+
+    this.city.interiors.terrainUniforms.uBounce.value = bounce;
+    this.headlight.intensity = intensity;
+    hidden.forEach((o, i) => (o.visible = was[i]!));
+    cam.position.copy(camPos);
+    cam.quaternion.copy(camQuat);
+    cam.updateMatrixWorld();
+    return lum;
   }
 
   /**
