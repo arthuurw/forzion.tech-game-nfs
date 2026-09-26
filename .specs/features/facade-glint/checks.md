@@ -23,11 +23,11 @@ Profile: standard
 
 `npx playwright test tests/e2e/visual.spec.ts -g "<nome>"`: chromium headless contra `vite dev`, lendo `window.__game`.
 
-A sonda `__game.render.headlightShimmer(type, { headlight, specularAA })`, só em DEV, faz o seguinte:
+A sonda `__game.render.headlightShimmer(type, { headlight, specularAA, specular })`, só em DEV, faz o seguinte:
 1. Escolhe o lote do centro com `facadeType` = `type` mais próximo do spawn.
 2. Põe o carro na estrada do lote, a 12 m da fachada e virado para ela.
 3. Esconde a chuva, as partículas e os cones, e troca o espelho da rua pelo chão escuro (como `render.shimmer` com `mirror: false`).
-4. Liga ou desliga o farol e o antialiasing de especular.
+4. Liga ou desliga o farol e o antialiasing de especular. Com `specular: false` (padrão `true`), zera só o especular das 4 fachadas (difuso, texturas e janelas iguais), para separar o brilho piscando do movimento real das bordas das janelas sob o foco do farol.
 5. Renderiza 12 quadros no canvas, movendo carro e câmera juntos 0.15 m por quadro, paralelo à fachada.
 
 Ela devolve:
@@ -38,13 +38,15 @@ Ela devolve:
 
 ### S1 - Fachada sem brilho piscando sob o farol · 3 files · 55 KB · ~14k
 
-**C1** - Para cada um dos 4 tipos de fachada, com `specularAA: true`:
+**C1** - Para cada um dos 4 tipos de fachada, com `specularAA: true` e `headlight: true`:
 
-`flicker(headlight: true) − flicker(headlight: false)` ≤ 0.0010 (0.10 % dos pixels). Ou seja, o farol não acrescenta cintilação.
+`flicker(specular: true) − flicker(specular: false)` ≤ 0.0010 (0.10 % dos pixels). Ou seja, o especular da fachada sob o farol não acrescenta cintilação além do movimento das bordas das janelas, que é geometria real e fica de fora.
+
+(Renegociado com o usuário em 2026-09-26: a métrica original, farol ligado − desligado, contava as bordas escuras das janelas deslizando sob o foco do farol, e nenhum ajuste de especular alcança isso; medições em `## Handoff`.)
 
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "headlight adds no facade glint"`
 
-**C2** - Com `specularAA: false` (o shader de antes), pelo menos um dos 4 tipos passa de 0.0010 na mesma diferença de C1. Isso prova que a sonda enxerga o defeito que o usuário viu e que C1 não passa por vazio.
+**C2** - Com `specularAA: false` e a aparência de antes (o shader e os materiais de `db836b8`), pelo menos um dos 4 tipos passa de 0.0010 na mesma diferença de C1. Isso prova que a sonda enxerga o defeito que o usuário viu e que C1 não passa por vazio.
 
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "probe detects glint without specular antialiasing"`
 
@@ -68,7 +70,7 @@ Proof: `npx playwright test tests/e2e/visual.spec.ts -g "specular antialiasing o
 | Set (size) | Member -> proof | Unproven |
 | --- | --- | --- |
 | facade types (4) | 0 Concrete034 C1, C3 · 1 MetalPlates006 C1, C3 · 2 Bricks059 C1, C3 · 3 PaintedPlaster017 C1, C3 | - |
-| probe states, farol × AA (4) | on+AA C1, C3 · off+AA C1, C3 · on sem AA C2 · off sem AA C2 | - |
+| probe states, especular × AA com farol + farol desligado (5) | spec+AA C1, C3 · sem spec+AA C1 · spec sem AA C2 · sem spec sem AA C2 · farol desligado+AA C3 | - |
 | startup config: facade material (1 assembly) | `makeFacadeMaterial` em `src/world/CityScene.ts`, único criador dos 4 materiais - C5 | - |
 
 - **Checks cruzando a fronteira do browser:** C1-C5. Não há lógica pura nova. A correção é GLSL e só se observa renderizada.
@@ -114,3 +116,7 @@ Cost: 5 provas Playwright em 1 arquivo.
   - 3 PaintedPlaster017: 0.004071 / 0.002246 / **0.001826**
 - **Com `specularAA: true` (Tokuyoshi-Kaplanyan, σ² 0.25, κ 0.18), diferença:** 0 ≈ 0.0023-0.0030 · 1 0.0183 · 2 0.0038 · 3 0.0018. C1 falha. `litMean` ligado/desligado: 1.47 · 2.28 · 1.31 · 1.27 (C3 passa).
 - **Stop (build parado):** sem especular nenhum (só difuso), a diferença ainda é 0 0.0023 · 1 0.0000 · 2 0.0003 · 3 0.0016; sem especular e sem textura (parede lisa + janelas) é 0 0.0040 · 3 0.0024. O que a sonda conta nos tipos 0 e 3 são as bordas das janelas escuras passando sob o foco do farol (a segunda diferença acima de 0.15 marca qualquer borda de contraste > 0.15 andando ~2.5 px por quadro). Nenhum antialiasing de especular chega a 0.0010 nesses tipos; C1 precisa de decisão do usuário.
+- **Decisão do usuário (2026-09-26), retomando o build:**
+  - C1 passa a isolar o especular (`specular: true` − `specular: false`, com farol e AA); C2 usa a mesma diferença.
+  - Autorizado mudar a aparência: baixar `normalScale` e/ou `metalness` do metal (tipo 1) e o `normalScale` do tijolo (tipo 2) até C1 passar, sem quebrar C3. Registrar aqui os valores finais.
+  - Para C2 continuar provando a sonda, o caso "sem AA" usa a aparência antiga. Se a sonda precisar de chave para isso, ela fica só em DEV.
