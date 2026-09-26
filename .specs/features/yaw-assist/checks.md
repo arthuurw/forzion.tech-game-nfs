@@ -41,7 +41,7 @@ Proof: `npx vitest run tests/physics/agility.test.ts -t "reaches at least 0.85 g
 
 ### S2 - A ajuda é contida · 7 files · 50 KB · ~13k
 
-**C7** - `yawAssistTorque(spec, steerRad, v, yawRate, wheelsInContact, yawInertia)` com uma ficha de teste `gain` 4, `maxNm` 5000, `lateralG` 1.1, `wheelbaseM` 2.6 e `yawInertia` 2000, tolerância 1e-6 (AC 7):
+**C7** - ✅ `yawAssistTorque(spec, steerRad, v, yawRate, wheelsInContact, yawInertia)` com uma ficha de teste `gain` 4, `maxNm` 5000, `lateralG` 1.1, `wheelbaseM` 2.6 e `yawInertia` 2000, tolerância 1e-6 (AC 7):
 
 | `steerRad` | `v` (m/s) | `yawRate` | rodas | esperado |
 | --- | --- | --- | --- | --- |
@@ -56,26 +56,26 @@ Proof: `npx vitest run tests/physics/agility.test.ts -t "reaches at least 0.85 g
 
 Proof: `npx vitest run tests/unit/yawAssist.test.ts -t "yaw assist torque follows the target yaw rate"`
 
-**C8** - O `Car` aplica a ajuda e lê a ficha (door 1):
+**C8** - ✅ O `Car` aplica a ajuda e lê a ficha (door 1):
 - `CarSpec` tem `yawAssistGain`, `yawAssistMaxNm` e `yawAssistLateralG`, finitos e > 0 em `DEFAULT_CAR`.
 - No harness, a 60 km/h com `steer +1`, o giro em regime com `{ ...DEFAULT_CAR, yawAssistMaxNm: 0 }` é pelo menos 15 % menor que com `DEFAULT_CAR` (a ajuda muda o carro, e o valor vem da ficha).
 - `car.yawAssistNm` depois de um passo com `steer +1` a 60 km/h é > 0, e parado é 0.
 
 Proof: `npx vitest run tests/physics/agility.test.ts -t "car applies the yaw assist from its spec"`
 
-**C9** - `yawAssist.ts` está na lista de módulos puros, sem `three` nem `@dimforge/rapier3d-compat` (door 1).
+**C9** - ✅ `yawAssist.ts` está na lista de módulos puros, sem `three` nem `@dimforge/rapier3d-compat` (door 1).
 Proof: `npx vitest run tests/unit/purity.test.ts -t "pure modules do not import three or rapier"`
 
-**C10** - Continuam verdes, sem mudar asserções, as provas de "não capota" com a ajuda ligada (AC 8): car-handling C2 e C3.
+**C10** - ✅ Continuam verdes, sem mudar asserções, as provas de "não capota" com a ajuda ligada (AC 8): car-handling C2 e C3.
 Proof: `npx vitest run tests/physics/stability.test.ts -t "no rollover across the maneuver matrix|all four wheels back on the ground after release"`
 
-**C11** - Continua verde, sem mudar asserções, o sideslip da car-feel C10 (10 casos, ≤ 12°) (AC 9).
+**C11** - ✅ Continua verde, sem mudar asserções, o sideslip da car-feel C10 (10 casos, ≤ 12°) (AC 9).
 Proof: `npx vitest run tests/physics/feel.test.ts -t "understeers without throttle or at speed"`
 
-**C12** - Continuam verdes, sem mudar asserções, o freio de mão e o power slide (AC 10): car-handling C11, C12, C13 e C36.
+**C12** - ✅ Continuam verdes, sem mudar asserções, o freio de mão e o power slide (AC 10): car-handling C11, C12, C13 e C36.
 Proof: `npx vitest run tests/physics/grip.test.ts -t "handbrake kicks the rear out|car recovers after the handbrake is released|steers while braking hard|throttle keeps pushing with the handbrake pulled"`
 
-**C13** - Continuam verdes, sem mudar asserções, motor e freios (AC 11): car-handling C19-C23, a balança da carroceria da car-feel (C1-C4) e as provas do browser que dirigem o carro.
+**C13** - ✅ Continuam verdes, sem mudar asserções, motor e freios (AC 11): car-handling C19-C23, a balança da carroceria da car-feel (C1-C4) e as provas do browser que dirigem o carro.
 Proof: `npx vitest run tests/physics/powertrain.test.ts -t "zero to 100 kmh between 5.5 and 7.5 s|top speed limited by drag|coasting from 100 to 60 kmh|braking from 100 kmh stops in 34 to 45 m|climbs a 9 percent grade"`
 Proof: `npx vitest run tests/physics/feel.test.ts -t "body roll between 3.5 and 6 degrees|body roll swings back after the turn|nose dives 2 to 5 degrees under braking|nose lifts under full throttle"`
 Proof: `npx playwright test tests/e2e/drive.spec.ts -g "A turns left|game builds the car from the default spec"`

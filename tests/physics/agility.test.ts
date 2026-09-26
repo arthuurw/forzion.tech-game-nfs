@@ -90,3 +90,27 @@ describe('yaw assist - agility', () => {
   });
 });
 
+describe('yaw assist - spec', () => {
+  // C8 (AC 7, door 1)
+  it('car applies the yaw assist from its spec', () => {
+    for (const field of ['yawAssistGain', 'yawAssistMaxNm', 'yawAssistLateralG'] as const) {
+      expect(Number.isFinite(DEFAULT_CAR[field]), field).toBe(true);
+      expect(DEFAULT_CAR[field], field).toBeGreaterThan(0);
+    }
+
+    const withAssist = steadyYaw(hold(60, 180).yaw);
+    const without = steadyYaw(hold(60, 180, { ...DEFAULT_CAR, yawAssistMaxNm: 0 }).yaw);
+    expect(without).toBeLessThanOrEqual(0.85 * withAssist);
+
+    const moving = createHarness();
+    moving.settle();
+    moving.setForwardKmh(60);
+    moving.step({ ...NO_INPUT, steer: 1 });
+    expect(moving.car.yawAssistNm).toBeGreaterThan(0);
+
+    const parked = createHarness();
+    parked.settle();
+    parked.step({ ...NO_INPUT, steer: 1 });
+    expect(parked.car.yawAssistNm).toBe(0);
+  });
+});
