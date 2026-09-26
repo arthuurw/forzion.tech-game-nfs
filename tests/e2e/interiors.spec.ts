@@ -35,6 +35,37 @@ async function downtownProbeVertex(page: Page): Promise<{ ix: number; iz: number
   });
 }
 
+/**
+ * Conta o miolo do seed 1337 no próprio browser, com os módulos puros servidos
+ * pelo Vite (terreno, estradas, lotes, `findBlockInteriors`, `placeInteriorProps`),
+ * sem ler nada do `Game`.
+ */
+async function seedCounts(page: Page): Promise<{ zones: number; downtown: number; outer: number; yards: number; pools: number; trees: number; sites: number }> {
+  return page.evaluate(async () => {
+    const T = await import('/src/world/terrain/TerrainGenerator.ts' as string);
+    const R = await import('/src/world/roads/RoadGenerator.ts' as string);
+    const C = await import('/src/world/terrain/carveRoads.ts' as string);
+    const L = await import('/src/world/lots/LotGenerator.ts' as string);
+    const B = await import('/src/world/interiors/BlockInteriors.ts' as string);
+    const P = await import('/src/world/interiors/InteriorProps.ts' as string);
+    const raw = T.generateTerrain(1337);
+    const network = R.generateRoads(1337, raw);
+    const carved = C.carveRoads(raw, network);
+    const { lots } = L.generateLots(1337, network, carved);
+    const bi = B.findBlockInteriors(carved, network, lots);
+    const props = P.placeInteriorProps(1337, bi, lots, carved);
+    return {
+      zones: bi.zones.length,
+      downtown: bi.zones.filter((z: any) => z.kind === 'downtown').length,
+      outer: bi.zones.filter((z: any) => z.kind === 'outer').length,
+      yards: props.yards.length,
+      pools: props.pools.length,
+      trees: props.trees.length,
+      sites: props.sites.length,
+    };
+  });
+}
+
 test.describe('block-fill - chão', () => {
   // C9 (AC 7, AC 8)
   test('ground uses the new terrain color', async ({ page }) => {
@@ -182,5 +213,49 @@ test.describe('block-fill - chão', () => {
     levels.push(await page.evaluate((id) => (window as any).__game.world.interiors.zoneLevel(id) as number, v.zone));
     expect(levels.length).toBeGreaterThan(10);
     expect(Math.max(...levels) - Math.min(...levels)).toBeGreaterThan(0);
+  });
+});
+
+test.describe('block-fill - quintais', () => {
+  // C16 (AC 15) - parte browser
+  test('yards are built', async ({ page }) => {
+    test.setTimeout(180_000);
+    await gotoGame(page);
+    const expected = await seedCounts(page);
+    const r = await page.evaluate(() => {
+      const it = (window as any).__game.world.interiors;
+      return { summary: it.summary(), materials: it.materials };
+    });
+    expect(expected.yards).toBeGreaterThan(0);
+    expect(r.summary.yards).toBe(expected.yards);
+    expect(r.materials.yardLampEmissive).toBeGreaterThan(0);
+    expect(r.materials.bulbEmissive).toBeGreaterThan(0);
+  });
+
+  // C17 (AC 16) - parte browser
+  test('yard bulbs sway', async ({ page }) => {
+    await gotoGame(page);
+    const count = await page.evaluate(() => (window as any).__game.world.interiors.bulbCount as number);
+    expect(count).toBeGreaterThan(0);
+    const read = () => page.evaluate(() => (window as any).__game.world.interiors.bulbPosition(0) as { x: number; y: number; z: number });
+    const a = await read();
+    await advanceSim(page, 0.5);
+    const b = await read();
+    expect(Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)).toBeGreaterThan(0);
+  });
+
+  // C19 (AC 18)
+  test('pool water is animated', async ({ page }) => {
+    await gotoGame(page);
+    const read = () => page.evaluate(() => (window as any).__game.world.interiors.materials.pool);
+    const a = await read();
+    await advanceSim(page, 1);
+    const b = await read();
+    expect(a.hasNormalMap).toBe(true);
+    expect(a.offset[0] !== b.offset[0] || a.offset[1] !== b.offset[1]).toBe(true);
+    const [r, g, bl] = a.emissive;
+    expect(bl).toBeGreaterThan(r);
+    expect(g).toBeGreaterThan(r);
+    expect(a.emissiveIntensity).toBeGreaterThan(0);
   });
 });

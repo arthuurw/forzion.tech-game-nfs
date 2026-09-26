@@ -97,21 +97,21 @@ Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "ground light changes
 
 ### S3 - Quintais · 6 files · 64 KB · ~16k
 
-**C15** - Quem ganha quintal (AC 14): no seed 1337, para todo lote, existe `Yard` com `lotIndex` dele se e só se o lote é `outer` e os vértices da grade ao longo da reta que sai do centro da fachada de fundo, para fora do lote, de 0 a 8 m (passo de 1 m, arredondado ao vértice mais próximo) são todos interiores. O predicado é recalculado no teste.
+**C15** - ✅ Quem ganha quintal (AC 14): no seed 1337, para todo lote, existe `Yard` com `lotIndex` dele se e só se o lote é `outer` e os vértices da grade ao longo da reta que sai do centro da fachada de fundo, para fora do lote, de 0 a 8 m (passo de 1 m, arredondado ao vértice mais próximo) são todos interiores. O predicado é recalculado no teste.
 Proof: `npx vitest run tests/unit/interiorProps.test.ts -t "yard for every outer lot with 8 m behind"`
 
-**C16** - Partes do quintal (AC 15): em todo `Yard` do seed 1337, o poste fica a distância entre 4 e 8 m da fachada de fundo, em vértice interior, com altura 2.5 m acima do terreno (± 0.01); há exatamente 6 lâmpadas, todas a no máximo 0.5 m do segmento entre o centro da fachada de fundo (a 2.2 m de altura) e o topo do poste. No browser, `summary().yards` = número de `Yard` do seed 1337, e a cabeça do poste e as lâmpadas usam material com `emissiveIntensity` > 0.
+**C16** - ✅ Partes do quintal (AC 15): em todo `Yard` do seed 1337, o poste fica a distância entre 4 e 8 m da fachada de fundo, em vértice interior, com altura 2.5 m acima do terreno (± 0.01); há exatamente 6 lâmpadas, todas a no máximo 0.5 m do segmento entre o centro da fachada de fundo (a 2.2 m de altura) e o topo do poste. No browser, `summary().yards` = número de `Yard` do seed 1337, e a cabeça do poste e as lâmpadas usam material com `emissiveIntensity` > 0.
 Proof: `npx vitest run tests/unit/interiorProps.test.ts -t "yard lamp and six bulbs"`
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "yards are built"`
 
-**C17** - Balanço das lâmpadas (AC 16): `bulbOffset(t, phase, freq)` tem |valor| ≤ 0.15 para t de 0 a 60 s; a frequência atribuída a cada lâmpada do seed 1337 está em [0.2, 0.4] Hz; `bulbOffset` com a mesma fase e t separados por 1/freq dá o mesmo valor (± 1e-9). No browser, a posição de uma lâmpada lida da malha (matriz de instância ou uniform de tempo aplicado) muda entre dois quadros separados por 0.5 s.
+**C17** - ✅ Balanço das lâmpadas (AC 16): `bulbOffset(t, phase, freq)` tem |valor| ≤ 0.15 para t de 0 a 60 s; a frequência atribuída a cada lâmpada do seed 1337 está em [0.2, 0.4] Hz; `bulbOffset` com a mesma fase e t separados por 1/freq dá o mesmo valor (± 1e-9). No browser, a posição de uma lâmpada lida da malha (matriz de instância ou uniform de tempo aplicado) muda entre dois quadros separados por 0.5 s.
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "string lights sway"`
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "yard bulbs sway"`
 
-**C18** - Piscinas (AC 17): no seed 1337, a fração de quintais com `Pool` está em [0.2, 0.4]; toda piscina tem `w` 4 e `d` 8; os 4 cantos e o centro, arredondados ao vértice mais próximo, são interiores da mesma zona; `y` = altura aplainada no centro + 0.05 (± 0.01).
+**C18** - ✅ Piscinas (AC 17): no seed 1337, a fração de quintais com `Pool` está em [0.2, 0.4]; toda piscina tem `w` 4 e `d` 8; os 4 cantos e o centro, arredondados ao vértice mais próximo, são interiores da mesma zona; `y` = altura aplainada no centro + 0.05 (± 0.01).
 Proof: `npx vitest run tests/unit/interiorProps.test.ts -t "pools fit in the yard"`
 
-**C19** - Água da piscina (AC 18): no browser, o material da piscina tem normal map, o offset dele muda entre dois quadros separados por 1 s, e a cor emissiva tem azul > vermelho e verde > vermelho, com `emissiveIntensity` > 0.
+**C19** - ✅ Água da piscina (AC 18): no browser, o material da piscina tem normal map, o offset dele muda entre dois quadros separados por 1 s, e a cor emissiva tem azul > vermelho e verde > vermelho, com `emissiveIntensity` > 0.
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "pool water is animated"`
 
 ### S4 - Árvores e vagalumes · 8 files · 74 KB · ~19k

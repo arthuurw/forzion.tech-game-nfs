@@ -888,6 +888,24 @@ export class Game {
         return scene.time;
       },
       groundProbe: (x: number, z: number, opts: { bounce: boolean }) => game.probeGround(x, z, opts),
+      get materials() {
+        const pool = scene.poolMaterial;
+        return {
+          yardLampEmissive: scene.yardLampMaterial.emissiveIntensity,
+          bulbEmissive: scene.bulbMaterial.emissiveIntensity,
+          pool: {
+            hasNormalMap: pool.normalMap !== null,
+            offset: pool.normalMap ? [pool.normalMap.offset.x, pool.normalMap.offset.y] : null,
+            emissive: [pool.emissive.r, pool.emissive.g, pool.emissive.b],
+            emissiveIntensity: pool.emissiveIntensity,
+          },
+        };
+      },
+      get bulbCount() {
+        return scene.bulbs.count;
+      },
+      /** posição da lâmpada `i` lida da malha: matriz da instância + balanço com o `uTime` aplicado */
+      bulbPosition: (i: number) => scene.bulbPosition(i),
     };
   }
 

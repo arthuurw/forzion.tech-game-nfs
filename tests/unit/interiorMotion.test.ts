@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { findBlockInteriors } from '../../src/world/interiors/BlockInteriors';
-import { bounceWeight, terrainColor, terrainNoise, zoneLight } from '../../src/world/interiors/interiorMotion';
+import { placeInteriorProps } from '../../src/world/interiors/InteriorProps';
+import { bounceWeight, bulbOffset, bulbSway, terrainColor, terrainNoise, zoneLight } from '../../src/world/interiors/interiorMotion';
 import { generateLots } from '../../src/world/lots/LotGenerator';
 import { generateRoads } from '../../src/world/roads/RoadGenerator';
 import { carveRoads } from '../../src/world/terrain/carveRoads';
@@ -11,6 +12,7 @@ const network = generateRoads(1337, raw);
 const carved = carveRoads(raw, network);
 const { lots } = generateLots(1337, network, carved);
 const interiors = findBlockInteriors(carved, network, lots);
+const props = placeInteriorProps(1337, interiors, lots, carved);
 
 /** '#rrggbb' em RGB linear pela curva sRGB padrão (IEC 61966-2-1). */
 function linear(hex: string): [number, number, number] {
@@ -128,5 +130,25 @@ describe('interior motion', () => {
       for (let i = 1; i <= Math.round(180 / DT) && !changed; i++) if (zoneLight(zone.id, i * DT, 1337) !== first) changed = true;
       expect(changed, `zone ${zone.id}`).toBe(true);
     }
+  });
+
+  // C17 (AC 16) - parte pura
+  it('string lights sway', () => {
+    const bulbs = props.yards.flatMap((y) => y.bulbs);
+    expect(bulbs.length).toBeGreaterThan(0);
+    let worst = 0;
+    for (const b of bulbs) {
+      const { freq, phase } = bulbSway(b.x, b.z);
+      expect(freq).toBeGreaterThanOrEqual(0.2);
+      expect(freq).toBeLessThanOrEqual(0.4);
+      for (let i = 0; i <= 60 * 60; i += 7) {
+        const t = i * DT;
+        worst = Math.max(worst, Math.abs(bulbOffset(t, phase, freq)));
+        // repete a cada 1/freq
+        expect(Math.abs(bulbOffset(t + 1 / freq, phase, freq) - bulbOffset(t, phase, freq))).toBeLessThanOrEqual(1e-9);
+      }
+    }
+    expect(worst).toBeGreaterThan(0);
+    expect(worst).toBeLessThanOrEqual(0.15);
   });
 });
