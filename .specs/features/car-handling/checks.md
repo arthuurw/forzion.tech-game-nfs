@@ -323,6 +323,7 @@ Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "service brake while in 
 **C38** - ✅ Freio-motor na ré, em `stepDrivetrain`, sem input:
 - `gear` −1 a −20 km/h: continua em ré, `rpm` > `idleRpm`, `engineForce` > 0 (contra o movimento para trás) e sem freio de serviço.
 - A força segue a mesma lei do freio-motor para frente: no mesmo `rpm`, `engineForce` na ré = −(`engineForce` na 1ª) × `reverseRatio` / `gearRatios[0]`.
+- `gear` −1 a +20 km/h (rolando para frente numa descida): `engineForce` < 0, com a mesma magnitude do caso de −20 km/h. A força é sempre contra o sentido em que o carro rola.
 - Parado em ré, `engineForce` = 0.
 
 (Assumption "freio de mão com acelerador" do plano, parte da ré; decisão do usuário depois do round 2)
