@@ -258,9 +258,10 @@ test.describe('city-terrain - mundo', () => {
     }, { ...s, h: headingAt(from) });
     await page.keyboard.down('KeyW');
     const start = await simTime(page);
+    const limit = ((to - from) * 2) / 15 + 4;
     let reached = false;
     let held: string | null = null;
-    while ((await simTime(page)) < start + 12) {
+    while ((await simTime(page)) < start + limit) {
       await advanceSim(page, 0.1);
       const st = await page.evaluate(() => ({ p: (window as any).__game.car.position, h: (window as any).__game.car.heading }));
       const i = nearestIdx(st.p.x, st.p.z);
@@ -331,13 +332,11 @@ test.describe('city-terrain - mundo', () => {
     });
     await advanceSim(page, 3);
     const r = await page.evaluate(() => ({ chunks: (window as any).__game.world.chunks, p: (window as any).__game.car.position }));
-    const expected: number[] = [];
-    for (let id = 0; id < 36; id++) {
-      const cx = -1536 + 256 + (id % 6) * 512;
-      const cz = -1536 + 256 + Math.floor(id / 6) * 512;
-      if (Math.hypot(cx - r.p.x, cz - r.p.z) <= 900) expected.push(id);
-    }
-    expect(r.chunks.loaded).toEqual(expected);
+    const dist = (id: number) =>
+      Math.hypot(-1536 + 256 + (id % 6) * 512 - r.p.x, -1536 + 256 + Math.floor(id / 6) * 512 - r.p.z);
+    // todo chunk a ≤ 900 m carregado; nenhum carregado a > 1200 m (entre os dois, a histerese da door 7 decide)
+    for (let id = 0; id < 36; id++) if (dist(id) <= 900) expect(r.chunks.loaded, `chunk ${id}`).toContain(id);
+    for (const id of r.chunks.loaded) expect(dist(id), `chunk ${id}`).toBeLessThanOrEqual(1200);
     expect(r.chunks.maxBuildsInOneFrame).toBe(1);
   });
 

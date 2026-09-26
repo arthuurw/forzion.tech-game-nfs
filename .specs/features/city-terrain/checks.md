@@ -103,7 +103,7 @@ Proof: `npx vitest run tests/unit/bridges.test.ts -t "bridge stretches where the
 **C27** - `bridgeParts(road, range, heightmap)` (módulo puro) devolve tabuleiro de 0.8 m de espessura com topo na altura da estrada, 2 guarda-corpos de 1 m de altura em `±width/2`, e pilares de 1.5 × 1.5 m espaçados de 24 m ± 0.5 ao longo do trecho, cada um com topo na base do tabuleiro e base ≤ altura (terreno ou leito do rio) sob ele + 0.01 (AC 21, door 6)
 Proof: `npx vitest run tests/unit/bridges.test.ts -t "deck rails and pillars"`
 
-**C28** - No browser, com o carro no início da ponte da `highway` sobre o rio, heading ao longo da estrada, `setForwardSpeed(15)` e `W` seguro, o índice do ponto de estrada mais próximo chega ao fim do trecho de ponte em até 12 s, e em nenhuma amostra de 0.1 s o chassi fica abaixo de `altura do tabuleiro − 1.2` (AC 22)
+**C28** - No browser, com o carro no início da ponte da `highway` sobre o rio, heading ao longo da estrada, `setForwardSpeed(15)` e `W` seguro, o índice do ponto de estrada mais próximo chega ao fim do trecho de ponte em até `comprimento do trecho / 15 + 4` s (tempo de simulação; decidido pelo usuário em 2026-09-25, o viaduto tem ~524 m), e em nenhuma amostra de 0.1 s o chassi fica abaixo de `altura do tabuleiro − 1.2` (AC 22)
 Proof: `npx playwright test tests/e2e/world.spec.ts -g "car crosses the highway bridge on the deck"`
 
 **C29** - No browser, com o carro no meio da mesma ponte, heading perpendicular à estrada rumo ao guarda-corpo e `W` por 3 s, o centro do chassi termina a ≤ `width/2` do eixo e acima de `altura do tabuleiro − 1.2` (AC 23)
@@ -134,7 +134,7 @@ Proof: `npx playwright test tests/e2e/world.spec.ts -g "buildings are four insta
 **C36** - `planChunks(carX, carZ, loaded)` (módulo puro) sobre a grade 6 × 6 de 512 m: chunk não carregado com centro a 899 m → construir; a 901 m → não; carregado a 1199 m → manter; a 1201 m → descartar; com 3 candidatos a construir, devolve só 1, o mais próximo; descartes não têm limite por chamada (AC 30, door 7)
 Proof: `npx vitest run tests/unit/chunks.test.ts -t "chunk build and dispose rules"`
 
-**C37** - No browser, após teleportar o carro para `(0, *, -1300)` e esperar 3 s, o conjunto `__game.world.chunks.loaded` é exatamente o conjunto de chunks com centro a ≤ 900 m do carro, nenhum carregado está a > 1200 m, e `__game.world.chunks.maxBuildsInOneFrame` = 1 (AC 30, door 7)
+**C37** - No browser, após teleportar o carro para `(0, *, -1300)` e esperar 3 s, todo chunk com centro a ≤ 900 m do carro está em `__game.world.chunks.loaded`, nenhum carregado está a > 1200 m (entre as duas distâncias pode estar ou não, door 7; decidido pelo usuário em 2026-09-25), e `__game.world.chunks.maxBuildsInOneFrame` = 1 (AC 30, door 7)
 Proof: `npx playwright test tests/e2e/world.spec.ts -g "chunks stream around the car"`
 
 **C38** - No browser, com qualidade `high`, depois de 3 s parado em cada um dos 5 locais (spawn, estrada de morro perto do pico, ponte da `highway`, orla da baía na `highway`, canto nordeste da `highway`), `__game.render.calls` ≤ 220 (AC 31)
@@ -240,4 +240,7 @@ Cost: 26 provas unitárias em 7 arquivos e 22 provas Playwright em 6 arquivos. S
 - **Settled mid-build (lotes):** lote de esquina cujo ponto de estrada mais próximo é de outra rua é descartado, para C33 (rotação = heading da estrada mais próxima) valer em todo lote.
 - **Settled mid-build (render):** a fita da estrada, as caixas extrudadas e os pilares estavam com os triângulos no sentido horário visto de fora; com `FrontSide` a pista sumia vista de cima e só aparecia no reflexo do espelho (a câmera virtual fica abaixo do plano), então fora do centro e em `?quality=low` não havia pista visível. Nenhum check pegava isso; C46 foi adicionado e mata o mutante do sentido invertido. A sonda de C23 renderiza no canvas (num render target a noite em cor linear quantiza para preto).
 - **Settled mid-build (C8):** um raio exatamente vertical sobre um vértice do heightfield atravessa o collider no Parry (caso de borda medido: 0 m de desvio erra, 0.01 m acerta); a prova usa pontos fora dos vértices da grade, onde a interpolação bilinear e a do triângulo diferem menos de 0.01 m.
+- **Checks corrigidos com o usuário (2026-09-25, depois do build):** C28 dava 12 s para atravessar a ponte, mas a ponte da rodovia sobre o rio virou um viaduto de ~524 m (topo a topo de barranco); o limite passou a `comprimento / 15 + 4` s. C37 exigia o conjunto exato de chunks a ≤ 900 m, o que a histerese da door 7 (descartar só além de 1200 m) torna impossível depois de um teleporte; passou a exigir os dois limites.
 - AC 19 mudou de 25 m para 40 m entre postes antes destes checks, a pedido do usuário ("pode diminuir a quantidade de postes na via", 2026-09-25)
+- **Boundary:** C1-C46 fechados no branch `city-terrain` (68/68 e2e e 74/74 unitários verdes antes do merge); falta só o Verifier
+- **Abandoned:** hill roads por caminhada gulosa sem antecipação (travavam em 30-60 m contra encostas de 12 %); corredor por ponto mais próximo (paredões entre corredores); sonda de faixas em render target (cor linear quantizava para preto)

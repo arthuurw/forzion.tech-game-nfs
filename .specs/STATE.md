@@ -34,8 +34,8 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 ## Handoff
 
 **Feature**: city-terrain - build em andamento no worktree `../Jogo-terrain` (branch `city-terrain`)
-**Where**: plano e checks aprovados e commitados (157cd02); geradores puros commitados (14f6176, 5dd4f08); integração (física, água, chunks, `CityScene`, `Game`, minimapa, specs e2e) sem commit enquanto a suíte e2e roda
-**In progress**: rodar a suíte e2e completa, commitar a integração, merge em `main`, Verifier da city-terrain
+**Where**: tudo commitado no branch `city-terrain` e juntado em `main`; 68/68 e2e e 74/74 unitários verdes
+**In progress**: Verifier da city-terrain sobre o merge
 **Next step**: depois do PASS, usuário testa o mapa novo; então sub-projeto 2 (corridas) em `.specs/features/races/`, lendo o `RoadNetwork`
 **Blockers**: none
 **Branch**: city-terrain (worktree); `main` com visual-upgrade (rodada 4 PASS) e free-roam-city (rodada 4 PASS)
