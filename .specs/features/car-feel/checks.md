@@ -114,7 +114,7 @@ Proof: `npx vitest run tests/physics/harness.test.ts -t "car reads suspension fr
 
 ### S3 - A câmera acompanha · 5 files · 60 KB · ~15k
 
-**C14** - `cameraRoll(bodyRoll)` em `src/camera/chaseMath.ts` (rad), tolerância 1e-9:
+**C14** - ✅ `cameraRoll(bodyRoll)` em `src/camera/chaseMath.ts` (rad), tolerância 1e-9:
 
 | `bodyRoll` | resultado |
 | --- | --- |
@@ -128,7 +128,7 @@ Proof: `npx vitest run tests/physics/harness.test.ts -t "car reads suspension fr
 (AC 13)
 Proof: `npx vitest run tests/unit/chaseMath.test.ts -t "camera roll follows body roll"`
 
-**C15** - `stepRoll(current, target, dt)` em `chaseMath.ts` = `current + (target − current) × smoothingFactor(dt)`:
+**C15** - ✅ `stepRoll(current, target, dt)` em `chaseMath.ts` = `current + (target − current) × smoothingFactor(dt)`:
 - `stepRoll(0, 0.06, 1/60)` = `0.06 × (1 − e^(−5/60))` (± 1e-12).
 - 60 chamadas de `stepRoll` com `dt` = 1/60 e alvo 0.06, a partir de 0, dão `0.06 × (1 − e^(−5))` (± 1e-9).
 - `stepRoll(x, x, dt)` = x.
@@ -136,14 +136,14 @@ Proof: `npx vitest run tests/unit/chaseMath.test.ts -t "camera roll follows body
 (AC 14)
 Proof: `npx vitest run tests/unit/chaseMath.test.ts -t "camera roll smoothing"`
 
-**C16** - No browser, com o carro parado e `__game.camera.roll` ≈ 0 (|roll| < 0.001 rad), `setForwardSpeed(60 / 3.6)` e `W` + `A` por 2 s:
+**C16** - ✅ No browser, com o carro parado e `__game.camera.roll` ≈ 0 (|roll| < 0.001 rad), `setForwardSpeed(60 / 3.6)` e `W` + `A` por 2 s:
 - `__game.camera.roll` tem o mesmo sinal de `__game.car.bodyRoll` e |roll| ≥ 1° (0.01745 rad).
 - A direção de visão da câmera (`camera.getWorldDirection`) fica a menos de 0.5° da direção da posição da câmera até o ponto de `lookAt` (1 m acima do carro): inclinar não muda para onde a câmera olha.
 
 (AC 14, AC 15)
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "camera leans with the body"`
 
-**C17** - Continuam verdes, sem mudança nas asserções, as provas que leem direção, aderência e câmera com a ficha nova:
+**C17** - ✅ Continuam verdes, sem mudança nas asserções, as provas que leem direção, aderência e câmera com a ficha nova:
 - car-handling C11, C12 e C13 (freio de mão e frenagem com direção)
 - car-handling C19 a C23 (0–100, velocidade máxima, rolagem livre, frenagem de 34 a 45 m, rampa de 9 %)
 - car-handling C36 (power slide com freio de mão)

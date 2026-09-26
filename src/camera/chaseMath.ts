@@ -2,7 +2,7 @@
  * Matemática pura da câmera de perseguição. Heading 0 = carro apontando +Z
  * (door 9); a câmera fica 6 m atrás e 2.5 m acima, olhando 1 m acima do carro.
  * O visual-upgrade adiciona FOV por velocidade, blur radial, shake de colisão
- * e atraso lateral na curva.
+ * e atraso lateral na curva; a car-feel, a inclinação junto com a carroceria.
  */
 export interface Vec3 {
   x: number;
@@ -29,6 +29,10 @@ export const SHAKE_TAU_S = 0.15;
 
 export const LATERAL_GAIN = 0.8;
 export const LATERAL_MAX_M = 1.2;
+
+/** fração da rolagem da carroceria que a câmera acompanha (car-feel AC 13) */
+export const ROLL_GAIN = 0.6;
+export const ROLL_MAX_RAD = (4 * Math.PI) / 180;
 
 function clamp01(t: number): number {
   return Math.min(1, Math.max(0, t));
@@ -75,4 +79,14 @@ export function shakeAt(t: number, amplitude: number): number {
 /** Deslocamento lateral (m) da câmera pela velocidade angular em Y; positivo = esquerda do carro. */
 export function lateralOffset(angularVelocityY: number): number {
   return Math.min(LATERAL_MAX_M, Math.max(-LATERAL_MAX_M, angularVelocityY * LATERAL_GAIN));
+}
+
+/** Inclinação alvo da câmera (rad): 60 % da rolagem da carroceria, no mesmo sentido, limitada a ±4°. */
+export function cameraRoll(bodyRoll: number): number {
+  return Math.min(ROLL_MAX_RAD, Math.max(-ROLL_MAX_RAD, bodyRoll * ROLL_GAIN));
+}
+
+/** Um passo da inclinação em direção ao alvo, com a mesma suavização da posição. */
+export function stepRoll(current: number, target: number, dt: number): number {
+  return current + (target - current) * smoothingFactor(dt);
 }

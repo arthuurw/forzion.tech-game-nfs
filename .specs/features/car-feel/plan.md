@@ -53,7 +53,7 @@ None - no stored-data shape change
 
 ## Surface
 
-None - nothing consumed outside. `window.__game.camera` (só DEV) ganha o campo de leitura `roll`.
+None - nothing consumed outside. `window.__game.camera` (só DEV) ganha os campos de leitura `roll` e `direction` (direção de visão, lida pela prova de C16).
 
 ## Landing
 

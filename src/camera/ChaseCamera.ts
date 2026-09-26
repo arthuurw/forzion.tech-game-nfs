@@ -1,17 +1,19 @@
 import * as THREE from 'three';
 import type { CarState } from '../vehicle/Car';
-import { chaseTarget, fovFor, lateralOffset, shakeAmplitude, shakeAt, smoothingFactor } from './chaseMath';
+import { cameraRoll, chaseTarget, fovFor, lateralOffset, shakeAmplitude, shakeAt, smoothingFactor, stepRoll } from './chaseMath';
 
 /**
  * Câmera atrás do carro com suavização exponencial (free-roam-city AC 11), e
  * no visual-upgrade: FOV por velocidade, atraso lateral na curva e shake de
- * colisão. As fórmulas estão em chaseMath.ts.
+ * colisão. Na car-feel, inclina junto com a carroceria. As fórmulas estão em
+ * chaseMath.ts.
  */
 export class ChaseCamera {
   readonly camera: THREE.PerspectiveCamera;
   private readonly target = new THREE.Vector3();
   private readonly look = new THREE.Vector3();
   private lateral = 0;
+  private rollAngle = 0;
   private shakeAmp = 0;
   private shakeT = 0;
   /** posição sem shake, suavizada; o shake é somado só na câmera final */
@@ -29,6 +31,11 @@ export class ChaseCamera {
   /** Deslocamento lateral atual (m), positivo = esquerda do carro (AC 20). */
   get lateralOffset(): number {
     return this.lateral;
+  }
+
+  /** Inclinação atual (rad), no mesmo sentido da rolagem da carroceria (car-feel AC 14). */
+  get roll(): number {
+    return this.rollAngle;
   }
 
   /** Amplitude atual do shake (m), para debug e provas. */
@@ -52,8 +59,9 @@ export class ChaseCamera {
     }
   }
 
-  update(dt: number, state: CarState, yawRate = 0): void {
+  update(dt: number, state: CarState, yawRate = 0, bodyRoll = 0): void {
     const k = smoothingFactor(dt);
+    this.rollAngle = stepRoll(this.rollAngle, cameraRoll(bodyRoll), dt);
     // atraso lateral na curva (AC 20): positivo = para a esquerda do carro
     this.lateral += (lateralOffset(yawRate) - this.lateral) * k;
     const t = chaseTarget(state, state.heading);
@@ -79,6 +87,9 @@ export class ChaseCamera {
 
     this.look.set(t.lookAt.x, t.lookAt.y, t.lookAt.z);
     this.camera.lookAt(this.look);
+    // gira em torno do eixo de visão (+Z local aponta para trás): -roll inclina no
+    // mesmo sentido da carroceria, rolagem positiva = lado esquerdo para cima
+    this.camera.rotateZ(-this.rollAngle);
   }
 
   resize(aspect: number): void {

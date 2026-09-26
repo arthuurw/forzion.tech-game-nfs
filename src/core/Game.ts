@@ -321,7 +321,7 @@ export class Game {
   private readonly render = (dt: number): void => {
     this.car.sync();
     const state = this.car.state();
-    this.chase.update(dt, state, this.car.yawRate());
+    this.chase.update(dt, state, this.car.yawRate(), this.car.bodyRoll);
     this.city.chunks.update(state.x, state.z);
     this.city.water.update(this.simTime);
     this.rain.update(this.simTime, { x: state.x, y: state.y, z: state.z });
@@ -659,6 +659,15 @@ export class Game {
         },
         get position() {
           return { x: game.chase.camera.position.x, y: game.chase.camera.position.y, z: game.chase.camera.position.z };
+        },
+        /** inclinação atual da câmera (rad), car-feel AC 14 */
+        get roll() {
+          return game.chase.roll;
+        },
+        /** direção de visão (`getWorldDirection`), para provar que inclinar não muda para onde a câmera olha */
+        get direction() {
+          const d = game.chase.camera.getWorldDirection(new THREE.Vector3());
+          return { x: d.x, y: d.y, z: d.z };
         },
       },
       physics: {
