@@ -124,3 +124,22 @@ export function bridgeMeshes(road: Road, parts: BridgeParts): { deck: TriMesh; r
     ),
   };
 }
+
+/** Pilar: caixa de `PILLAR_SIZE` × `PILLAR_SIZE` girada pelo heading, de `bottom` a `top` (render; a física usa um cuboide do mesmo tamanho). */
+export function pillarBox(x: number, z: number, bottom: number, top: number, heading: number): TriMesh {
+  const s = PILLAR_SIZE / 2;
+  const cos = Math.cos(heading);
+  const sin = Math.sin(heading);
+  const corners: number[] = [];
+  for (const y of [bottom, top]) {
+    for (const [a, b] of [[-s, -s], [s, -s], [s, s], [-s, s]] as const) {
+      corners.push(x + a * cos + b * sin, y, z - a * sin + b * cos);
+    }
+  }
+  // normais para fora: fundo para −y, topo para +y, laterais para fora
+  const idx = [
+    0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6,
+    0, 5, 1, 0, 4, 5, 1, 6, 2, 1, 5, 6, 2, 7, 3, 2, 6, 7, 3, 4, 0, 3, 7, 4,
+  ];
+  return { positions: new Float32Array(corners), indices: new Uint32Array(idx) };
+}

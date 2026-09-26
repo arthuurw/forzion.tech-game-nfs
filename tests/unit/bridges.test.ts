@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { generateTerrain, heightAt, riverCenterX, type Heightmap } from '../../src/world/terrain/TerrainGenerator';
 import { generateRoads, markBridges } from '../../src/world/roads/RoadGenerator';
-import { bridgeMeshes, bridgeParts } from '../../src/world/roads/bridges';
+import { bridgeMeshes, bridgeParts, pillarBox, PILLAR_SIZE } from '../../src/world/roads/bridges';
 import { pointHeading } from '../../src/world/roads/roadMesh';
 
 const hm = generateTerrain(1337);
@@ -117,10 +117,26 @@ describe('bridges', () => {
           const deckY = r.points[a * 3 + 1]! + (r.points[b * 3 + 1]! - r.points[a * 3 + 1]!) * t;
           expect(pl.top).toBeCloseTo(deckY - 0.8, 4);
           expect(pl.bottom).toBeLessThanOrEqual(heightAt(hm, pl.x, pl.z) + 0.01);
+          // seção de 1.5 × 1.5 m centrada no pilar, de `bottom` a `top` (a malha do render)
+          const box = pillarBox(pl.x, pl.z, pl.bottom, pl.top, pl.heading).positions;
+          const c = (v: number) => [box[v * 3]!, box[v * 3 + 1]!, box[v * 3 + 2]!] as const;
+          for (const [base, y] of [[0, pl.bottom], [4, pl.top]] as const) {
+            const q = [0, 1, 2, 3].map((v) => c(base + v));
+            for (const v of q) expect(v[1]).toBeCloseTo(y, 4);
+            for (let e = 0; e < 4; e++) {
+              const [a, b] = [q[e]!, q[(e + 1) % 4]!];
+              expect(Math.hypot(a[0] - b[0], a[2] - b[2])).toBeCloseTo(1.5, 3);
+            }
+            expect(Math.hypot(q[0]![0] - q[2]![0], q[0]![2] - q[2]![2])).toBeCloseTo(1.5 * Math.SQRT2, 3);
+            expect(q.reduce((s, v) => s + v[0], 0) / 4).toBeCloseTo(pl.x, 3);
+            expect(q.reduce((s, v) => s + v[2], 0) / 4).toBeCloseTo(pl.z, 3);
+          }
           checked++;
         });
       }
     }
     expect(checked).toBeGreaterThan(10);
+    // o collider do pilar (`WorldPhysics`) é um cuboide de meia-extensão PILLAR_SIZE / 2 em x e z
+    expect(PILLAR_SIZE).toBe(1.5);
   });
 });

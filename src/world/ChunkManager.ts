@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CHUNK_SIZE, CHUNKS_PER_SIDE, chunkOf, planChunks } from './chunks';
 import type { Road, RoadNetwork } from './roads/RoadGenerator';
-import { bridgeMeshes, extrudeAlong, PILLAR_SIZE, type BridgeParts, type TriMesh } from './roads/bridges';
+import { bridgeMeshes, extrudeAlong, pillarBox, type BridgeParts } from './roads/bridges';
 import { roadStripGeometry } from './roads/roadMesh';
 import type { Heightmap } from './terrain/TerrainGenerator';
 import { DOWNTOWN_HALF } from './worldMath';
@@ -321,22 +321,4 @@ function splitRuns(idx: number[]): number[][] {
   }
   if (cur.length) runs.push(cur);
   return runs;
-}
-
-function pillarBox(x: number, z: number, bottom: number, top: number, heading: number): TriMesh {
-  const s = PILLAR_SIZE / 2;
-  const cos = Math.cos(heading);
-  const sin = Math.sin(heading);
-  const corners: number[] = [];
-  for (const y of [bottom, top]) {
-    for (const [a, b] of [[-s, -s], [s, -s], [s, s], [-s, s]] as const) {
-      corners.push(x + a * cos + b * sin, y, z - a * sin + b * cos);
-    }
-  }
-  // normais para fora: fundo para −y, topo para +y, laterais para fora
-  const idx = [
-    0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6,
-    0, 5, 1, 0, 4, 5, 1, 6, 2, 1, 5, 6, 2, 7, 3, 2, 6, 7, 3, 4, 0, 3, 7, 4,
-  ];
-  return { positions: new Float32Array(corners), indices: new Uint32Array(idx) };
 }
