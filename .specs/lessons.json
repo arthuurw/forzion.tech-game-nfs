@@ -198,10 +198,11 @@
       "recurrence": 1,
       "harmful": 0,
       "evidence": [
-        "round1 drivetrain.ts:176 (vehicle)"
+        "round1 drivetrain.ts:176 (vehicle)",
+        "round2 drivetrain.ts:172-178 (vehicle)"
       ],
       "created": "2026-09-26T18:50:06Z",
-      "last_seen": "2026-09-26T18:50:06Z"
+      "last_seen": "2026-09-26T19:03:24Z"
     }
   ]
 }

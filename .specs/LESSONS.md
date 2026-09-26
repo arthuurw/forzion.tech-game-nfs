@@ -77,8 +77,8 @@ Seen once or not yet corroborated. Tracked, not trusted.
 ### L-011 - Every branch in a state-machine step function owes an asserted case; enumerate branches from the code's if/else ladder when writing coverage, not from the plan's regimes.
 - signal: `ac_gap` · recurrence: 1 feature(s) · scope: `vehicle` · harmful: 0
 - features: car-handling
-- evidence: round1 drivetrain.ts:176 (vehicle)
-- last seen: 2026-09-26T18:50:06Z
+- evidence: round1 drivetrain.ts:176 (vehicle) (+1 more)
+- last seen: 2026-09-26T19:03:24Z
 
 ## Quarantined (failed when applied - ignore)
 
