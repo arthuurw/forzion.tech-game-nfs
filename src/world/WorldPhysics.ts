@@ -15,6 +15,8 @@ import { WORLD_HALF } from './worldMath';
 export class WorldPhysics {
   readonly body: RAPIER.RigidBody;
   readonly walls: Array<{ x: number; z: number; hx: number; hz: number }> = [];
+  /** colliders dos pilares das pontes, na ordem de `bridgeParts` */
+  readonly pillars: RAPIER.Collider[] = [];
 
   constructor(
     private readonly world: RAPIER.World,
@@ -46,12 +48,13 @@ export class WorldPhysics {
         }
         for (const p of parts.pillars) {
           const h = (p.top - p.bottom) / 2;
-          world.createCollider(
+          const pillar = world.createCollider(
             RAPIER.ColliderDesc.cuboid(PILLAR_SIZE / 2, h, PILLAR_SIZE / 2)
               .setTranslation(p.x, p.bottom + h, p.z)
               .setRotation(yaw(p.heading)),
             this.body,
           );
+          this.pillars.push(pillar);
         }
       }
     }
