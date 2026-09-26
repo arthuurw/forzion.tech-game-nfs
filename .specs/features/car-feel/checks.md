@@ -82,9 +82,7 @@ Proof: `npx vitest run tests/physics/feel.test.ts -t "lateral grip never exceeds
 Substitui car-handling C9. (AC 9)
 Proof: `npx vitest run tests/physics/feel.test.ts -t "reaches at least 0.75 g at 60 kmh"`
 
-**C10** - ✅ 8 casos, `steer +1` por 3 s, sem `handbrake`, sideslip ≤ 12° em todo passo:
-- sem `throttle`: 60, 90, 120, 150 e 180 km/h;
-- com `throttle`: 120, 150 e 180 km/h.
+**C10** - ✅ 10 casos, `steer +1` por 3 s, sem `handbrake`, sideslip ≤ 12° em todo passo: 60, 90, 120, 150 e 180 km/h × {sem `throttle`, com `throttle`}.
 
 Substitui car-handling C10. (AC 10)
 Proof: `npx vitest run tests/physics/feel.test.ts -t "understeers without throttle or at speed"`
@@ -94,7 +92,7 @@ C11 e C12 foram retirados com os AC 11 e AC 12 do plano (decisão do usuário em
 **C13** - ✅ Ficha e leitura da suspensão (door 1):
 - `CarSpec` tem `suspensionStiffness`, `suspensionCompression` e `suspensionRelaxation`, e em `DEFAULT_CAR` os três são finitos e > 0.
 - `DEFAULT_CAR` tem `steerRateRadS` 4.0, `steerReturnRadS` 5.0 e `steerLateralG` 1.7; `steerMaxRad` continua 0.55.
-- No harness, um `Car` com `{ ...DEFAULT_CAR, suspensionStiffness: 17, suspensionCompression: 1.7, suspensionRelaxation: 2.1 }` tem, nas 4 rodas, `wheelSuspensionStiffness` 17, `wheelSuspensionCompression` 1.7 e `wheelSuspensionRelaxation` 2.1 no controlador do Rapier (lidos de volta, ± 1e-6): a suspensão vem da ficha.
+- No harness, um `Car` com `{ ...DEFAULT_CAR, suspensionStiffness: 23, suspensionCompression: 1.7, suspensionRelaxation: 2.1 }` (os três diferentes de `DEFAULT_CAR`, que tem 17, 2.7 e 0.8) tem, nas 4 rodas, `wheelSuspensionStiffness` 23, `wheelSuspensionCompression` 1.7 e `wheelSuspensionRelaxation` 2.1 no controlador do Rapier (lidos de volta, ± 1e-6): a suspensão vem da ficha.
 
 Os valores de direção substituem os de car-handling C28; o resto de C28 continua valendo. (AC 6, AC 7, door 1)
 Proof: `npx vitest run tests/unit/carSpec.test.ts -t "default car spec values"`
@@ -127,6 +125,9 @@ Proof: `npx vitest run tests/unit/chaseMath.test.ts -t "camera roll smoothing"`
 **C16** - ✅ No browser, com o carro parado e `__game.camera.roll` ≈ 0 (|roll| < 0.001 rad), `setForwardSpeed(60 / 3.6)` e `W` + `A` por 2 s:
 - `__game.camera.roll` tem o mesmo sinal de `__game.car.bodyRoll` e |roll| ≥ 1° (0.01745 rad).
 - A direção de visão da câmera (`camera.getWorldDirection`) fica a menos de 0.5° da direção da posição da câmera até o ponto de `lookAt` (1 m acima do carro): inclinar não muda para onde a câmera olha.
+- A câmera do three inclina de fato. `__game.camera.up` é o "cima" da câmera no mundo, `(0, 1, 0)` pelo quaternion da câmera. A base sem inclinação vem de um `lookAt` com a mesma direção de visão `d`: direita₀ = `d × Y` normalizado e cima₀ = direita₀ × `d`. Então:
+  - a projeção de `up` em direita₀ tem o mesmo sinal de `__game.car.bodyRoll`;
+  - o ângulo `atan2(up · direita₀, up · cima₀)` fica a no máximo 0.2° de `__game.camera.roll`.
 
 (AC 14, AC 15)
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "camera leans with the body"`
@@ -152,7 +153,7 @@ Na tabela de Coverage, `ch-N` é o check N da car-handling.
 | plan ACs (13) | 1 C1 · 2 C2 · 3 C3 · 4 C4 · 5 C5 · 6 C6, C13 · 7 C7, C13 · 8 C8 · 9 C9 · 10 C10 · 13 C14 · 14 C15, C16 · 15 C16 | - |
 | landing doors (1) | 1 C13 | - |
 | roll directions (2) | esquerda C1, C2 · direita C1 | - |
-| understeer cases, 5 sem acelerador + 3 com (8) | C10, table-driven over all 8 | - |
+| understeer cases, 5 velocidades × sem e com acelerador (10) | C10, table-driven over all 10 | - |
 | steering target cases (7) | v=0 C7 · v<1 C7 · min cut C7 · 10 C7 · 27.78 C7 · 55.56 C7 · ré C7 | - |
 | suspension fields (3) | stiffness C13 · compression C13 · relaxation C13 | - |
 | camera roll cases (6) | 0 C14 · +0.05 C14 · −0.05 C14 · 0.1 C14 · +limite C14 · −limite C14 | - |
@@ -192,7 +193,7 @@ Cost: 4 provas unitárias em 3 arquivos, 10 de física real em 2 arquivos e 1 Pl
 - **data lifecycle**: n/a - nada persistido
 - **dependency failure**: existing - sem o GLB o carro placeholder usa a mesma física (check 33 da free-roam-city)
 - **state transitions**: C2 (curva → reta, a carroceria volta)
-- **observability**: C16 - `__game.camera.roll` em DEV; `__game.car.bodyRoll`, `bodyPitch`, `sideslip`, `lateralG` já existem (check 33 da car-handling)
+- **observability**: C16 - `__game.camera.roll` e `__game.camera.up` em DEV; `__game.car.bodyRoll`, `bodyPitch`, `sideslip`, `lateralG` já existem (check 33 da car-handling)
 
 ## Handoff
 
