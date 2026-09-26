@@ -3,7 +3,7 @@
 Profile: standard
 Plan: `.specs/features/car-handling/plan.md`
 
-35 checks in 4 slices · 3 one-way doors · 0 open
+37 checks in 4 slices · 3 one-way doors · 0 open
 
 ## Comandos de prova
 
@@ -302,6 +302,24 @@ Proof: `npx playwright test tests/e2e/visual.spec.ts -g "camera swings left whil
 **C35** - ✅ `Game` constrói o carro com `DEFAULT_CAR`: no browser, `__game.car.spec` é igual campo a campo a `DEFAULT_CAR` (importado no teste via `page.evaluate` sobre o módulo servido pelo Vite) (door 1, startup config)
 Proof: `npx playwright test tests/e2e/drive.spec.ts -g "game builds the car from the default spec"`
 
+### Acrescentados depois do round 1 da verificação (decisão do usuário em 2026-09-26)
+
+**C36** - ✅ Freio de mão com acelerador (power slide):
+- Em `stepDrivetrain`, na marcha 3 a 4500 rpm, `throttle` + `handbrake` dá `engineForce` igual ao de `throttle` sozinho (> 0), com `brakeFront` = 0, `brakeRear` > 0 e `rearFrictionFactor` = 0.4.
+- Com `handbrake` sem `throttle`, `engineForce` = 0 (nem freio-motor).
+- No harness, a partir de 60 km/h em linha reta, 60 passos de `handbrake` + `throttle` terminam mais de 2 km/h acima de 60 passos de `handbrake` sozinho.
+
+(Assumption "freio de mão com acelerador" do plano)
+Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "handbrake with throttle keeps engine force"`
+Proof: `npx vitest run tests/physics/grip.test.ts -t "throttle keeps pushing with the handbrake pulled"`
+
+**C37** - ✅ Freio de serviço com a ré engatada, em `stepDrivetrain`:
+- `gear` −1, `throttle`, a −10 km/h: continua em ré, `engineForce` = 0 e `brakeFront + brakeRear` = `brakeForceN`, com `brakeFront / brakeForceN` = 0.65.
+- `gear` −1, `brake`, a +5 km/h: `engineForce` = 0 e `brakeFront + brakeRear` = `brakeForceN`.
+
+(free-roam-city AC 3, door 2)
+Proof: `npx vitest run tests/unit/drivetrain.test.ts -t "service brake while in reverse gear"`
+
 ## Coverage
 
 | Set (size) | Member -> proof | Unproven |
@@ -313,7 +331,7 @@ Proof: `npx playwright test tests/e2e/drive.spec.ts -g "game builds the car from
 | understeer cases, 5 velocidades × 2 (10) | C10, table-driven over all 10 | - |
 | gearbox transitions (8) | up 2→3 C17 · no up from 6th C17 · power cut during shift C17 · down 4→3 C18 · down blocked by overrev C18 · hold 0.6 s C18 · no down from 1st C18 · into and out of R C24 | - |
 | rpm regimes (5) | wheel-driven C16 · idle floor C16 · clutch floor in 1st C16 · clutch floor in R C16 · redline cap C16, C15 | - |
-| drive input regimes (6) | throttle C15, C19 · brake forward C14, C22 · reverse C24 · handbrake C25, C11 · coast C21, C15 · steer C6, C7 | - |
+| drive input regimes (8) | throttle C15, C19 · brake forward C14, C22 · reverse C24 · brake in reverse C37 · handbrake C25, C11 · handbrake + throttle C36 · coast C21, C15 · steer C6, C7 | - |
 | steering target cases (7) | v=0 C7 · v<1 guard C7 · min cut C7 · 10 m/s C7 · 27.78 m/s C7 · 55.56 m/s C7 · reverse C7 | - |
 | skidding table (6) | slip 2.6 C30 · slip 2.5 C30 · slip at 5 km/h C30 · handbrake 21 C30 · handbrake 20 C30 · nothing C30 | - |
 | superseded free-roam checks (7) | C2 → C14 · C4 → C24 · C6 → C6, C7 · C7 → C25 · C8 → C20 · C27 → C17, C18 · C28 → C16 | - |

@@ -287,6 +287,33 @@ describe('drivetrain - engine and gearbox', () => {
     expect(stepDrivetrain(spec, settled({ gear: 3 }), idle, 60 / 3.6, DT).cmd.rearFrictionFactor).toBe(1);
   });
 
+  // C36 - decisão do usuário (2026-09-26): acelerador + freio de mão mantém a força do motor (power slide)
+  it('handbrake with throttle keeps engine force', () => {
+    const v = speedFor(3, 4500);
+    const drive = stepDrivetrain(spec, settled({ gear: 3 }), { ...idle, throttle: true }, v, DT).cmd;
+    const slide = stepDrivetrain(spec, settled({ gear: 3 }), { ...idle, throttle: true, handbrake: true }, v, DT).cmd;
+    expect(drive.engineForce).toBeGreaterThan(0);
+    expect(slide.engineForce).toBe(drive.engineForce);
+    expect(slide.brakeFront).toBe(0);
+    expect(slide.brakeRear).toBeGreaterThan(0);
+    expect(slide.rearFrictionFactor).toBe(spec.handbrakeRearGrip);
+    // sem acelerador, nem motor nem freio-motor
+    expect(stepDrivetrain(spec, settled({ gear: 3 }), { ...idle, handbrake: true }, v, DT).cmd.engineForce).toBe(0);
+  });
+
+  // C37 - freio de serviço com a ré engatada: acelerador andando para trás, ou S andando para frente
+  it('service brake while in reverse gear', () => {
+    const both = spec.brakeForceN;
+    const back = stepDrivetrain(spec, settled({ gear: -1 }), { ...idle, throttle: true }, -10 / 3.6, DT);
+    expect(back.state.gear).toBe(-1);
+    expect(back.cmd.engineForce).toBe(0);
+    expect(back.cmd.brakeFront + back.cmd.brakeRear).toBeCloseTo(both, 9);
+    expect(back.cmd.brakeFront / both).toBeCloseTo(spec.brakeBiasFront, 9);
+    const fwd = stepDrivetrain(spec, settled({ gear: -1 }), { ...idle, brake: true }, 5 / 3.6, DT);
+    expect(fwd.cmd.engineForce).toBe(0);
+    expect(fwd.cmd.brakeFront + fwd.cmd.brakeRear).toBeCloseTo(both, 9);
+  });
+
   // C26 (door 2)
   it('drivetrain step is pure', () => {
     const cases: Array<[DrivetrainState, DriveInput, number]> = [

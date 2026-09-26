@@ -79,6 +79,18 @@ describe('grip', () => {
     expect(max).toBeGreaterThan(20);
   });
 
+  // C36 - decisão do usuário (2026-09-26): com acelerador, o freio de mão vira power slide
+  it('throttle keeps pushing with the handbrake pulled', () => {
+    const run = (throttle: boolean): number => {
+      const h = createHarness();
+      h.settle();
+      h.setForwardKmh(60);
+      for (let i = 0; i < 60; i++) h.step({ ...NO_INPUT, handbrake: true, throttle });
+      return kmh(h.car);
+    };
+    expect(run(true)).toBeGreaterThan(run(false) + 2);
+  });
+
   // C12 (AC 12)
   it('car recovers after the handbrake is released', () => {
     const h = createHarness();
