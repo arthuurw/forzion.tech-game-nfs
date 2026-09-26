@@ -15,8 +15,8 @@ import {
 /**
  * O carro: um corpo rígido (chassi) + 4 rodas por raycast do Rapier (door 2).
  * O Rapier não desenha nada; este módulo mantém o mesh do three grudado no
- * corpo físico a cada frame (`sync`). Massa, geometria, arrasto e aderência
- * vêm da ficha (`carSpec.ts`); motor, câmbio, freios e volante vêm de
+ * corpo físico a cada frame (`sync`). Massa, geometria, arrasto, aderência
+ * e suspensão vêm da ficha (`carSpec.ts`); motor, câmbio, freios e volante vêm de
  * `drivetrain.ts`. Aqui só aplicamos e medimos.
  */
 export interface CarState {
@@ -40,10 +40,6 @@ export interface ResetSnapshot {
 const CHASSIS_HALF = { x: 0.9, y: 0.35, z: 2.1 };
 const WHEEL_REST = 0.35;
 const WHEEL_Y = -0.2;
-/** rigidez da mola por unidade de massa do chassi (o Rapier multiplica pela massa) */
-const SUSPENSION_STIFFNESS = 32;
-const SUSPENSION_COMPRESSION = 2.4;
-const SUSPENSION_RELAXATION = 2.8;
 /** caixa usada só para a inércia do chassi: largura, altura e comprimento (m) */
 const INERTIA_BOX = { x: 1.8, y: 0.9, z: 4.2 };
 const GRAVITY = 9.81;
@@ -98,7 +94,7 @@ export class Car {
     // Massa, centro de massa e inércia vêm da ficha, não dos colliders (densidade 0).
     // O centro de massa fica `comHeightM` acima do chão com a suspensão assentada,
     // abaixo do chassi: o carro derrapa antes de capotar (AC 1).
-    const rideHeight = -WHEEL_Y + (WHEEL_REST - GRAVITY / (4 * SUSPENSION_STIFFNESS)) + spec.wheelRadiusM;
+    const rideHeight = -WHEEL_Y + (WHEEL_REST - GRAVITY / (4 * spec.suspensionStiffness)) + spec.wheelRadiusM;
     const m = spec.massKg;
     const b = INERTIA_BOX;
     this.body = world.createRigidBody(
@@ -135,9 +131,9 @@ export class Car {
     const axle = { x: -1, y: 0, z: 0 };
     this.wheelLocal().forEach((p, i) => {
       this.controller.addWheel({ x: p.x, y: WHEEL_Y, z: p.z }, down, axle, WHEEL_REST, spec.wheelRadiusM);
-      this.controller.setWheelSuspensionStiffness(i, SUSPENSION_STIFFNESS);
-      this.controller.setWheelSuspensionCompression(i, SUSPENSION_COMPRESSION);
-      this.controller.setWheelSuspensionRelaxation(i, SUSPENSION_RELAXATION);
+      this.controller.setWheelSuspensionStiffness(i, spec.suspensionStiffness);
+      this.controller.setWheelSuspensionCompression(i, spec.suspensionCompression);
+      this.controller.setWheelSuspensionRelaxation(i, spec.suspensionRelaxation);
       this.controller.setWheelMaxSuspensionTravel(i, 0.3);
       this.controller.setWheelMaxSuspensionForce(i, 40000);
       this.controller.setWheelFrictionSlip(i, spec.tireGrip);

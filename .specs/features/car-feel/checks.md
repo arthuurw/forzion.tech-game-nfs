@@ -17,29 +17,29 @@ As grandezas (inclinação, rolagem, arfagem, sideslip, aceleração lateral em 
 
 ### S1 - A carroceria balança · 4 files · 40 KB · ~10k
 
-**C1** - Curva à esquerda (`steer +1`) a partir de 80 km/h, com `throttle` ligado sempre que a velocidade está abaixo de 80 km/h, por 3 s:
+**C1** - ✅ Curva à esquerda (`steer +1`) a partir de 80 km/h, com `throttle` ligado sempre que a velocidade está abaixo de 80 km/h, por 3 s:
 - A rolagem média dos passos 90–180 está entre +3.5° e +6.0° (o carro inclina para fora).
 - Com `steer −1`, a média está entre −6.0° e −3.5°.
 
 Substitui car-handling C4. (AC 1)
 Proof: `npx vitest run tests/physics/feel.test.ts -t "body roll between 3.5 and 6 degrees"`
 
-**C2** - Na continuação do caso `steer +1` de C1, no passo 180 a direção e o acelerador são soltos:
+**C2** - ✅ Na continuação do caso `steer +1` de C1, no passo 180 a direção e o acelerador são soltos:
 - Nos 60 passos seguintes (1.0 s), a menor rolagem está entre −1.5° e −0.3° (passa para o outro lado).
 - Do passo 150 ao 240 depois de soltar (2.5 s a 4.0 s), |rolagem| < 0.5° em todo passo.
 
 (AC 2)
 Proof: `npx vitest run tests/physics/feel.test.ts -t "body roll swings back after the turn"`
 
-**C3** - Com `brake` a partir de 100 km/h, a menor arfagem nos primeiros 30 passos (0.5 s) está entre −5.0° e −2.0°.
+**C3** - ✅ Com `brake` a partir de 100 km/h, a menor arfagem nos primeiros 30 passos (0.5 s) está entre −5.0° e −2.0°.
 
 Substitui car-handling C5. (AC 3)
 Proof: `npx vitest run tests/physics/feel.test.ts -t "nose dives 2 to 5 degrees under braking"`
 
-**C4** - Parado e assentado, com `throttle`, a maior arfagem nos primeiros 60 passos (1.0 s) está entre +1.0° e +4.0° (frente sobe, traseira agacha). (AC 4)
+**C4** - ✅ Parado e assentado, com `throttle`, a maior arfagem nos primeiros 60 passos (1.0 s) está entre +1.0° e +4.0° (frente sobe, traseira agacha). (AC 4)
 Proof: `npx vitest run tests/physics/feel.test.ts -t "nose lifts under full throttle"`
 
-**C5** - Continuam verdes, sem mudança nas asserções, as provas da car-handling de "não capota" com a ficha nova (AC 5):
+**C5** - ✅ Continuam verdes, sem mudança nas asserções, as provas da car-handling de "não capota" com a ficha nova (AC 5):
 - car-handling C2, matriz de 54 casos com inclinação ≤ 15°.
 - car-handling C3, as 4 rodas no chão em até 60 passos depois de soltar.
 
