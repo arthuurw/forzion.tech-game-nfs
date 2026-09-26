@@ -60,6 +60,19 @@ test.describe('drive', () => {
     expect(d).toBeGreaterThan(0.15);
   });
 
+  // yaw-assist C8: o campo DEV `__game.car.yawAssistNm` é o torque aplicado (positivo = esquerda)
+  test('car debug exposes the yaw assist torque', async ({ page }) => {
+    expect(await page.evaluate(() => (window as any).__game.car.yawAssistNm)).toBe(0);
+    await page.keyboard.down('KeyW');
+    await advanceSim(page, 1);
+    await page.keyboard.down('KeyA');
+    await advanceSim(page, 0.3);
+    const nm = await page.evaluate(() => (window as any).__game.car.yawAssistNm);
+    await page.keyboard.up('KeyA');
+    await page.keyboard.up('KeyW');
+    expect(nm).toBeGreaterThan(0);
+  });
+
   // C9 (AC 7); city-terrain C44: o prédio agora vem de `__game.world.lots`
   test('building blocks the chassis', async ({ page }) => {
     const s = await buildingScenario(page);
