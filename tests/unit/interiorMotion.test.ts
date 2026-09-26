@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { findBlockInteriors } from '../../src/world/interiors/BlockInteriors';
 import { placeInteriorProps } from '../../src/world/interiors/InteriorProps';
-import { bounceWeight, bulbOffset, bulbSway, terrainColor, terrainNoise, zoneLight } from '../../src/world/interiors/interiorMotion';
+import {
+  bounceWeight,
+  bulbOffset,
+  bulbSway,
+  crownSway,
+  fireflyMotion,
+  terrainColor,
+  terrainNoise,
+  zoneLight,
+} from '../../src/world/interiors/interiorMotion';
 import { generateLots } from '../../src/world/lots/LotGenerator';
 import { generateRoads } from '../../src/world/roads/RoadGenerator';
 import { carveRoads } from '../../src/world/terrain/carveRoads';
@@ -150,5 +159,57 @@ describe('interior motion', () => {
     }
     expect(worst).toBeGreaterThan(0);
     expect(worst).toBeLessThanOrEqual(0.15);
+  });
+
+  // C22 (AC 21) - parte pura
+  it('tree crowns sway', () => {
+    let s = 3;
+    const rand = () => ((s = (Math.imul(s, 1103515245) + 12345) >>> 0) / 4294967296);
+    for (let p = 0; p < 100; p++) {
+      const x = (rand() - 0.5) * 3000;
+      const z = (rand() - 0.5) * 3000;
+      let worst = 0;
+      let axis: [number, number] | null = null;
+      let crossings = 0;
+      let prev = 0;
+      for (let i = 0; i <= 60 * 60; i++) {
+        const d = crownSway(i * DT, x, z);
+        const mag = Math.hypot(d.dx, d.dz);
+        worst = Math.max(worst, mag);
+        if (!axis && mag > 1e-3) axis = [d.dx / mag, d.dz / mag];
+        const along = axis ? d.dx * axis[0] + d.dz * axis[1] : 0;
+        if (i > 0 && Math.sign(along) !== Math.sign(prev) && along !== 0 && prev !== 0) crossings++;
+        if (along !== 0) prev = along;
+      }
+      expect(worst).toBeGreaterThan(0);
+      expect(worst).toBeLessThanOrEqual(0.3);
+      // cada ciclo cruza o zero 2 vezes: frequência ≈ cruzamentos / (2 · 60 s)
+      const freq = crossings / 120;
+      expect(freq, `(${x}, ${z})`).toBeGreaterThanOrEqual(0.2 - 1 / 120);
+      expect(freq, `(${x}, ${z})`).toBeLessThanOrEqual(0.4 + 1 / 120);
+    }
+  });
+
+  // C25 (AC 23) - parte pura
+  it('fireflies drift and pulse slowly', () => {
+    for (let i = 0; i < 200; i++) {
+      let fastest = 0;
+      let crossings = 0;
+      let prevGlow = fireflyMotion(0, i).glow - 0.5;
+      let prev = fireflyMotion(0, i);
+      for (let k = 1; k <= 60 * 60; k++) {
+        const m = fireflyMotion(k * DT, i);
+        fastest = Math.max(fastest, Math.hypot(m.dx - prev.dx, m.dy - prev.dy, m.dz - prev.dz) / DT);
+        const g = m.glow - 0.5;
+        if (g !== 0 && prevGlow !== 0 && Math.sign(g) !== Math.sign(prevGlow)) crossings++;
+        if (g !== 0) prevGlow = g;
+        prev = m;
+      }
+      expect(fastest, `firefly ${i}`).toBeLessThanOrEqual(0.5);
+      expect(fastest).toBeGreaterThan(0);
+      const pulse = crossings / 120;
+      expect(pulse, `firefly ${i}`).toBeGreaterThanOrEqual(0.3 - 1 / 120);
+      expect(pulse, `firefly ${i}`).toBeLessThanOrEqual(0.6 + 1 / 120);
+    }
   });
 });

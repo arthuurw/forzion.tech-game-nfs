@@ -116,23 +116,23 @@ Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "pool water is animat
 
 ### S4 - Árvores e vagalumes · 8 files · 74 KB · ~19k
 
-**C20** - Onde nascem árvores (AC 19): no seed 1337, toda `Tree` está num vértice interior de zona `outer` com `facadeDist` ≥ 6 e inclinação ≤ 0.35 (pela diferença central do heightmap aplainado, como o terreno); a menor distância entre duas árvores é ≥ 7 m (todas as duplas, por grade de busca); em toda zona, árvores ≤ `areaM2` / 120; e há pelo menos 1 árvore.
+**C20** - ✅ Onde nascem árvores (AC 19): no seed 1337, toda `Tree` está num vértice interior de zona `outer` com `facadeDist` ≥ 6 e inclinação ≤ 0.35 (pela diferença central do heightmap aplainado, como o terreno); a menor distância entre duas árvores é ≥ 7 m (todas as duplas, por grade de busca); em toda zona, árvores ≤ `areaM2` / 120; e há pelo menos 1 árvore.
 Proof: `npx vitest run tests/unit/interiorProps.test.ts -t "trees on outer interior ground"`
 
-**C21** - Altura (AC 20): toda árvore tem `height` em [5, 10], e o seed 1337 tem árvores abaixo de 6 e acima de 9.
+**C21** - ✅ Altura (AC 20): toda árvore tem `height` em [5, 10], e o seed 1337 tem árvores abaixo de 6 e acima de 9.
 Proof: `npx vitest run tests/unit/interiorProps.test.ts -t "tree heights between 5 and 10"`
 
-**C22** - Balanço da copa (AC 21): `crownSway(t, x, z)` tem |deslocamento horizontal| ≤ 0.3 m para t de 0 a 60 s em 100 posições; a frequência por posição fica em [0.2, 0.4] Hz. No browser, o uniform de tempo do material da copa avança entre dois quadros e as matrizes de instância dos troncos não mudam entre esses quadros.
+**C22** - ✅ Balanço da copa (AC 21): `crownSway(t, x, z)` tem |deslocamento horizontal| ≤ 0.3 m para t de 0 a 60 s em 100 posições; a frequência por posição fica em [0.2, 0.4] Hz. No browser, o uniform de tempo do material da copa avança entre dois quadros e as matrizes de instância dos troncos não mudam entre esses quadros.
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "tree crowns sway"`
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "tree crowns sway and trunks stay"`
 
-**C23** - Colliders dos troncos (AC 22): com `RAPIER.init()` e o `WorldPhysics` do seed 1337, há um collider por árvore (`physics.trees.length` = número de `Tree`), cada um centrado na árvore (± 0.01 em x e z) e tocando o chão.
+**C23** - ✅ Colliders dos troncos (AC 22): com `RAPIER.init()` e o `WorldPhysics` do seed 1337, há um collider por árvore (`physics.trees.length` = número de `Tree`), cada um centrado na árvore (± 0.01 em x e z) e tocando o chão.
 Proof: `npx vitest run tests/physics/interiors.test.ts -t "one collider per tree trunk"`
 
-**C24** - Batida no tronco (AC 22): no browser, o carro é teleportado a 15 m de uma árvore, de frente para ela, com 40 km/h; com `W` segurado, a velocidade fica abaixo de 5 km/h em algum instante até 1 s depois do primeiro contato (distância horizontal ao tronco ≤ 3 m).
+**C24** - ✅ Batida no tronco (AC 22): no browser, o carro é teleportado a 15 m de uma árvore, de frente para ela, com 40 km/h; com `W` segurado, a velocidade fica abaixo de 5 km/h em algum instante até 1 s depois do primeiro contato (distância horizontal ao tronco ≤ 3 m).
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "car stops at a tree trunk"`
 
-**C25** - Vagalumes (AC 23): no browser, `summary().fireflies` ≤ 600 em high e ≤ 300 em low (reinício com `?quality=low`), e > 0 nos dois; `fireflyMotion` puro dá velocidade ≤ 0.5 m/s entre quaisquer dois passos de 1/60 em 60 s, e frequência de pulso em [0.3, 0.6] Hz para 200 vagalumes.
+**C25** - ✅ Vagalumes (AC 23): no browser, `summary().fireflies` ≤ 600 em high e ≤ 300 em low (reinício com `?quality=low`), e > 0 nos dois; `fireflyMotion` puro dá velocidade ≤ 0.5 m/s entre quaisquer dois passos de 1/60 em 60 s, e frequência de pulso em [0.3, 0.6] Hz para 200 vagalumes.
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "fireflies drift and pulse slowly"`
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "fireflies within budget"`
 

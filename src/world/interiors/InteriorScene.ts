@@ -3,7 +3,17 @@ import type { QualityPreset } from '../../core/quality';
 import type { BlockInteriors } from './BlockInteriors';
 import type { InteriorProps } from './InteriorProps';
 import { waveNormalMap } from '../Water';
-import { BULB_AMPLITUDE, POOL_FLOW, bulbSway, zoneLight } from './interiorMotion';
+import {
+  BULB_AMPLITUDE,
+  CROWN_AMPLITUDE,
+  FIREFLIES_HIGH,
+  FIREFLIES_LOW,
+  POOL_FLOW,
+  bulbSway,
+  crownSwayParams,
+  fireflyMotion,
+  zoneLight,
+} from './interiorMotion';
 import { YARD_LAMP_HEIGHT } from './InteriorProps';
 
 /** cor da luz rebatida das janelas (a mesma luz quente das fachadas) */
@@ -39,8 +49,16 @@ export class InteriorScene {
   readonly bulbMaterial: THREE.MeshStandardMaterial;
   readonly pools: THREE.InstancedMesh;
   readonly poolMaterial: THREE.MeshStandardMaterial;
+  /** árvores: tronco e copa numa malha só; a copa balança no vertex shader, o tronco fica parado */
+  readonly trees: THREE.InstancedMesh;
+  readonly treeMaterial: THREE.MeshStandardMaterial;
+  /** vagalumes: `Points` com âncora (perto de uma árvore) e parâmetros por ponto; o movimento é no shader */
+  readonly fireflies: THREE.Points;
+  readonly fireflyMaterial: THREE.ShaderMaterial;
   /** vagalumes na cena */
-  fireflyCount = 0;
+  readonly fireflyCount: number;
+  /** centro (x, z) usado na última escolha das árvores com vagalumes */
+  private fireflyCenter: { x: number; z: number } | null = null;
   /** pedestres ativos */
   readonly walkers: unknown[] = [];
 
@@ -81,7 +99,15 @@ export class InteriorScene {
     });
     this.poolMaterial.normalMap!.repeat.set(2, 2);
     this.pools = this.buildPools();
-    this.group.add(this.yardLamps, this.bulbs, this.pools);
+
+    // --- árvores e vagalumes ---
+    this.treeMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0 });
+    crownSwaying(this.treeMaterial, this.swayTime);
+    this.trees = this.buildTrees();
+    this.fireflyCount = quality.level === 'low' ? FIREFLIES_LOW : FIREFLIES_HIGH;
+    this.fireflyMaterial = fireflyMaterial(this.swayTime);
+    this.fireflies = this.buildFireflies();
+    this.group.add(this.yardLamps, this.bulbs, this.pools, this.trees, this.fireflies);
     this.update(0);
   }
 
@@ -143,6 +169,84 @@ export class InteriorScene {
     mesh.name = 'pools';
     mesh.computeBoundingSphere();
     return mesh;
+  }
+
+  private buildTrees(): THREE.InstancedMesh {
+    // árvore de altura 1: tronco até 0.5, copa (icosaedro achatado) centrada em 0.66
+    const trunk = new THREE.CylinderGeometry(0.022, 0.032, 0.52, 6, 1, true);
+    trunk.translate(0, 0.26, 0);
+    const crown = new THREE.IcosahedronGeometry(0.3, 1);
+    crown.scale(1, 0.85, 1);
+    crown.translate(0, 0.66, 0);
+    const geometry = mergeTree(trunk, crown);
+    const trees = this.props.trees;
+    const sway = new Float32Array(Math.max(1, trees.length) * 4);
+    const mesh = new THREE.InstancedMesh(geometry, this.treeMaterial, Math.max(1, trees.length));
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0);
+    trees.forEach((t, i) => {
+      // giro pela posição, para as copas não ficarem todas iguais
+      q.setFromAxisAngle(up, (t.x * 0.37 + t.z * 0.61) % (Math.PI * 2));
+      m.compose(new THREE.Vector3(t.x, t.y, t.z), q, new THREE.Vector3(t.height, t.height, t.height));
+      mesh.setMatrixAt(i, m);
+      const p = crownSwayParams(t.x, t.z);
+      // o deslocamento é aplicado antes da matriz (escala = altura): divide pela altura; a direção
+      // do vento vai para o espaço local desfazendo o giro da instância
+      const a = -((t.x * 0.37 + t.z * 0.61) % (Math.PI * 2));
+      const lx = p.dirX * Math.cos(a) + p.dirZ * Math.sin(a);
+      const lz = -p.dirX * Math.sin(a) + p.dirZ * Math.cos(a);
+      sway.set([p.freq, p.phase, (lx * CROWN_AMPLITUDE) / t.height, (lz * CROWN_AMPLITUDE) / t.height], i * 4);
+    });
+    geometry.setAttribute('aSway', new THREE.InstancedBufferAttribute(sway, 4));
+    mesh.count = trees.length;
+    mesh.name = 'trees';
+    mesh.computeBoundingSphere();
+    return mesh;
+  }
+
+  private buildFireflies(): THREE.Points {
+    const n = this.fireflyCount;
+    const geometry = new THREE.BufferGeometry();
+    // posição = âncora (reescrita quando o carro anda); aParams = fases e frequência de pulso de fireflyMotion
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+    const params = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) {
+      const f = fireflyMotion(0, i);
+      params.set([f.phaseX, f.phaseZ, f.phaseY, f.pulseHz], i * 4);
+    }
+    geometry.setAttribute('aParams', new THREE.BufferAttribute(params, 4));
+    geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
+    const points = new THREE.Points(geometry, this.fireflyMaterial);
+    points.frustumCulled = false;
+    points.name = 'fireflies';
+    return points;
+  }
+
+  /** Põe os vagalumes em volta das árvores mais perto de (x, z): 3 por árvore, até 3 m da copa. */
+  private anchorFireflies(x: number, z: number): void {
+    const trees = this.props.trees;
+    const pos = this.fireflies.geometry.getAttribute('position') as THREE.BufferAttribute;
+    if (trees.length === 0) return;
+    const perTree = 3;
+    const order = trees
+      .map((t, i) => ({ i, d: (t.x - x) ** 2 + (t.z - z) ** 2 }))
+      .sort((a, b) => a.d - b.d)
+      .slice(0, Math.ceil(this.fireflyCount / perTree));
+    for (let k = 0; k < this.fireflyCount; k++) {
+      const t = trees[order[Math.floor(k / perTree) % order.length]!.i]!;
+      const a = ((k * 2.399963) % (Math.PI * 2)) + t.x;
+      const r = t.crown * (0.8 + 0.6 * (((k * 0.618034) % 1) + 0.0));
+      pos.setXYZ(k, t.x + Math.sin(a) * r, t.y + 0.8 + ((k * 0.414214) % 1) * 2, t.z + Math.cos(a) * r);
+    }
+    pos.needsUpdate = true;
+    this.fireflyCenter = { x, z };
+  }
+
+  /** Árvores perto do carro para os vagalumes: reescolhe quando o carro anda 60 m. */
+  follow(x: number, z: number): void {
+    const c = this.fireflyCenter;
+    if (!c || Math.hypot(c.x - x, c.z - z) > 60) this.anchorFireflies(x, z);
   }
 
   /** Posição da lâmpada `i` agora: a matriz da instância mais o balanço do shader com o `uTime` aplicado. */
@@ -283,4 +387,97 @@ transformed.xz += aSway.zw * swayS;`,
       );
   };
   material.customProgramCacheKey = () => key;
+}
+
+/** Junta tronco (marrom) e copa (verde, com `aCrown` 1) numa geometria com cor por vértice. */
+function mergeTree(trunk: THREE.BufferGeometry, crown: THREE.BufferGeometry): THREE.BufferGeometry {
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const colors: number[] = [];
+  const mask: number[] = [];
+  const bark = new THREE.Color('#3b2a1e');
+  const leaf = new THREE.Color('#2f5a2a');
+  for (const [g0, color, isCrown] of [
+    [trunk, bark, 0],
+    [crown, leaf, 1],
+  ] as const) {
+    const g = g0.index ? g0.toNonIndexed() : g0;
+    const p = g.getAttribute('position');
+    const n = g.getAttribute('normal');
+    for (let i = 0; i < p.count; i++) {
+      positions.push(p.getX(i), p.getY(i), p.getZ(i));
+      normals.push(n.getX(i), n.getY(i), n.getZ(i));
+      // um pouco de variação na copa pela altura do vértice
+      const shade = isCrown ? 0.85 + 0.3 * Math.min(1, Math.max(0, (p.getY(i) - 0.4) / 0.5)) : 1;
+      colors.push(color.r * shade, color.g * shade, color.b * shade);
+      // a copa balança mais em cima; o tronco não balança
+      mask.push(isCrown ? Math.min(1, Math.max(0, (p.getY(i) - 0.4) / 0.56)) : 0);
+    }
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  out.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  out.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  out.setAttribute('aCrown', new THREE.Float32BufferAttribute(mask, 1));
+  return out;
+}
+
+/** Copa balançando: `aSway` = (freq, fase, dirX·A/h, dirZ·A/h), deslocamento pesado por `aCrown` (0 no tronco). */
+function crownSwaying(material: THREE.MeshStandardMaterial, time: { value: number }): void {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = time;
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+attribute vec4 aSway;
+attribute float aCrown;
+uniform float uTime;`,
+      )
+      .replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+transformed.xz += aSway.zw * aCrown * sin(6.28318530718 * aSway.x * uTime + aSway.y);`,
+      );
+  };
+  material.customProgramCacheKey = () => 'tree-crown';
+}
+
+/** Vagalume: deriva lenta e pulso (as contas de `fireflyMotion`), ponto aditivo com névoa. */
+function fireflyMaterial(time: { value: number }): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: { uTime: time },
+    vertexShader: /* glsl */ `
+      attribute vec4 aParams;
+      uniform float uTime;
+      varying float vGlow;
+      varying float vFog;
+      void main() {
+        float t = uTime;
+        vec3 p = position + vec3(
+          1.0 * sin(6.28318530718 * 0.05 * t + aParams.x),
+          0.4 * sin(6.28318530718 * 0.06 * t + aParams.z),
+          1.0 * sin(6.28318530718 * 0.045 * t + aParams.y));
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        gl_Position = projectionMatrix * mv;
+        gl_PointSize = clamp(40.0 / max(1.0, -mv.z), 1.5, 8.0);
+        vGlow = 0.5 + 0.5 * sin(6.28318530718 * aParams.w * t + aParams.x);
+        float f = 0.0035 * -mv.z;
+        vFog = exp(-f * f);
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      varying float vGlow;
+      varying float vFog;
+      void main() {
+        vec2 c = gl_PointCoord - 0.5;
+        float a = 1.0 - smoothstep(0.1, 0.5, length(c));
+        if (a < 0.01) discard;
+        gl_FragColor = vec4(vec3(0.75, 1.0, 0.35) * 1.6 * vGlow * a * vFog, 1.0);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
 }

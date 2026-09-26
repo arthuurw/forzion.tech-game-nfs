@@ -1,4 +1,5 @@
 import RAPIER from '@dimforge/rapier3d-compat';
+import type { InteriorProps } from './interiors/InteriorProps';
 import type { Lot } from './lots/LotGenerator';
 import type { RoadNetwork } from './roads/RoadGenerator';
 import { bridgeMeshes, bridgeParts, PILLAR_SIZE } from './roads/bridges';
@@ -17,6 +18,10 @@ export class WorldPhysics {
   readonly walls: Array<{ x: number; z: number; hx: number; hz: number }> = [];
   /** colliders dos pilares das pontes, na ordem de `bridgeParts` */
   readonly pillars: RAPIER.Collider[] = [];
+  /** colliders dos guarda-corpos das pontes */
+  rails = 0;
+  /** colliders dos troncos das árvores do miolo, na ordem de `props.trees` (block-fill) */
+  readonly trees: RAPIER.Collider[] = [];
 
   constructor(
     private readonly world: RAPIER.World,
@@ -24,6 +29,7 @@ export class WorldPhysics {
     raw: Heightmap,
     network: RoadNetwork,
     lots: Lot[],
+    props: InteriorProps | null = null,
   ) {
     this.body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
 
@@ -45,6 +51,7 @@ export class WorldPhysics {
         const parts = bridgeParts(road, range, raw);
         for (const rail of bridgeMeshes(road, parts).rails) {
           world.createCollider(RAPIER.ColliderDesc.trimesh(rail.positions, rail.indices), this.body);
+          this.rails++;
         }
         for (const p of parts.pillars) {
           const h = (p.top - p.bottom) / 2;
@@ -69,6 +76,15 @@ export class WorldPhysics {
       );
     }
 
+    // block-fill: tronco de árvore como cilindro de 0.3 m, de 0.5 m abaixo do chão até metade da altura
+    for (const t of props?.trees ?? []) {
+      const bottom = t.y - TRUNK_SINK;
+      const half = (t.y + t.height * 0.5 - bottom) / 2;
+      this.trees.push(
+        world.createCollider(RAPIER.ColliderDesc.cylinder(half, TRUNK_RADIUS).setTranslation(t.x, bottom + half, t.z), this.body),
+      );
+    }
+
     // paredes invisíveis nas bordas (AC 35)
     const t = 1;
     const wallH = 200;
@@ -90,6 +106,10 @@ export class WorldPhysics {
     return hit ? 400 - hit.timeOfImpact : null;
   }
 }
+
+/** raio do collider do tronco e quanto ele entra no chão (m) */
+const TRUNK_RADIUS = 0.3;
+const TRUNK_SINK = 0.5;
 
 function yaw(heading: number): { x: number; y: number; z: number; w: number } {
   return { x: 0, y: Math.sin(heading / 2), z: 0, w: Math.cos(heading / 2) };

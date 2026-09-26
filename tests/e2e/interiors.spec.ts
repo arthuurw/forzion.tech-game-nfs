@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { advanceSim, gotoGame, simTime } from './helpers';
+import { advanceSim, gotoGame, simTime, speedKmh, waitSimUntil } from './helpers';
 
 /**
  * block-fill: o miolo das quadras no browser, lendo `__game.world.interiors`.
@@ -257,5 +257,88 @@ test.describe('block-fill - quintais', () => {
     expect(bl).toBeGreaterThan(r);
     expect(g).toBeGreaterThan(r);
     expect(a.emissiveIntensity).toBeGreaterThan(0);
+  });
+});
+
+test.describe('block-fill - árvores', () => {
+  // C22 (AC 21) - parte browser
+  test('tree crowns sway and trunks stay', async ({ page }) => {
+    await gotoGame(page);
+    const read = () =>
+      page.evaluate(() => {
+        const it = (window as any).__game.world.interiors;
+        return { time: it.crownTime as number, matrices: it.treeMatrices(50) as number[][] };
+      });
+    const a = await read();
+    await advanceSim(page, 0.2);
+    const b = await read();
+    expect(a.matrices.length).toBeGreaterThan(0);
+    expect(b.time).toBeGreaterThan(a.time);
+    expect(b.matrices).toEqual(a.matrices);
+  });
+
+  // C24 (AC 22)
+  test('car stops at a tree trunk', async ({ page }) => {
+    test.setTimeout(180_000);
+    await gotoGame(page);
+    // árvore com 15 m de chão do miolo livre e quase plano à frente, sem outra árvore no caminho
+    const s = await page.evaluate(() => {
+      const w = (window as any).__game.world;
+      const it = w.interiors;
+      const zoneAt = (x: number, z: number) => it.cell(Math.round((x - it.origin) / it.spacing), Math.round((z - it.origin) / it.spacing)).zoneOf;
+      const trees = it.trees as Array<{ x: number; y: number; z: number }>;
+      for (const t of trees) {
+        for (let k = 0; k < 16; k++) {
+          const h = (k * Math.PI) / 8;
+          // o carro sai de 15 m e anda na direção h até a árvore
+          const sx = t.x - Math.sin(h) * 15;
+          const sz = t.z - Math.cos(h) * 15;
+          let ok = true;
+          let lo = Infinity;
+          let hi = -Infinity;
+          for (let d = -4; d <= 15 && ok; d += 0.5) {
+            const x = sx + Math.sin(h) * d;
+            const z = sz + Math.cos(h) * d;
+            for (const side of [-1.5, 0, 1.5]) {
+              if (zoneAt(x + Math.cos(h) * side, z - Math.sin(h) * side) < 0) ok = false;
+            }
+            const y = w.heightAt(x, z);
+            lo = Math.min(lo, y);
+            hi = Math.max(hi, y);
+          }
+          if (!ok || hi - lo > 0.6) continue;
+          const blocked = trees.some((o) => o !== t && Math.hypot(o.x - (sx + t.x) / 2, o.z - (sz + t.z) / 2) < 12);
+          if (blocked) continue;
+          return { tree: t, x: sx, z: sz, y: w.heightAt(sx, sz), heading: h };
+        }
+      }
+      throw new Error('no clear tree approach');
+    });
+    await page.evaluate((s) => {
+      const car = (window as any).__game.car;
+      car.teleport(s.x, s.y + 1.2, s.z, s.heading);
+      car.setForwardSpeed(40 / 3.6);
+    }, s);
+    await page.keyboard.down('KeyW');
+    const near = `Math.hypot(g.car.position.x - ${s.tree.x}, g.car.position.z - ${s.tree.z}) <= 3`;
+    const touched = await waitSimUntil(page, near, 5);
+    expect(touched, 'car reached the trunk').toBe(true);
+    const stopped = await waitSimUntil(page, 'g.car.speedKmh < 5', 1);
+    const kmh = await speedKmh(page);
+    await page.keyboard.up('KeyW');
+    expect(stopped, `speed ${kmh.toFixed(1)} km/h`).toBe(true);
+  });
+
+  // C25 (AC 23) - parte browser
+  test('fireflies within budget', async ({ page }) => {
+    await gotoGame(page);
+    const high = await page.evaluate(() => (window as any).__game.world.interiors.summary().fireflies as number);
+    expect(high).toBeGreaterThan(0);
+    expect(high).toBeLessThanOrEqual(600);
+    await page.goto('/?quality=low');
+    await page.waitForFunction(() => (window as any).__game?.ready === true, null, { timeout: 30_000 });
+    const low = await page.evaluate(() => (window as any).__game.world.interiors.summary().fireflies as number);
+    expect(low).toBeGreaterThan(0);
+    expect(low).toBeLessThanOrEqual(300);
   });
 });

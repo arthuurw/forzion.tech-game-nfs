@@ -114,4 +114,59 @@ describe('interior props', () => {
       expect(Math.abs(p.y - (heightAt(carved, p.x, p.z) + 0.05))).toBeLessThanOrEqual(0.01);
     }
   });
+
+  // C20 (AC 19, door 2)
+  it('trees on outer interior ground', () => {
+    const trees = props.trees;
+    expect(trees.length).toBeGreaterThanOrEqual(1);
+    const n = bi.size;
+    const H = (ix: number, iz: number) => carved.heights[Math.min(n - 1, Math.max(0, iz)) * n + Math.min(n - 1, Math.max(0, ix))]!;
+    const perZone = new Map<number, number>();
+    for (const t of trees) {
+      const fx = (t.x - bi.origin) / bi.spacing;
+      const fz = (t.z - bi.origin) / bi.spacing;
+      expect(Math.abs(fx - Math.round(fx))).toBeLessThan(1e-6);
+      expect(Math.abs(fz - Math.round(fz))).toBeLessThan(1e-6);
+      const ix = Math.round(fx);
+      const iz = Math.round(fz);
+      const k = iz * n + ix;
+      const zone = bi.zoneOf[k]!;
+      expect(zone).toBeGreaterThanOrEqual(0);
+      expect(t.zoneId).toBe(zone);
+      expect(bi.zones[zone]!.kind).toBe('outer');
+      expect(bi.facadeDist[k]).toBeGreaterThanOrEqual(6);
+      const dx = (H(ix + 1, iz) - H(ix - 1, iz)) / (2 * bi.spacing);
+      const dz = (H(ix, iz + 1) - H(ix, iz - 1)) / (2 * bi.spacing);
+      expect(Math.hypot(dx, dz)).toBeLessThanOrEqual(0.35);
+      perZone.set(zone, (perZone.get(zone) ?? 0) + 1);
+    }
+    for (const [zone, count] of perZone) expect(count).toBeLessThanOrEqual(bi.zones[zone]!.areaM2 / 120);
+    // menor distância entre duas árvores, todas as duplas por grade de 8 m
+    const grid = new Map<string, number[]>();
+    trees.forEach((t, i) => {
+      const key = `${Math.floor(t.x / 8)},${Math.floor(t.z / 8)}`;
+      grid.set(key, [...(grid.get(key) ?? []), i]);
+    });
+    let closest = Infinity;
+    trees.forEach((t, i) => {
+      const gx = Math.floor(t.x / 8);
+      const gz = Math.floor(t.z / 8);
+      for (let a = gx - 1; a <= gx + 1; a++) {
+        for (let b = gz - 1; b <= gz + 1; b++) {
+          for (const j of grid.get(`${a},${b}`) ?? []) if (j !== i) closest = Math.min(closest, Math.hypot(trees[j]!.x - t.x, trees[j]!.z - t.z));
+        }
+      }
+    });
+    expect(closest).toBeGreaterThanOrEqual(7);
+  });
+
+  // C21 (AC 20, door 2)
+  it('tree heights between 5 and 10', () => {
+    for (const t of props.trees) {
+      expect(t.height).toBeGreaterThanOrEqual(5);
+      expect(t.height).toBeLessThanOrEqual(10);
+    }
+    expect(props.trees.some((t) => t.height < 6)).toBe(true);
+    expect(props.trees.some((t) => t.height > 9)).toBe(true);
+  });
 });

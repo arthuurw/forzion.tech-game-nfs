@@ -154,7 +154,7 @@ export class Game {
     const interiors = findBlockInteriors(carved, network, lots);
     const props = placeInteriorProps(seed, interiors, lots, carved);
     const data: WorldData = { seed, raw, carved, network, lots, signs, lamps, interiors, props };
-    this.physics = new WorldPhysics(this.world, carved, raw, network, lots);
+    this.physics = new WorldPhysics(this.world, carved, raw, network, lots, props);
     this.city = new CityScene(data, this.scene, assets, quality);
 
     // spawn: parado numa avenida do centro, alinhado a ela, 12 m antes do cruzamento
@@ -331,6 +331,7 @@ export class Game {
     this.city.chunks.update(state.x, state.z);
     this.city.water.update(this.simTime);
     this.city.interiors.update(this.simTime);
+    this.city.interiors.follow(state.x, state.z);
     this.rain.update(this.simTime, { x: state.x, y: state.y, z: state.z });
     this.effects.render();
     this.city.signMaterials.forEach((m, i) => {
@@ -904,6 +905,21 @@ export class Game {
       get bulbCount() {
         return scene.bulbs.count;
       },
+      /** `uTime` do material das copas agora */
+      get crownTime() {
+        return scene.swayTime.value;
+      },
+      /** as `n` primeiras matrizes de instância das árvores (troncos e copas) */
+      treeMatrices: (n: number) => {
+        const m = new THREE.Matrix4();
+        const out: number[][] = [];
+        for (let i = 0; i < Math.min(n, scene.trees.count); i++) {
+          scene.trees.getMatrixAt(i, m);
+          out.push([...m.elements]);
+        }
+        return out;
+      },
+      trees: props.trees.map((t) => ({ ...t })),
       /** posição da lâmpada `i` lida da malha: matriz da instância + balanço com o `uTime` aplicado */
       bulbPosition: (i: number) => scene.bulbPosition(i),
     };

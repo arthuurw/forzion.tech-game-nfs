@@ -182,17 +182,20 @@ export function crownSway(t: number, x: number, z: number): { dx: number; dz: nu
 }
 
 /** Deriva e brilho do vagalume `i` em torno da sua âncora: lento (≤ 0.5 m/s) e pulsando a 0.3-0.6 Hz. */
-export function fireflyMotion(t: number, i: number): { dx: number; dy: number; dz: number; glow: number; pulseHz: number } {
-  const a = hash01(i * 0.618 + 0.3, 1.7);
-  const b = hash01(i * 0.414 + 2.1, 3.9);
-  const c = hash01(i * 0.732 + 4.4, 0.6);
+export function fireflyMotion(
+  t: number,
+  i: number,
+): { dx: number; dy: number; dz: number; glow: number; pulseHz: number; phaseX: number; phaseY: number; phaseZ: number } {
+  const phaseX = hash01(i * 0.618 + 0.3, 1.7) * Math.PI * 2;
+  const phaseZ = hash01(i * 0.414 + 2.1, 3.9) * Math.PI * 2;
+  const phaseY = hash01(i * 0.732 + 4.4, 0.6) * Math.PI * 2;
   const pulseHz = 0.3 + 0.3 * hash01(i * 0.271 + 6.2, 7.1);
   // |v| ≤ √((1.0·2π·0.05)² + (1.0·2π·0.045)² + (0.4·2π·0.06)²) ≈ 0.45 m/s
-  const dx = 1.0 * Math.sin(2 * Math.PI * 0.05 * t + a * 6.283);
-  const dz = 1.0 * Math.sin(2 * Math.PI * 0.045 * t + b * 6.283);
-  const dy = 0.4 * Math.sin(2 * Math.PI * 0.06 * t + c * 6.283);
-  const glow = 0.5 + 0.5 * Math.sin(2 * Math.PI * pulseHz * t + a * 6.283);
-  return { dx, dy, dz, glow, pulseHz };
+  const dx = 1.0 * Math.sin(2 * Math.PI * 0.05 * t + phaseX);
+  const dz = 1.0 * Math.sin(2 * Math.PI * 0.045 * t + phaseZ);
+  const dy = 0.4 * Math.sin(2 * Math.PI * 0.06 * t + phaseY);
+  const glow = 0.5 + 0.5 * Math.sin(2 * Math.PI * pulseHz * t + phaseX);
+  return { dx, dy, dz, glow, pulseHz, phaseX, phaseY, phaseZ };
 }
 
 /** vagalumes por qualidade */
