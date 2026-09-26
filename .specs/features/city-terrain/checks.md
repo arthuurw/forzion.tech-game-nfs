@@ -86,7 +86,7 @@ Proof: `npx playwright test tests/e2e/world.spec.ts -g "road materials use the a
 **C23** - No browser, `__game.render.probeRoadMarks(roadId, index)` renderiza uma vista ortográfica de cima (chuva, partículas e carro ocultos) sobre um ponto de avenida do centro e devolve luminâncias: centro de traço da linha central ≥ 1.5 × centro de vão; linha de borda ≥ 1.5 × meio da faixa; e a distância entre centros de 2 traços consecutivos medida na imagem é 6 m ± 0.25 (AC 18)
 Proof: `npx playwright test tests/e2e/world.spec.ts -g "lane marks drawn in the road shader"`
 
-**C24** - `generateLamps(network)` põe postes nos dois lados de toda estrada, a `width/2 + 1.5` m do eixo, espaçados de 40 m ± 0.5 ao longo da estrada, nenhum dentro de um trecho de ponte; a contagem por estrada é `2 × floor(comprimento fora de ponte / 40)` ± 2 por trecho interrompido (AC 19)
+**C24** - `generateLamps(network)` devolve `{ lamps, skipped }`: para cada trecho contínuo fora de ponte de comprimento `L`, os dois lados recebem juntos `2 × floor(L / 40)` posições a `width/2 + 1.5` m do eixo, espaçadas de 40 m ± 0.5 ao longo do trecho; nenhuma posição fica num trecho de ponte; cada posição vai para `skipped` se cai a ≤ `width/2 + 1` do eixo de outra estrada (cruzamento) e para `lamps` caso contrário, e `lamps.length + skipped.length` = soma de `2 × floor(L / 40)` (AC 19)
 Proof: `npx vitest run tests/unit/roads.test.ts -t "lamp posts every 40 m on both sides"`
 
 **C25** - No browser, `__game.world.lamps` reporta exatamente 1 `InstancedMesh` de postes e 1 de cabeças, ambos com `count` igual ao número de postes de `generateLamps` (AC 19)
@@ -231,4 +231,5 @@ Cost: 26 provas unitárias em 7 arquivos e 22 provas Playwright em 6 arquivos. S
 - S1 = 15k (TerrainGenerator, noise, worldMath, WorldPhysics, Water, Game, helpers, 2 testes); S2 entra em roads/CityScene a +19k → 34k; S3 +10k → 44k; S4 +11k → 55k; S5 +29k (ChunkManager, chunks, Minimap, minimapMath, Game, visual/drive/hud/render specs) → 84k total, abaixo do budget de 150k - one builder
 - Estimativa por `wc -c` dos arquivos existentes tocados (Game 23 KB, CityScene 16 KB, visual.spec 18 KB, hud.spec 7 KB, drive.spec 5 KB, render.spec 4 KB, Minimap 2 KB) mais os novos previstos no tamanho dos análogos (CityGenerator 8 KB por gerador), dividido por 4
 - O `CityGenerator` fica no repositório (mulberry32 e paleta são reusados; seus testes unitários continuam verdes), mas deixa de alimentar o jogo; free-roam C17-C19 e visual C5 passam a ser histórico, superados como diz `## Coverage`
+- **Settled mid-build:** (autor, antes do código) C24 contava `2 × floor(L / 40)` postes por estrada, mas um poste que cai sobre outra estrada num cruzamento seria um obstáculo no meio da pista; o check passou a separar `lamps` e `skipped` e a provar a soma, sem afrouxar o espaçamento.
 - AC 19 mudou de 25 m para 40 m entre postes antes destes checks, a pedido do usuário ("pode diminuir a quantidade de postes na via", 2026-09-25)
