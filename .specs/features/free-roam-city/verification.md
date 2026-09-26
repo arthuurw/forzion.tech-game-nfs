@@ -2,11 +2,11 @@
 
 **Verdict**: PASS
 **Profile**: standard
-**Diff range**: 5f760df..42e60a1 (fix: ff54e6d..42e60a1)
-**Round**: 3 - scoped
+**Diff range**: 5f760df..78c9795 (rodada 4: 25ae5fb..78c9795; rodada 3: ff54e6d..42e60a1)
+**Round**: 4 - scoped
 **Verifier**: independent sub-agent (author != verifier)
 
-Resumo: rodada escopada pelo diff do fix (`git diff ff54e6d..42e60a1`: `src/audio/AudioEngine.ts`,
+Resumo da rodada 3 (a rodada 4 está logo abaixo): rodada escopada pelo diff do fix (`git diff ff54e6d..42e60a1`: `src/audio/AudioEngine.ts`,
 `src/core/Game.ts`, `tests/e2e/audio.spec.ts`, `tests/e2e/hud.spec.ts`, `tests/unit/purity.test.ts`,
 `checks.md`) e pelos seis findings residuais do PASS da rodada 2 (rotação do triângulo em C42,
 tolerância float32 em C45, tipos de nó da porta 8, `exposeDebug.ts` fora de C39, `event.repeat` do
@@ -16,6 +16,55 @@ check tem asserção localizada; 5 dos 6 findings residuais estão fechados (C42
 e o sexto (`event.repeat`) continua como pass-through sem impacto em linha de `Test policy`;
 4 mutantes novos injetados nas superfícies que o fix criou ou endureceu, 4 mortos (os 11 das
 rodadas 1-2 carregados). Nenhuma linha contradiz o PASS. Observações residuais em `## Findings`.
+
+## Rodada 4 (scoped, verified at 78c9795)
+
+Escopo: commit pós-PASS `78c9795` (`git diff --name-only 25ae5fb..78c9795`: `src/world/CityGenerator.ts`,
+`src/world/CityScene.ts`, `tests/unit/cityGenerator.test.ts`, `tests/e2e/visual.spec.ts` (só move o
+comentário `// C34`), `free-roam-city/{checks,plan}.md`, `visual-upgrade/checks.md` (texto do Handoff)).
+Pedido do usuário: "pode diminuir a quantidade de postes na via" (`LAMP_SPACING` 20 -> 40,
+`CityGenerator.ts:14`) e "deixe um pouco menos claras as luzes amarelas das janelas"
+(`WINDOW_BRIGHTNESS = 0.7`, `CityScene.ts:22`, multiplicando `warm` no shader em `:379`). Nenhum
+verdict não-PASS pendente da rodada 3. Checks re-provados: C20 (texto, prova e teste mudaram) e C22
+(fonte `CityScene.ts` tocada). Tudo o mais: carried from 42e60a1 (rodada 3) - ver ressalva R4-2.
+
+- **AC 16 x C20**: `plan.md:108` "postes de luz a cada 40 m ao longo dos dois lados de cada rua" e
+  `checks.md:78` "espaçados de 40 m (± 0.01) nos dois lados ... `floor(comprimento / 40)`" concordam;
+  nenhuma outra menção a 20 m para postes em `.specs/` nem dependência de contagem de postes em
+  `tests/` (`grep -rn "lamp|560|280" tests/` fora de `cityGenerator.test.ts` só acha
+  `render.spec.ts:22`, emissive do poste).
+- **Provas em 78c9795**: `npx vitest run tests/unit/cityGenerator.test.ts -t "lamp posts every 40 m on
+  both sides"` exit 0 - `✓ tests/unit/cityGenerator.test.ts > CityGenerator > lamp posts every 40 m on
+  both sides`, `Tests 1 passed | 5 skipped (6)` (o filtro acertou exatamente o teste renomeado);
+  `npx playwright test tests/e2e/render.spec.ts` exit 0 - `✓ 2 tests/e2e/render.spec.ts:18:3 › render
+  › neon emissive intensity at least 2`, `6 passed (44.4s)`; `npx vitest run` exit 0 -
+  `Test Files 15 passed (15)`, `Tests 46 passed (46)`. Playwright subiu o próprio Vite em `:5173`
+  (0 listeners antes; o servidor do usuário em `:5174` não foi tocado).
+- **C20** (verified at 78c9795): `tests/unit/cityGenerator.test.ts:89` `it('lamp posts every 40 m on
+  both sides'`; `:93-94` `expected = 2 * (2 * streetsPerAxis) * Math.floor(streetLength / 40)`,
+  `expect(city.lamps.length).toBe(expected)` (280); `:103` `expect(groups.size).toBe(2 * 2 *
+  streetsPerAxis)` (28 = 14 ruas x 2 lados, chave = eixo + coordenada lateral); `:106`
+  `expect(coords.length, key).toBe(Math.floor(streetLength / 40))` (10 por lado); `:108`
+  `expect(coords[i]! - coords[i - 1]!, key).toBeCloseTo(40, 2)` (tolerância 0.005, dentro do ± 0.01
+  do check). Fonte: `src/world/CityGenerator.ts:14` `LAMP_SPACING = 40`, `:184` `count =
+  Math.floor(length / LAMP_SPACING)`, `:188` `along = -CITY_EXTENT + LAMP_SPACING / 2 + i *
+  LAMP_SPACING`, `:189` `for (const s of [-1, 1])`. A asserção mira o valor do check (40, ± 0.01,
+  `2 x ruas x floor(L/40)`), escrito literalmente no teste. PASS.
+- **C22** (verified at 78c9795): `tests/e2e/render.spec.ts:20` `expect(m.windowEmissiveIntensity)
+  .toBeGreaterThanOrEqual(2)`; `:22` `expect(m.lampEmissiveIntensity).toBeGreaterThanOrEqual(2)`;
+  `:23-24` `m.signEmissiveIntensities.length` `toBe(4)`, cada `v` `toBeGreaterThanOrEqual(2)`.
+  Getters `src/core/Game.ts:517-519` (`facadeMaterials[0].emissiveIntensity`), `:539-544`. Fontes:
+  janela `src/world/CityScene.ts:304` `emissiveIntensity: 2.2` (inalterado pelo diff), poste `:109`
+  `2.5`, letreiro `:247` `2.6` (base; flicker da visual-upgrade). `WINDOW_BRIGHTNESS` entra só no
+  GLSL (`:379`), não na propriedade: C22 continua literalmente verdadeiro. PASS (ver R4-1).
+- **Coverage** recalculada para as autoridades tocadas: `lamp groups (28)` e `emissive materials (3)`
+  (linhas atualizadas na tabela). **Test policy**: re-julgadas as linhas que classificam
+  `CityGenerator.ts` (Decides, not reached) e `CityScene.ts` (Instrumentation) - ambas yes.
+- **Faults**: 5 mutantes em `<scratchpad>/verify-c20` (worktree de 78c9795 + junção `node_modules`),
+  um por superfície de asserção de C20 (`:94`, `:103`, `:106`, `:108`) e um na superfície janela de
+  C22 (fonte tocada pelo diff); 5 mortos. Tabela em `## Faults injected`.
+
+### Rodada 3 (carried from 42e60a1)
 
 Passo 1 (binding sources): o plano não marca nenhuma fonte como binding - nada a comparar.
 Passo 5 (walk the flow with the user): usuário indisponível nesta rodada - não executado; nenhum
@@ -74,9 +123,9 @@ Comandos rodados em `HEAD` (42e60a1), uma invocação por alvo, sem filtro de no
 | C17 | 64 quarteirões 40 m, ruas 12 m, bounds ±202 | batch U · `✓ CityGenerator > 8x8 grid of 40 m blocks with 12 m streets` | carried from 181fd5d · `tests/unit/cityGenerator.test.ts:14-17` `city.blocks.length` `toBe(64)`, `blockSize` `toBe(40)`, `streetWidth` `toBe(12)`, `bounds` `toBe(202)`; `:20-29` 8 xs/zs, passo `toBeCloseTo(52)`, extremos `±182` | PASS |
 | C18 | 1-4 prédios por quarteirão, altura [10,60], base dentro | batch U · `✓ CityGenerator > buildings per block within bounds` | carried from 181fd5d · `tests/unit/cityGenerator.test.ts:36-37` `block.buildings.length` `>= 1`, `<= 4`; `:40-41` `b.height` `>= 10`, `<= 60`; `:42-45` `b.x ± b.width/2` e `b.z ± b.depth/2` dentro de `block ± half` | PASS |
 | C19 | >= 1 letreiro por quarteirão; cores na paleta de 4 | batch U · `✓ CityGenerator > neon signs use the 4-color palette` | carried from 181fd5d · `tests/unit/cityGenerator.test.ts:52` `[...NEON_PALETTE]` `toEqual(['#ff2d95','#00e5ff','#b026ff','#ffd400'])`; `:57` `block.signs.length` `>= 1`; `:59` `palette.has(s.color)` `toBe(true)`; `:63` `used.size` `toBe(4)` | PASS |
-| C20 | Postes a cada 20 m nos dois lados; total = 2 × ruas × floor(L/20) | batch U · `✓ CityGenerator > lamp posts every 20 m on both sides` | carried from 181fd5d · `tests/unit/cityGenerator.test.ts:71-72` `expected = 2 * (2 * 7) * Math.floor(404 / 20)`, `city.lamps.length` `toBe(expected)`; `:81` `groups.size` `toBe(28)`; `:84` `coords.length` `toBe(20)`; `:86` `coords[i] - coords[i-1]` `toBeCloseTo(20, 2)` | PASS |
-| C21 | `renderer.info.render.calls` <= 60 | batch E · `[21/26] render.spec.ts:11:3 › draw calls at most 60` | carried from 181fd5d · `tests/e2e/render.spec.ts:13-14` `expect(calls).toBeGreaterThan(0)`, `expect(calls).toBeLessThanOrEqual(60)` | PASS |
-| C22 | Letreiro, janela e cabeça de poste com emissiveIntensity >= 2 | batch E · `[22/26] render.spec.ts:18:3 › neon emissive intensity at least 2` | carried from 181fd5d · `tests/e2e/render.spec.ts:20` `m.windowEmissiveIntensity` `toBeGreaterThanOrEqual(2)`; `:21` `m.lampEmissiveIntensity` `toBeGreaterThanOrEqual(2)`; `:22-23` `m.signEmissiveIntensities.length` `toBe(4)`, cada `v` `toBeGreaterThanOrEqual(2)`; getter `src/core/Game.ts:221-223` relido em 42e60a1, inalterado | PASS |
+| C20 | Postes a cada 40 m (± 0.01) nos dois lados; total = 2 × ruas × floor(L/40) | `npx vitest run tests/unit/cityGenerator.test.ts -t "lamp posts every 40 m on both sides"` exit 0 · `✓ CityGenerator > lamp posts every 40 m on both sides` (+ `npx vitest run` 46/46) | verified at 78c9795 · `tests/unit/cityGenerator.test.ts:93-94` `expected = 2 * (2 * streetsPerAxis) * Math.floor(streetLength / 40)`, `city.lamps.length` `toBe(expected)`; `:103` `groups.size` `toBe(2 * 2 * streetsPerAxis)`; `:106` `coords.length` `toBe(Math.floor(streetLength / 40))`; `:108` `coords[i] - coords[i - 1]` `toBeCloseTo(40, 2)`; fonte `src/world/CityGenerator.ts:14` `LAMP_SPACING = 40` | PASS |
+| C21 | `renderer.info.render.calls` <= 60 | batch E · `[21/26] render.spec.ts:11:3 › draw calls at most 60` | carried from 181fd5d (valor 60 desatualizado desde 503b714, ver R4-2) · `tests/e2e/render.spec.ts:13-14` `expect(calls).toBeGreaterThan(0)`, `expect(calls).toBeLessThanOrEqual(60)` | PASS em 42e60a1; superseded por visual-upgrade C8 (≤ 120, `render.spec.ts:11:3` verde em 78c9795) |
+| C22 | Letreiro, janela e cabeça de poste com emissiveIntensity >= 2 | `npx playwright test tests/e2e/render.spec.ts` exit 0 · `✓ 2 render.spec.ts:18:3 › render › neon emissive intensity at least 2` | verified at 78c9795 · `tests/e2e/render.spec.ts:20` `m.windowEmissiveIntensity` `toBeGreaterThanOrEqual(2)`; `:22` `m.lampEmissiveIntensity` `toBeGreaterThanOrEqual(2)`; `:23-24` `m.signEmissiveIntensities.length` `toBe(4)`, cada `v` `toBeGreaterThanOrEqual(2)`; getters `src/core/Game.ts:517-519,539-544`; fonte `src/world/CityScene.ts:304` janela `2.2` (o `WINDOW_BRIGHTNESS` 0.7 de `:22` só entra no GLSL `:379`, ver R4-1) | PASS |
 | C23 | Rua roughness <= 0.25; `scene.environment` não nulo | batch E · `[23/26] render.spec.ts:27:3 › wet road material and environment map` | carried from 181fd5d · `tests/e2e/render.spec.ts:30-31` `expect(roughness).toBeLessThanOrEqual(0.25)`, `expect(hasEnv).toBe(true)` | PASS |
 | C24 | Composer com UnrealBloomPass habilitado; toneMapping ACES | batch E · `[24/26] render.spec.ts:35:3 › bloom pass and ACES tone mapping` | carried from 181fd5d · `tests/e2e/render.spec.ts:40-42` `expect(info.passes).toContain('UnrealBloomPass')`, `expect(info.bloomEnabled).toBe(true)`, `expect(info.aces).toBe(true)` | PASS |
 | C25 | `formatSpeed` 13.9→"50", -2.0→"7", 0.27→"1" | batch U · `✓ hud format > speed in kmh as integer` | carried from 181fd5d · `tests/unit/hudFormat.test.ts:7-9` `formatSpeed(13.9)` `toBe('50')`, `formatSpeed(-2.0)` `toBe('7')`, `formatSpeed(0.27)` `toBe('1')` | PASS |
@@ -137,7 +186,8 @@ nodes (6)` recontado do código. Nenhum outro conjunto novo (o fix não adiciono
 | bloom literals (3) | carried from 181fd5d · `src/core/Game.ts:76` `new UnrealBloomPass(…, 0.8, 0.4, 0.7)` (linha relida, inalterada) | strength C45 (`render.spec.ts:73`) · radius C45 (`:74`) · threshold C45 (`:75`) | - |
 | pass order (3) | carried from 181fd5d · `src/core/Game.ts:75-78` `addPass` ×3 (relidas, inalteradas) | C45 `render.spec.ts:72` `toEqual([RenderPass, UnrealBloomPass, OutputPass])` | - |
 | engine force per wheel (4) | carried from 181fd5d · `src/vehicle/Car.ts:39-40` `FRONT = [0, 1]`, `REAR = [2, 3]`; `:115-124` | roda 0 C45 (`render.spec.ts:84`) · roda 1 C45 (`:85`) · roda 2 C45 (`:86`) · roda 3 C45 (`:87`) | - |
-| emissive materials (3) | carried from 181fd5d · `src/world/CityScene.ts:34` janela 2.0 · `:40` poste 2.5 · `:128` letreiro 3.0 | janela C22 (`render.spec.ts:20`) · poste C22 (`:21`) · letreiro C22 (`:22-23`) | - |
+| emissive materials (3) | verified at 78c9795 · `src/world/CityScene.ts:304` janela 2.2 (fachada, 4 tipos) · `:109` poste 2.5 · `:247` letreiro 2.6 (4 cores) | janela C22 (`render.spec.ts:20`) · poste C22 (`:22`) · letreiro C22 (`:23-24`) | - |
+| lamp groups (28) | verified at 78c9795 · `src/world/CityGenerator.ts` `streetsFor()` 7 ruas em x + 7 em z · `:189` lados `[-1, 1]` · `:184` 10 postes por lado (`floor(404/40)`) | 28 grupos C20 (`cityGenerator.test.ts:103`) · 10 por grupo C20 (`:106`) · espaçamento 40 C20 (`:108`) · total 280 C20 (`:94`) | - |
 | audio graph nodes (6) | verified at 42e60a1 · `src/audio/AudioEngine.ts:33-34` osc sawtooth · `:36-37` filtro lowpass 900 Hz · `:41-42` gain motor · `:47-49` buffer source loop · `:51-52` filtro lowpass 420 Hz · `:55-56` gain ambiente | engine osc C46 (`audio.spec.ts:34` posição 0) · engine filter C46 (`:34` posição 1) · engine gain C46 (`:34` posição 2) · ambient source C46 (`:35` posição 0) · ambient filter C46 (`:35` posição 1) · ambient gain C46 (`:35` posição 2) | - |
 | audio gains (3) | verified at 42e60a1 · `src/audio/AudioEngine.ts:29` master · `:42` engine `ENGINE_GAIN` · `:56` ambient `AMBIENT_GAIN` | master C37 (`audio.spec.ts:26`) · engine C37 (`:25`) · ambient C37 (`:24`) | - |
 | mute transitions (2) | verified at 42e60a1 · `src/audio/AudioEngine.ts:69-72` `toggleMute()` | 1→0 C38 (`audio.spec.ts:45`) · 0→1 C38 (`:47`) | - |
@@ -160,9 +210,9 @@ Re-julgadas: as linhas que classificam arquivos tocados (`src/audio/AudioEngine.
 | Row | Files it classifies | Required proof | Expectation met |
 | --- | --- | --- | --- |
 | Decides, reached across a boundary | `src/vehicle/drivetrain.ts` · `src/core/Loader.ts` (+ `src/main.ts` na tabela do autor) | carried from 181fd5d · drivetrain: fronteira C1, C3, C5 · camada própria C2, C4 (3 arestas de ré), C6-C8, C27, C28 (7 marchas, 4 regimes, 2 arestas de cap, 4 amostras de direção). Loader/main: fronteira C31 (ok), C32 (WebGL2), C33 (GLB), C41 (catch) | yes |
-| Decides, not reached across a boundary | `src/core/input.ts` · `src/core/FixedStepper.ts` · `src/camera/chaseMath.ts` · `src/world/CityGenerator.ts` · `src/hud/format.ts` · `src/hud/minimapMath.ts` · `src/audio/audioMap.ts` · `src/core/exposeDebug.ts` | carried from 181fd5d · C15 · C12 · C13, C14 · C16-C20 · C25, C29 · C30 · C36 · C34 (e agora também C39 varre `exposeDebug.ts`) | yes |
+| Decides, not reached across a boundary | `src/core/input.ts` · `src/core/FixedStepper.ts` · `src/camera/chaseMath.ts` · `src/world/CityGenerator.ts` · `src/hud/format.ts` · `src/hud/minimapMath.ts` · `src/audio/audioMap.ts` · `src/core/exposeDebug.ts` | carried from 181fd5d; `CityGenerator.ts` re-julgado em 78c9795 (C20 a 40 m, 4 superfícies mortas) · C15 · C12 · C13, C14 · C16-C20 · C25, C29 · C30 · C36 · C34 (e agora também C39 varre `exposeDebug.ts`) | yes |
 | Entry point that decides nothing | `src/main.ts` · `src/core/InputManager.ts` | verified at 42e60a1 · main.ts: entrada aceita C31; error paths: sem WebGL2 C32, `catch` do boot C41 (`hud.spec.ts:92,94`). InputManager: primeira tecla C35 (`audio.spec.ts:11-13`) e C46; teclas seguradas C1-C11; `src/core/InputManager.ts:39` `if (event.repeat) return` continua sem prova própria - pass-through coberto pelas provas que seguram teclas (finding 4), sem exigência desta linha | yes |
-| Instrumentation, pass-throughs | `src/vehicle/Car.ts` · `src/world/CityScene.ts` · `src/world/Environment.ts` · `src/core/Game.ts` · `src/core/GameLoop.ts` · `src/hud/Hud.ts` · `src/audio/AudioEngine.ts` · `src/camera/ChaseCamera.ts` · `src/hud/Minimap.ts` | verified at 42e60a1 · AudioEngine C35 (`start()` `:23-62`), C37 (ganhos `:29,42,56`), C38 (`toggleMute` `:69-72`), C46 (`graph()` `:87-103` lê `type`/`loop`/`constructor.name` reais dos nós; instrumentação nova coberta pelo consumidor `audio.spec.ts:34-37`) · Game C21-C24, C41 (`:82`), C43-C45 (getters inalterados), C46 (getter `:257-259`) · Hud C26 (`#speed`) + C44 (`#gear`, `#rpm-fill`, `Hud.ts:24-29`) · Minimap C42 (`hud.spec.ts:119-122,144-145`, incluindo `Minimap.ts:36` `rotate`) · Car C1-C11, C40, C45 · CityScene C21-C23 · Environment C23 · GameLoop C1 · ChaseCamera C43 (carried) | yes |
+| Instrumentation, pass-throughs | `src/vehicle/Car.ts` · `src/world/CityScene.ts` · `src/world/Environment.ts` · `src/core/Game.ts` · `src/core/GameLoop.ts` · `src/hud/Hud.ts` · `src/audio/AudioEngine.ts` · `src/camera/ChaseCamera.ts` · `src/hud/Minimap.ts` | verified at 42e60a1 · AudioEngine C35 (`start()` `:23-62`), C37 (ganhos `:29,42,56`), C38 (`toggleMute` `:69-72`), C46 (`graph()` `:87-103` lê `type`/`loop`/`constructor.name` reais dos nós; instrumentação nova coberta pelo consumidor `audio.spec.ts:34-37`) · Game C21-C24, C41 (`:82`), C43-C45 (getters inalterados), C46 (getter `:257-259`) · Hud C26 (`#speed`) + C44 (`#gear`, `#rpm-fill`, `Hud.ts:24-29`) · Minimap C42 (`hud.spec.ts:119-122,144-145`, incluindo `Minimap.ts:36` `rotate`) · Car C1-C11, C40, C45 · CityScene C21-C23 (re-julgado em 78c9795: `WINDOW_BRIGHTNESS` é pass-through de shader; C22 cobre a propriedade, R4-1) · Environment C23 · GameLoop C1 · ChaseCamera C43 (carried) | yes |
 
 ## Faults injected
 
@@ -177,10 +227,12 @@ Provas Playwright rodadas de dentro do worktree, uma invocação por vez; como
 em `:5173` (`netstat -ano`), garantindo que o Vite servido era o do worktree mutado. Uma falha
 por superfície de asserção nova ou endurecida pelo fix; cada uma derruba uma prova diferente.
 
+Rodada 4: baseline porcelain da árvore real vazio; worktree `<scratchpad>/verify-c20` em 78c9795 com junção `mklink /J` para `node_modules`; `git checkout -- <arquivo>` entre mutantes (porcelain do worktree vazio após cada um); vitest dentro do worktree; Playwright com `E2E_PORT=5179` (0 listeners antes). Junção removida com `cmd //c rmdir`, worktree com `git worktree remove --force`; `git worktree list` = árvore real + `Jogo-terrain` (intocado); porcelain final da árvore real vazio antes de reescrever este relatório.
+
 | Mutation | Location | Killed |
 | --- | --- | --- |
 | carried from c58edf6 · `GEAR_BANDS` `[30, 60]` → `[31, 60]` | `src/vehicle/drivetrain.ts:46` | yes - `vitest … -t "gear bands"` exit 1: `gear at 30 km/h: expected 1 to be 2` (C27) |
-| carried from c58edf6 · `LAMP_SPACING` `20` → `21` | `src/world/CityGenerator.ts:14` | yes - `vitest … -t "lamp posts every 20 m on both sides"` exit 1: `expected 532 to be 560` (C20) |
+| carried from c58edf6 (teste renomeado em 78c9795; superfície re-injetada abaixo) · `LAMP_SPACING` `20` → `21` | `src/world/CityGenerator.ts:14` | yes - `vitest … -t "lamp posts every 20 m on both sides"` exit 1: `expected 532 to be 560` (C20) |
 | carried from c58edf6 · `maxSteps` `5` → `6` | `src/core/FixedStepper.ts:16` | yes - `vitest … -t "steps at 1/60 with a cap of 5"` exit 1: `expected 6 to be 5` (C12) |
 | carried from c58edf6 · ramo de falha do GLB devolve `placeholder: false` | `src/core/Loader.ts:36` | yes - `playwright … -g "missing glb falls back to box chassis"` exit 1: `hud.spec.ts:62` Received: false (C33) |
 | carried from c58edf6 · `reset()` levanta `t.y + 3` em vez de `t.y + 1` | `src/vehicle/Car.ts:176` | yes - `playwright … -g "reset puts car upright"` exit 1: `drive.spec.ts:104` Expected 1.5975 Received 3.5975 (C11) |
@@ -194,6 +246,11 @@ por superfície de asserção nova ou endurecida pelo fix; cada uma derruba uma 
 | verified at 42e60a1 · linha `ctx.rotate(-state.heading);` removida (triângulo nunca gira) | `src/hud/Minimap.ts:36` | yes - `npx playwright test tests/e2e/hud.spec.ts -g "minimap draws blocks and car"` exit 1: `hud.spec.ts:144` `expect(tip.maxX).toBeGreaterThanOrEqual(84)` Expected >= 84 Received 83 (C42; margem de 1 px, finding 2) |
 | verified at 42e60a1 · oscilador do motor `'sawtooth'` → `'square'` | `src/audio/AudioEngine.ts:34` | yes - `npx playwright test tests/e2e/audio.spec.ts -g "synthesized audio graph"` exit 1: `audio.spec.ts:34` `expect(graph.engine).toEqual([...])` deep equality, 1 elemento diferente (C46) |
 | verified at 42e60a1 · HUD escreve `gearLabel(state.gear + 1)` (contra a asserção nova `toBe(String(sample.gear))`) | `src/hud/Hud.ts:24` | yes - `npx playwright test tests/e2e/hud.spec.ts -g "gear and rpm bar match car state"` exit 1: `hud.spec.ts:164` Expected "2" Received "3" (C44, versão sem valor fixo) |
+| verified at 78c9795 · `LAMP_SPACING` `40` → `20` | `src/world/CityGenerator.ts:14` | yes - `npx vitest run tests/unit/cityGenerator.test.ts -t "lamp posts every 40 m on both sides"` exit 1: `expected 560 to be 280` em `cityGenerator.test.ts:94` (C20 total) |
+| verified at 78c9795 · os dois postes no mesmo lado (`s * side` → `Math.abs(s) * side`) | `src/world/CityGenerator.ts:191,193` | yes - mesma prova exit 1: `expected 14 to be 28` em `:103` (C20 "dois lados") |
+| verified at 78c9795 · contagem por eixo desbalanceada (`i < count + (axis === "x" ? 1 : -1)`; total segue 280) | `src/world/CityGenerator.ts:187` | yes - mesma prova exit 1: `x:-161.400: expected 11 to be 10` em `:106` (C20 por rua) |
+| verified at 78c9795 · primeiro poste deslocado 5 m (`+ (i === 0 ? 5 : 0)`) | `src/world/CityGenerator.ts:188` | yes - mesma prova exit 1: `x:-161.400: expected 35 to be close to 40, received difference is 5` em `:108` (C20 espaçamento) |
+| verified at 78c9795 · janela `emissiveIntensity` `2.2` → `1.9` | `src/world/CityScene.ts:304` | yes - `E2E_PORT=5179 npx playwright test tests/e2e/render.spec.ts -g "neon emissive intensity at least 2"` exit 1: `render.spec.ts:20:39` Expected >= 2 Received 1.9 (C22) |
 
 ## Gate
 
@@ -203,9 +260,36 @@ por superfície de asserção nova ou endurecida pelo fix; cada uma derruba uma 
 validate_verification: 0 error(s), 0 warning(s) across [free-roam-city]
 ```
 
-Provas em `HEAD` 42e60a1: 22 unit passed, 0 failed · 26 e2e passed, 0 failed.
+Rodada 4, provas em `HEAD` 78c9795: `npx vitest run` 46 passed, 0 failed (15 arquivos) · `npx playwright test tests/e2e/render.spec.ts` 6 passed, 0 failed.
+
+Rodada 3 (carried): provas em `HEAD` 42e60a1: 22 unit passed, 0 failed · 26 e2e passed, 0 failed.
 
 ## Findings
+
+Rodada 4 (verified at 78c9795) - nenhum sustenta FAIL desta rodada:
+
+- **R4-1. C22 afirma a propriedade, não o brilho renderizado das janelas.** `emissiveIntensity`
+  segue 2.2 (`CityScene.ts:304`), mas o shader multiplica a radiância por `warm = 0.70 * mix(0.8,
+  0.5..1.0, detail)` (`:379`), então a intensidade efetiva de janela fica em ~0.77-1.54 (antes do
+  diff: ~1.1-2.2). Nenhum pixel de janela atinge mais 2.0 efetivo; o AC 17 ("emissive de intensidade
+  2.0 ou mais nos elementos neon e janelas") só se mantém na leitura literal da propriedade, que é o
+  que C22 diz. Um mutante `WINDOW_BRIGHTNESS` 0.7 -> 0.05 (janelas quase apagadas) passaria C22 - fora
+  do claim, por isso não entrou na tabela de faults. Mudança pedida pelo usuário e registrada no
+  Handoff; se o AC 17 deve valer para o brilho percebido, é o texto do AC que precisa mudar.
+- **R4-2. Deriva fora deste range: provas de free-roam em `render.spec.ts` reescritas pela
+  visual-upgrade (503b714).** C21 (`checks.md:81-82`, "60 ou menos", proof `-g "draw calls at most
+  60"`) não tem mais teste com esse nome; `render.spec.ts:11` é `draw calls at most 120` (visual-upgrade
+  C8, superseding registrado em `visual-upgrade/plan.md:46` e `visual-upgrade/checks.md:42`). C45
+  agora afirma a pilha de 6 passes (`render.spec.ts:74`); a ordem relativa Render -> Bloom -> Output e
+  os literais seguem cobertos. As linhas C21/C45 da tabela `## Checks` citam o estado de 42e60a1.
+  Recomendado: anotar C21 como superseded em `free-roam-city/checks.md` (fora do mandato deste
+  Verifier) ou rodar uma verificação completa de free-roam em HEAD.
+- **R4-3. C20 não prende posição.** O teste não afirma onde começa a fila (comentário "começando 20 m
+  depois da borda", `CityGenerator.ts:180`, sem prova) nem a distância lateral ao meio-fio (`side`,
+  `:185`); `along = -CITY_EXTENT + i * LAMP_SPACING` (sem o meio passo) ou uma fila inteira deslocada
+  passariam. Não é claim de C20 (precision gap, não mutante sobrevivente).
+
+Rodada 3 (carried from 42e60a1):
 
 Nenhum sustenta um FAIL; são observações de precisão para uma rodada futura. Dos 6 findings
 residuais da rodada 2, os de número 1 (rotação em C42), 2 (tolerância float32 em C45), 3 (tipos
