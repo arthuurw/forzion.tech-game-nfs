@@ -45,12 +45,12 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 
 ## Handoff
 
-**Feature**: `residuals` concluída (Verifier PASS rodada 1, 2026-09-27) na branch `residuals`, ainda não juntada em `main`; `races` com `plan.md` aprovado, sem `checks.md`
-**Where**: branch `residuals`; 151/151 unitários e 101/101 e2e verdes em 2026-09-27 (5 e2e falharam só quando rodaram junto com a injeção de falhas do Verifier e passaram sozinhos)
+**Feature**: `residuals` concluída (Verifier PASS rodada 1, 2026-09-27) juntada em `main`; `races` com `plan.md` aprovado, sem `checks.md`
+**Where**: `main`; 151/151 unitários e 101/101 e2e verdes em 2026-09-27 (5 e2e falharam só quando rodaram junto com a injeção de falhas do Verifier e passaram sozinhos)
 **In progress**: nada
-**Next step**: juntar `residuals` em `main`; depois `races`: escrever `.specs/features/races/checks.md` a partir do plano aprovado e construir
+**Next step**: `races`: escrever `.specs/features/races/checks.md` a partir do plano aprovado e construir
 **Blockers**: none
-**Branch**: `residuals`
+**Branch**: `main`
 
 Concluídas: free-roam-city (PASS rodada 4), engine-sound (PASS rodada 3), visual-upgrade (PASS rodada 4), city-terrain (PASS rodada 3), car-handling (PASS rodada 4, autorizada pelo usuário depois de escalar), facade-glint (PASS rodada 1), car-feel (PASS rodada 2; traseira só no acelerador fora de escopo por decisão do usuário), yaw-assist (PASS rodada 2), corner-assist (PASS rodada 3), block-fill (PASS rodada 2).
 Decisões do usuário no build (2026-09-26): C1 da facade-glint isola o especular; metal com `metalness` 0.05 e `normalScale` 0.2, tijolo com `normalScale` 0.25 e piso de rugosidade 0.6; C4 da car-handling com sinal corrigido e C29 com velocidade horizontal; freio de mão com acelerador mantém o motor (power slide); freio-motor na ré; C7 da corner-assist trocou a prova; doors 1 e 2 da block-fill alargadas pelo builder e confirmadas.
