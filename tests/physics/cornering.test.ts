@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { DEFAULT_CAR, type CarSpec } from '../../src/vehicle/carSpec';
-import { LateralGWindow, NO_INPUT, createHarness, initRapier, kmh, rollDeg } from './harness';
+import { LateralGWindow, NO_INPUT, axis, createHarness, initRapier, kmh, rollDeg } from './harness';
 
 beforeAll(async () => {
   await initRapier();
@@ -115,5 +115,24 @@ describe('corner assist - spec', () => {
     parked.settle();
     parked.step({ ...NO_INPUT, steer: 1 });
     expect(parked.car.cornerAssistN).toBe(0);
+
+    // o impulso aponta para a esquerda do carro com força positiva, de frente e de ré
+    for (const v0 of [100, -28]) {
+      const h = createHarness();
+      h.settle();
+      h.setForwardKmh(v0);
+      let pushed = 0;
+      for (let i = 0; i < 40; i++) {
+        h.step({ ...NO_INPUT, steer: 1 });
+        if (h.car.cornerAssistN <= 0) continue;
+        const left = axis(h.car, 1, 0, 0);
+        const imp = h.car.cornerAssistImpulse;
+        const along = imp.x * left.x + imp.z * left.z;
+        expect(along, `${v0} km/h step ${i + 1}`).toBeGreaterThan(0);
+        expect(Math.abs(imp.y)).toBe(0);
+        pushed++;
+      }
+      expect(pushed, `${v0} km/h`).toBeGreaterThanOrEqual(5);
+    }
   });
 });

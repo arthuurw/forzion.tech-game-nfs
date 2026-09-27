@@ -49,16 +49,19 @@ Proof: `npx vitest run tests/physics/cornering.test.ts -t "path straightens with
 | 0.2 | 20 | 1 | não | 0 (menos de 2 rodas no chão) |
 | 0.2 | 20 | 2 | não | 7848 |
 | 0.2 | 20 | 4 | sim | 0 (freio de mão) |
+| 1.2 | 5 | 4 | não | 7848 (exatamente 5 m/s já tem força; pede 15.90 m/s² acima do início, limitado) |
 
 Proof: `npx vitest run tests/unit/cornerAssist.test.ts -t "corner assist force fills lateral acceleration above the start"`
 
 **C7** - ✅ O `Car` aplica a força e lê a ficha (door 1):
 - `CarSpec` tem `cornerAssistStartG` e `cornerAssistMaxG`, finitos, com `cornerAssistMaxG` > `cornerAssistStartG` > 0 em `DEFAULT_CAR`.
 - No harness, 180 passos com `steer +1` a 100 km/h: com `{ ...DEFAULT_CAR, cornerAssistMaxG: DEFAULT_CAR.cornerAssistStartG }`, `car.cornerAssistN` é 0 em todo passo; com `DEFAULT_CAR`, é > 0 em pelo menos 60 passos. A força vem da ficha.
+- A força é aplicada no centro de massa: com a força ligada, a rolagem média dos passos 90–180 a 100 km/h difere em no máximo 1.0° da rolagem com a força desligada.
+- `car.cornerAssistN` é > 0 depois de 60 passos com `steer +1` a 100 km/h, e 0 parado.
+- A 100 km/h e a −28 km/h (de ré), com `steer +1`, em todo passo com `car.cornerAssistN` > 0 o impulso aplicado (`car.cornerAssistImpulse`) aponta para a esquerda do carro (produto com o eixo `+X` do chassi > 0) e não tem componente vertical; isso acontece em pelo menos 5 dos 40 passos em cada sentido.
+- No browser, `__game.car.cornerAssistN` é 0 parado no spawn e > 0 depois de `W` por 2 s e `W` + `A` por 0.5 s.
 
 (Prova trocada com o usuário em 2026-09-26: a versão aprovada comparava o giro com e sem a força, mas sem a força a ajuda de giro faz o carro rodar e girar mais, o que não diz nada sobre ler a ficha.)
-- A força é aplicada no centro de massa: com a força ligada, a rolagem média dos passos 90–180 a 100 km/h difere em no máximo 1.0° da rolagem com a força desligada.
-- `car.cornerAssistN` é > 0 depois de 60 passos com `steer +1` a 100 km/h, e 0 parado. No browser, `__game.car.cornerAssistN` é 0 parado no spawn e > 0 depois de `W` por 2 s e `W` + `A` por 0.5 s.
 
 Proof: `npx vitest run tests/physics/cornering.test.ts -t "car applies the corner assist from its spec at the center of mass"`
 Proof: `npx playwright test tests/e2e/drive.spec.ts -g "car debug exposes the corner assist force"`
@@ -92,7 +95,7 @@ Proof: `npx playwright test tests/e2e/visual.spec.ts -g "camera swings left whil
 | --- | --- | --- |
 | plan ACs (12) | 1 C1 · 2 C2 · 3 C3 · 4 C4 · 5 C5 · 6 C6, C7 · 7 C9 · 8 C10 · 9 C11 · 10 C12 · 11 C13 · 12 C14 | - |
 | landing doors (1) | 1 C6, C7, C8 | - |
-| corner assist cases (9) | abaixo do início C6 · livre C6 · limitado C6 · lado oposto C6 · ré C6 · abaixo de 5 m/s C6 · 1 roda C6 · 2 rodas C6 · freio de mão C6 | - |
+| corner assist cases (10) | abaixo do início C6 · livre C6 · limitado C6 · lado oposto C6 · ré C6, C7 · abaixo de 5 m/s C6 · 1 roda C6 · 2 rodas C6 · freio de mão C6 · exatamente 5 m/s C6 | - |
 | spec fields (2) | startG C7 · maxG C7 | - |
 | superseded yaw-assist checks (1) | ya-5 → C4 | - |
 | startup config: car construction (1 assembly) | `src/core/Game.ts` constrói o `Car` com `DEFAULT_CAR` (check 35 da car-handling, 2ª prova de C14) | - |
