@@ -48,12 +48,12 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 
 ## Handoff
 
-**Feature**: `block-life-extras` concluída (Verifier PASS rodada 3, 2026-09-27, 39 checks; rodadas 1 e 2 pegaram fechamento do laço, estado `gone` do gato, limiar de 30 m e cor da pintura em linear) na branch `block-life-extras`, ainda não juntada em `main`
-**Where**: branch `block-life-extras`; 202/202 unitários e 132/132 e2e verdes em 2026-09-27; draw calls no grid do centro em corrida: 219 de 220
+**Feature**: `block-life-extras` concluída (Verifier PASS rodada 3, 2026-09-27, 39 checks; rodadas 1 e 2 pegaram fechamento do laço, estado `gone` do gato, limiar de 30 m e cor da pintura em linear) juntada em `main` e publicada
+**Where**: `main`; 202/202 unitários e 132/132 e2e verdes em 2026-09-27; draw calls no grid do centro em corrida: 219 de 220
 **In progress**: nada
-**Next step**: juntar `block-life-extras` em `main` local; `git push` só com ok do usuário; depois sub-projeto 3 (garagem)
+**Next step**: sub-projeto 3 (garagem + tuning visual)
 **Blockers**: none
-**Branch**: `block-life-extras`
+**Branch**: `main`
 
 Concluídas: free-roam-city (PASS rodada 4), engine-sound (PASS rodada 3), visual-upgrade (PASS rodada 4), city-terrain (PASS rodada 3), car-handling (PASS rodada 4, autorizada pelo usuário depois de escalar), facade-glint (PASS rodada 1), car-feel (PASS rodada 2; traseira só no acelerador fora de escopo por decisão do usuário), yaw-assist (PASS rodada 2), corner-assist (PASS rodada 3), block-fill (PASS rodada 2), residuals (PASS rodada 1), races (PASS rodada 1), block-life-extras (PASS rodada 3).
 Decisões do usuário no build (2026-09-26): C1 da facade-glint isola o especular; metal com `metalness` 0.05 e `normalScale` 0.2, tijolo com `normalScale` 0.25 e piso de rugosidade 0.6; C4 da car-handling com sinal corrigido e C29 com velocidade horizontal; freio de mão com acelerador mantém o motor (power slide); freio-motor na ré; C7 da corner-assist trocou a prova; doors 1 e 2 da block-fill alargadas pelo builder e confirmadas.
