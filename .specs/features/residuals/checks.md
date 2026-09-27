@@ -9,25 +9,25 @@ Plan: `.specs/features/residuals/plan.md`
 
 ### S1 - reflexo da rua estável · 3 files · 100 KB · ~25k
 
-**C1** - Com o espelho da rua ligado, câmera andando 0.05 m por quadro em 10 quadros a 640×360, `__game.render.shimmer(0.05, { mirror: true })` < 0.010. Parada (passo 0), = 0 (AC 1)
+**C1** - ✅ Câmera andando 0.05 m por quadro em 10 quadros a 640×360, na mesma página: `shimmer(0.05, { mirror: true }) − shimmer(0.05, { mirror: false })` ≤ 0.001. Parada (passo 0), com o espelho, = 0 (AC 1, renegociado em 2026-09-27)
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "street reflection stays stable while the camera moves"`
 
-**C2** - Sensibilidade da sonda: com o blur do espelho desligado (`mirrorBlur: false`, o shader de uma amostra de antes), a mesma medida da C1 dá > 0.010. Sem isso, a C1 passaria com uma sonda cega (AC 1)
+**C2** - ✅ Sensibilidade da sonda: com o blur do espelho desligado (`mirrorBlur: false`, o shader de uma amostra de antes), `shimmer(0.05, { mirror: true, mirrorBlur: false }) − shimmer(0.05, { mirror: false })` ≥ 0.003. Sem isso, a C1 passaria com uma sonda cega (AC 1, renegociado em 2026-09-27)
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "probe detects reflection shimmer without blur"`
 
-**C3** - O alvo do espelho continua `floor(innerWidth × 0.5) × floor(innerHeight × 0.5)`: 320 × 180 a 640×360 (AC 2, visual-upgrade C4)
+**C3** - ✅ O alvo do espelho continua `floor(innerWidth × 0.5) × floor(innerHeight × 0.5)`: 320 × 180 a 640×360 (AC 2, visual-upgrade C4)
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "reflector present only in high quality"`
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "reflection blur keeps the half-resolution target"`
 
-**C4** - Brilho que o espelho soma à rua: luminância média da metade de baixo do quadro com o espelho, menos a mesma área com o chão escuro no lugar do espelho, é ≥ 0.6 × o mesmo ganho medido com `mirrorBlur: false`, na mesma página e na mesma pose de câmera (AC 3)
+**C4** - ✅ Brilho que o espelho soma à rua: luminância média da metade de baixo do quadro com o espelho, menos a mesma área com o chão escuro no lugar do espelho, é ≥ 0.6 × o mesmo ganho medido com `mirrorBlur: false`, na mesma página e na mesma pose de câmera (AC 3)
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "blurred reflection keeps most of its brightness"`
 
-### S2 - folga do tijolo na facade-glint · 2 files · 44 KB · ~11k
+### S2 - guarda do tijolo na facade-glint · 1 file · 23 KB · ~6k
 
-**C5** - Tijolo (tipo 2), farol ligado, AA ligado: `headlightShimmer(2, specular: true).flicker − headlightShimmer(2, specular: false).flicker` ≤ 0.0006 (AC 4)
+**C5** - ✅ Tijolo (tipo 2), farol ligado, AA ligado: `headlightShimmer(2, specular: true).flicker − headlightShimmer(2, specular: false).flicker` ≤ 0.0007 (AC 4, renegociado em 2026-09-27)
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "brick facade glint has margin"`
 
-**C6** - Os tipos 0-3 continuam na C1 da facade-glint (≤ 0.0010) e na C3 (`litMean` com farol ≥ 1.2 × sem farol) (AC 4, AC 5)
+**C6** - ✅ Os tipos 0-3 continuam na C1 da facade-glint (≤ 0.0010) e na C3 (`litMean` com farol ≥ 1.2 × sem farol) (AC 4, AC 5)
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "headlight adds no facade glint"`
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "headlight still lights the facade"`
 
@@ -99,3 +99,5 @@ Cost: 5 provas Playwright novas em 2 arquivos, 3 unitárias num arquivo novo, 1 
 - Mechanism: one builder (cabe no budget, sem pergunta)
 
 - **Settled mid-build:** C8 nomeava `InteriorScene.ts` como lugar das constantes. A mesma conta já existia em `interiorMotion.fireflyMotion` (puro, ao lado de `BULB_AMPLITUDE`), então a fonte única ficou lá, e `InteriorScene.ts` exporta os trechos de GLSL montados a partir dela. O seletor `-g "C22|C25"` da C10 não casava com nenhum teste (os nomes não têm o número do check). Trocado pelos nomes reais, sem mudar a asserção.
+- **Settled mid-build (2026-09-27, usuário):** as bases do plano eram velhas. Medido no build a 640×360: espelho sem blur 0.0103, sem espelho 0.0054, com blur de 2.5 texels 0.0057, ganho de brilho 0.67 do original. Tijolo 0.00058 sem mudar nada, e os botões do plano pioram (mapa de rugosidade em 0 dá 0.00072, `normalScale` 0.18 dá 0.00063 e 0.1 dá 0.0019). O usuário escolheu: C1 e C2 relativos ao "sem espelho" (≤ 0.001 com blur, ≥ 0.003 sem blur), e o tijolo sem mudança de material, com C5 ≤ 0.0007 como guarda de regressão.
+- **Abandoned:** atenuar o `roughnessMap` do tijolo (`FACADE_ROUGHNESS_MAP_STRENGTH`): a 0.5 não mudou nada (0.00059), e a 0 piorou (0.00072).

@@ -18,17 +18,17 @@ Quando isto sair: o chão molhado reflete sem pontos piscando, o tijolo tem folg
 
 Reusa a sonda de cintilação que já existe (`__game.render.shimmer`, `src/core/Game.ts:614-661`), o teste de ré de `tests/e2e/drive.spec.ts:39`, e o padrão de constante interpolada no GLSL que o `BULB_AMPLITUDE` já usa em `InteriorScene.ts`.
 
-1. `world/CityScene` (exists): o shader do `Reflector` passa a fazer várias amostras com blur no alvo, que continua do mesmo tamanho (door 3 da visual-upgrade intacta). O `roughnessMap` do tijolo é atenuado.
+1. `world/CityScene` (exists): o shader do `Reflector` passa a fazer 9 amostras em tenda, afastadas 2.5 texels, no alvo, que continua do mesmo tamanho (door 3 da visual-upgrade intacta). O material do tijolo não muda.
 2. `world/interiors/InteriorScene` (exists): frequências e amplitudes do balanço das árvores, dos vagalumes e da lâmpada viram constantes TS exportadas. O mesmo valor vai interpolado no GLSL e é lido pelas sondas.
-3. `tests/e2e/visual.spec.ts` (exists) e `tests/e2e/drive.spec.ts` (exists): provas novas de cintilação com o espelho e do "R".
-4. `.specs/features/block-fill/checks.md` (exists): linha do custo recontada.
+3. `core/Game` (exists): as sondas DEV `render.shimmer` (com `mirrorBlur`) e `render.mirrorGain`.
+4. `tests/e2e/visual.spec.ts` (exists) e `tests/e2e/drive.spec.ts` (exists): provas novas de cintilação com o espelho e do "R".
+5. `.specs/features/block-fill/checks.md` (exists): linha do custo recontada.
 
 ## Impact
 
 | Front | What changes |
 | --- | --- |
 | visual | o reflexo da rua fica mais borrado, com cara de asfalto molhado em vez de espelho. As lâmpadas refletidas viram manchas em vez de pontos |
-| visual | o tijolo perde parte do contraste de rugosidade de perto. Metal, vidro e concreto não mudam |
 | checks existentes | continuam valendo: visual-upgrade C4 (alvo do espelho em meia resolução), C41 (janelas estáveis) e o restante do door 3; facade-glint C1-C3 dos 4 tipos; block-fill C22 e C25 (sondas de árvore e vagalume), agora lendo as constantes compartilhadas |
 | stored data | nada para migrar |
 
@@ -54,7 +54,7 @@ None - nothing consumed outside
 
 **Acceptance Criteria**
 
-1. WHILE a câmera anda com o espelho da rua ligado, a 640×360, the system SHALL manter a cintilação medida por `__game.render.shimmer` com `mirror: true` abaixo de 0.010. A medida de base é 0.0274.
+1. WHILE a câmera anda com o espelho da rua ligado, a 640×360, the system SHALL manter a cintilação medida por `__game.render.shimmer` com `mirror: true` no máximo 0.001 acima da mesma medida com `mirror: false`. Renegociado com o usuário em 2026-09-27: a base de 0.0274 era velha. No build, sem blur, o espelho mediu 0.0103 contra 0.0054 sem espelho.
 2. The system SHALL manter o alvo do espelho em `floor(largura × 0.5) × floor(altura × 0.5)` (visual-upgrade C4).
 3. The system SHALL manter visível o brilho que o espelho soma à rua: a luminância média da área de rua com o espelho, menos a mesma área sem o espelho, SHALL ser pelo menos 0.6 × essa diferença medida antes da mudança.
 
@@ -64,7 +64,7 @@ None - nothing consumed outside
 
 **Acceptance Criteria**
 
-4. The system SHALL manter a C1 da facade-glint no tijolo (`flicker(specular) − flicker(sem specular)`, farol ligado, AA ligado) ≤ 0.0006, e nos outros 3 tipos ≤ 0.0010 como hoje.
+4. The system SHALL manter a C1 da facade-glint no tijolo (`flicker(specular) − flicker(sem specular)`, farol ligado, AA ligado) ≤ 0.0007, e nos outros 3 tipos ≤ 0.0010 como hoje. Renegociado com o usuário em 2026-09-27: o tijolo já mede 0.00058 sem mudar o material (a base de 0.00074 era velha), e os botões do plano pioram a medida. O limite vira guarda de regressão.
 5. The system SHALL manter a C3 da facade-glint em todos os tipos: o `litMean` com o farol ligado ≥ 1.2 × o `litMean` com ele desligado.
 
 **Independent test:** a prova da facade-glint em `tests/e2e/visual.spec.ts`.
@@ -107,7 +107,7 @@ None - nothing consumed outside
 | Assumption | Chosen default | Rationale | Confirmed? |
 | --- | --- | --- | --- |
 | como estabilizar o reflexo | blur de várias amostras no shader do `Reflector`, com o alvo do mesmo tamanho | ataca a causa (uma amostra por pixel num alvo pequeno) sem mexer em porta. O reflexo fica mais "molhado" | y |
-| como dar folga ao tijolo | atenuar o `roughnessMap` do tijolo na direção de 0.85; se não bastar, `normalScale` 0.25 → 0.18 | a varredura mostrou que o `roughnessMap` é a causa, e o piso de rugosidade não ajuda. Muda a cara do tijolo de perto | y |
+| como dar folga ao tijolo | não mexer no material; só a guarda de regressão da AC 4 | medido no build: tijolo 0.00058 sem mudança (42 % de folga contra 0.0010). Mapa de rugosidade em 0 deu 0.00072, `normalScale` 0.18 deu 0.00063 e 0.1 deu 0.0019. Escolha do usuário em 2026-09-27 | y |
 | corner-assist | não mexer, só registrar em Out of scope | qualquer ajuste muda a sensação do carro, que o usuário aprovou | y |
 
 **Open questions:** none - all resolved or logged above.

@@ -35,6 +35,54 @@ const WINDOW_COLOR = new THREE.Color('#ffd9a0');
 /** brilho percebido das janelas acesas (pedido do usuário: um pouco menos claras); a intensidade emissiva continua 2.2 para o bloom */
 const WINDOW_BRIGHTNESS = 0.7;
 const LAMP_POST_HEIGHT = 6;
+/**
+ * raio do blur do reflexo da rua, em texels do alvo de meia resolução (residuals S1):
+ * janelas e lâmpadas menores que um texel serrilhavam no alvo e piscavam com a câmera andando
+ */
+export const MIRROR_BLUR_TEXELS = 2.5;
+
+/**
+ * `Reflector.ReflectorShader` com 9 amostras em tenda (1-2-1 × 1-2-1) em volta do ponto
+ * projetado, afastadas `uBlur` texels. Com `uBlur` = 0 as 9 caem no mesmo ponto: é o
+ * shader de uma amostra de antes (a sonda `mirrorBlur: false` usa isso).
+ */
+interface ReflectorShaderDef {
+  name: string;
+  uniforms: Record<string, THREE.IUniform>;
+  vertexShader: string;
+  fragmentShader: string;
+}
+
+function blurredReflectorShader(width: number, height: number): ReflectorShaderDef {
+  // o shader padrão existe em runtime, mas os tipos do three não o declaram
+  const base = (Reflector as unknown as { ReflectorShader: ReflectorShaderDef }).ReflectorShader;
+  return {
+    name: 'BlurredReflectorShader',
+    uniforms: {
+      ...base.uniforms,
+      uTexel: { value: new THREE.Vector2(1 / width, 1 / height) },
+      uBlur: { value: MIRROR_BLUR_TEXELS },
+    },
+    vertexShader: base.vertexShader,
+    fragmentShader: base.fragmentShader
+      .replace(
+        'varying vec4 vUv;',
+        `varying vec4 vUv;
+		uniform vec2 uTexel;
+		uniform float uBlur;`,
+      )
+      .replace(
+        'vec4 base = texture2DProj( tDiffuse, vUv );',
+        `vec2 uv = vUv.xy / vUv.w;
+			vec2 d = uTexel * uBlur;
+			vec4 base = 0.25 * texture2D( tDiffuse, uv );
+			base += 0.125 * ( texture2D( tDiffuse, uv + vec2( d.x, 0.0 ) ) + texture2D( tDiffuse, uv - vec2( d.x, 0.0 ) )
+				+ texture2D( tDiffuse, uv + vec2( 0.0, d.y ) ) + texture2D( tDiffuse, uv - vec2( 0.0, d.y ) ) );
+			base += 0.0625 * ( texture2D( tDiffuse, uv + d ) + texture2D( tDiffuse, uv - d )
+				+ texture2D( tDiffuse, uv + vec2( d.x, -d.y ) ) + texture2D( tDiffuse, uv - vec2( d.x, -d.y ) ) );`,
+      ),
+  };
+}
 
 export interface WorldData {
   seed: number;
@@ -89,11 +137,14 @@ export class CityScene {
     // --- centro: reflector (ou chão escuro em `low`) sob o asfalto semitransparente ---
     if (quality.reflector) {
       // door 3: render target = metade da viewport em pixels CSS (sem devicePixelRatio)
+      const textureWidth = Math.floor(window.innerWidth * 0.5);
+      const textureHeight = Math.floor(window.innerHeight * 0.5);
       this.reflector = new Reflector(new THREE.PlaneGeometry(size, size), {
         clipBias: 0.003,
-        textureWidth: Math.floor(window.innerWidth * 0.5),
-        textureHeight: Math.floor(window.innerHeight * 0.5),
+        textureWidth,
+        textureHeight,
         color: 0x8a8f9a,
+        shader: blurredReflectorShader(textureWidth, textureHeight),
       });
       this.reflector.rotation.x = -Math.PI / 2;
       this.reflector.position.y = 0;

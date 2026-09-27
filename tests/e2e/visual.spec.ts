@@ -515,3 +515,71 @@ test.describe('facade-glint', () => {
     expect(await page.evaluate(() => (window as any).__game.materials.facadeSpecularAA)).toBe(true);
   });
 });
+
+test.describe('residuals - reflexo da rua e tijolo', () => {
+  const shimmer = (page: Page, step: number, opts: { mirror: boolean; mirrorBlur?: boolean }): Promise<number> =>
+    page.evaluate(([step, opts]) => (window as any).__game.render.shimmer(step, opts) as number, [step, opts] as const);
+
+  // C1 (AC 1): com o espelho ligado, a câmera andando quase não soma cintilação ao "sem espelho"
+  test('street reflection stays stable while the camera moves', async ({ page }) => {
+    await open(page);
+    await advanceSim(page, 1);
+    const moving = await shimmer(page, 0.05, { mirror: true });
+    const noMirror = await shimmer(page, 0.05, { mirror: false });
+    const still = await shimmer(page, 0, { mirror: true });
+    expect(still).toBe(0);
+    expect(moving - noMirror).toBeLessThanOrEqual(0.001);
+  });
+
+  // C2 (AC 1): sem o blur (shader de uma amostra), a mesma sonda enxerga o espelho cintilando
+  test('probe detects reflection shimmer without blur', async ({ page }) => {
+    await open(page);
+    await advanceSim(page, 1);
+    const sharp = await shimmer(page, 0.05, { mirror: true, mirrorBlur: false });
+    const noMirror = await shimmer(page, 0.05, { mirror: false });
+    expect(sharp - noMirror).toBeGreaterThanOrEqual(0.003);
+  });
+
+  // C3 (AC 2): o blur usa o texel do alvo de meia resolução, que não muda de tamanho
+  test('reflection blur keeps the half-resolution target', async ({ page }) => {
+    await open(page);
+    const s = await page.evaluate(() => ({
+      r: (window as any).__game.scene.reflector,
+      w: window.innerWidth,
+      h: window.innerHeight,
+    }));
+    const size = [Math.floor(s.w * 0.5), Math.floor(s.h * 0.5)];
+    expect(size).toEqual([320, 180]);
+    expect(s.r.size).toEqual(size);
+    expect(s.r.texel[0]).toBeCloseTo(1 / size[0]!, 9);
+    expect(s.r.texel[1]).toBeCloseTo(1 / size[1]!, 9);
+    expect(s.r.blur).toBeGreaterThan(0);
+  });
+
+  // C4 (AC 3): o blur não apaga o reflexo - ganho ≥ 0.6 × o do shader de uma amostra
+  test('blurred reflection keeps most of its brightness', async ({ page }) => {
+    await open(page);
+    await advanceSim(page, 1);
+    const blurred = await page.evaluate(() => (window as any).__game.render.mirrorGain({}) as number);
+    const sharp = await page.evaluate(() => (window as any).__game.render.mirrorGain({ mirrorBlur: false }) as number);
+    expect(sharp).toBeGreaterThan(0);
+    expect(blurred).toBeGreaterThanOrEqual(0.6 * sharp);
+  });
+
+  // C5 (AC 4): guarda de regressão do tijolo (tipo 2) na C1 da facade-glint
+  test('brick facade glint has margin', async ({ page }) => {
+    await open(page);
+    await advanceSim(page, 1);
+    const probe = (specular: boolean) =>
+      page.evaluate(
+        (specular) =>
+          (window as any).__game.render.headlightShimmer(2, { headlight: true, specularAA: true, specular }) as {
+            flicker: number;
+          },
+        specular,
+      );
+    const spec = await probe(true);
+    const flat = await probe(false);
+    expect(spec.flicker - flat.flicker).toBeLessThanOrEqual(0.0007);
+  });
+});

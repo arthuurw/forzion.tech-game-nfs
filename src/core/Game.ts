@@ -609,10 +609,12 @@ export class Game {
          * que muda de pixel para pixel a cada quadro dá valores altos.
          * `mirror: false` troca o reflexo da rua pelo chão escuro do modo `low`
          * (sem chão, o centro vira um buraco e as bordas contra o fundo cintilam),
-         * para medir só as fachadas.
+         * para medir só as fachadas. `mirrorBlur: false` zera o blur do espelho durante a
+         * medida (o shader de uma amostra de antes da residuals).
          */
-        shimmer: (step: number, opts: { frames?: number; mirror?: boolean } = {}): number => {
+        shimmer: (step: number, opts: { frames?: number; mirror?: boolean; mirrorBlur?: boolean } = {}): number => {
           const frames = opts.frames ?? 10;
+          const restoreBlur = game.setMirrorBlur(opts.mirrorBlur);
           const cam = game.chase.camera;
           const hidden: THREE.Object3D[] = [game.rain.points, ...game.effects.objects];
           let ground: THREE.Mesh | null = null;
@@ -646,6 +648,7 @@ export class Game {
           }
           cam.position.copy(p0);
           cam.updateMatrixWorld();
+          restoreBlur();
           hidden.forEach((o, i) => (o.visible = was[i]!));
           if (ground) {
             game.scene.remove(ground);
@@ -658,6 +661,45 @@ export class Game {
             for (let k = 0; k < w * h; k++) if (Math.abs(c[k]! - 2 * b[k]! + a[k]!) > 0.15) flicker++;
           }
           return flicker / ((frames - 2) * w * h);
+        },
+        /**
+         * só DEV/testes (residuals C4): brilho que o espelho soma à rua. Luminância média da
+         * metade de baixo do quadro com o espelho, menos a mesma área com o chão escuro do
+         * modo `low` no lugar dele, na pose atual da câmera (chuva e partículas escondidas).
+         */
+        mirrorGain: (opts: { mirrorBlur?: boolean } = {}): number => {
+          const r = game.city.reflector;
+          if (!r) return 0;
+          const restoreBlur = game.setMirrorBlur(opts.mirrorBlur);
+          const hidden: THREE.Object3D[] = [game.rain.points, ...game.effects.objects];
+          const was = hidden.map((o) => o.visible);
+          hidden.forEach((o) => (o.visible = false));
+          const gl = game.renderer.getContext();
+          const w = gl.drawingBufferWidth;
+          const h = gl.drawingBufferHeight;
+          const rows = Math.floor(h / 2);
+          const px = new Uint8Array(w * rows * 4);
+          const meanLum = (): number => {
+            game.composer.render(0);
+            gl.readPixels(0, 0, w, rows, gl.RGBA, gl.UNSIGNED_BYTE, px);
+            let sum = 0;
+            for (let k = 0; k < w * rows; k++) sum += (0.2126 * px[4 * k]! + 0.7152 * px[4 * k + 1]! + 0.0722 * px[4 * k + 2]!) / 255;
+            return sum / (w * rows);
+          };
+          const withMirror = meanLum();
+          const size = game.city.reflectorSize;
+          const ground = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ color: '#07080d' }));
+          ground.rotation.x = -Math.PI / 2;
+          game.scene.add(ground);
+          r.visible = false;
+          const without = meanLum();
+          r.visible = true;
+          game.scene.remove(ground);
+          ground.geometry.dispose();
+          (ground.material as THREE.Material).dispose();
+          hidden.forEach((o, i) => (o.visible = was[i]!));
+          restoreBlur();
+          return withMirror - without;
         },
         headlightShimmer: (type: number, opts: HeadlightShimmerOpts) =>
           game.probeHeadlightShimmer(type, opts),
@@ -763,6 +805,12 @@ export class Game {
             y: r.position.y,
             planeSize: [g.width, g.height],
             position: [r.position.x, r.position.y, r.position.z],
+            // residuals S1: blur do shader do espelho, em texels do alvo, e o texel que ele usa
+            blur: (r.material as THREE.ShaderMaterial).uniforms.uBlur!.value as number,
+            texel: [
+              ((r.material as THREE.ShaderMaterial).uniforms.uTexel!.value as THREE.Vector2).x,
+              ((r.material as THREE.ShaderMaterial).uniforms.uTexel!.value as THREE.Vector2).y,
+            ],
           };
         },
       },
@@ -970,6 +1018,18 @@ export class Game {
   }
 
   /** Luminância média do quarto central da tela no último `composer.render` (lida com `readPixels`). */
+  /** Só DEV: `false` zera o blur do espelho até chamar a função devolvida; `undefined` não mexe. */
+  setMirrorBlur(on: boolean | undefined): () => void {
+    const r = this.city.reflector;
+    if (on !== false || !r) return () => {};
+    const u = (r.material as THREE.ShaderMaterial).uniforms.uBlur!;
+    const was = u.value as number;
+    u.value = 0;
+    return () => {
+      u.value = was;
+    };
+  }
+
   private centralLuminance(): number {
     const gl = this.renderer.getContext();
     const w = gl.drawingBufferWidth;
