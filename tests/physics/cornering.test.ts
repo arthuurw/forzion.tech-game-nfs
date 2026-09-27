@@ -84,3 +84,36 @@ describe('corner assist - cornering', () => {
     expect(after.some((x) => x < 0.15)).toBe(true);
   });
 });
+
+describe('corner assist - spec', () => {
+  // C7 (AC 6, door 1)
+  it('car applies the corner assist from its spec at the center of mass', () => {
+    const start = DEFAULT_CAR.cornerAssistStartG;
+    const max = DEFAULT_CAR.cornerAssistMaxG;
+    expect(Number.isFinite(start)).toBe(true);
+    expect(Number.isFinite(max)).toBe(true);
+    expect(start).toBeGreaterThan(0);
+    expect(max).toBeGreaterThan(start);
+
+    // a força vem da ficha: teto igual ao início desliga
+    const offSpec: CarSpec = { ...DEFAULT_CAR, cornerAssistMaxG: start };
+    const off = hold(100, 180, offSpec);
+    expect(off.force.length).toBe(180);
+    off.force.forEach((f, i) => expect(f, `off step ${i + 1}`).toBe(0));
+    const on = hold(100, 180);
+    expect(on.force.filter((f) => f > 0).length).toBeGreaterThanOrEqual(60);
+
+    // no centro de massa: a rolagem quase não muda com a força
+    const rollOn = meanSteps90to180(on.roll);
+    const rollOff = meanSteps90to180(off.roll);
+    expect(Math.abs(rollOn - rollOff)).toBeLessThanOrEqual(1.0);
+
+    const moving = hold(100, 60);
+    expect(moving.h.car.cornerAssistN).toBeGreaterThan(0);
+
+    const parked = createHarness();
+    parked.settle();
+    parked.step({ ...NO_INPUT, steer: 1 });
+    expect(parked.car.cornerAssistN).toBe(0);
+  });
+});
