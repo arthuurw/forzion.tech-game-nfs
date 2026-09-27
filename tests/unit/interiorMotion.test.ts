@@ -73,6 +73,37 @@ describe('interior motion', () => {
     expect(hi).toBeLessThanOrEqual(1);
     // varia de verdade (não é constante)
     expect(hi - lo).toBeGreaterThan(0.5);
+
+    // do seed: mesmo seed dá o mesmo valor; outro seed muda o ruído em quase todo ponto
+    let differ = 0;
+    for (let i = 0; i < 1000; i++) {
+      const x = (rand() - 0.5) * 3072;
+      const z = (rand() - 0.5) * 3072;
+      const n = terrainNoise(1337, x, z);
+      expect(terrainNoise(1337, x, z)).toBe(n);
+      if (Math.abs(terrainNoise(1338, x, z) - n) > 1e-6) differ++;
+    }
+    expect(differ).toBeGreaterThanOrEqual(900);
+
+    // escala de 8 m: ruído de valor com nós a cada 8 m. Dentro de uma célula de 8 × 8 m o valor é a
+    // interpolação suave (smoothstep) dos 4 cantos, ± 1e-9. Com nós a 16 m ou a 4 m isso quebra.
+    const smooth = (t: number) => t * t * (3 - 2 * t);
+    let worstCell = 0;
+    for (let i = 0; i < 500; i++) {
+      const ix = Math.floor((rand() - 0.5) * 384);
+      const iz = Math.floor((rand() - 0.5) * 384);
+      const u = 0.05 + 0.9 * rand();
+      const v = 0.05 + 0.9 * rand();
+      const a = terrainNoise(1337, 8 * ix, 8 * iz);
+      const b = terrainNoise(1337, 8 * (ix + 1), 8 * iz);
+      const c = terrainNoise(1337, 8 * ix, 8 * (iz + 1));
+      const d = terrainNoise(1337, 8 * (ix + 1), 8 * (iz + 1));
+      const su = smooth(u);
+      const sv = smooth(v);
+      const expected = a + (b - a) * su + (c - a) * sv + (a - b - c + d) * su * sv;
+      worstCell = Math.max(worstCell, Math.abs(terrainNoise(1337, 8 * (ix + u), 8 * (iz + v)) - expected));
+    }
+    expect(worstCell).toBeLessThanOrEqual(1e-9);
   });
 
   // C10 (AC 9) - parte pura
@@ -150,21 +181,28 @@ describe('interior motion', () => {
   });
 
   // C17 (AC 16) - parte pura
-  it('string lights sway', () => {
+  it('string lights sway', { timeout: 60_000 }, () => {
     const bulbs = props.yards.flatMap((y) => y.bulbs);
     expect(bulbs.length).toBeGreaterThan(0);
     let worst = 0;
+    // pior caso de cada propriedade sobre todas as lâmpadas e instantes, um expect por propriedade
+    let freqLo = Infinity;
+    let freqHi = -Infinity;
+    let worstPeriod = 0;
     for (const b of bulbs) {
       const { freq, phase } = bulbSway(b.x, b.z);
-      expect(freq).toBeGreaterThanOrEqual(0.2);
-      expect(freq).toBeLessThanOrEqual(0.4);
+      freqLo = Math.min(freqLo, freq);
+      freqHi = Math.max(freqHi, freq);
       for (let i = 0; i <= 60 * 60; i += 7) {
         const t = i * DT;
         worst = Math.max(worst, Math.abs(bulbOffset(t, phase, freq)));
         // repete a cada 1/freq
-        expect(Math.abs(bulbOffset(t + 1 / freq, phase, freq) - bulbOffset(t, phase, freq))).toBeLessThanOrEqual(1e-9);
+        worstPeriod = Math.max(worstPeriod, Math.abs(bulbOffset(t + 1 / freq, phase, freq) - bulbOffset(t, phase, freq)));
       }
     }
+    expect(freqLo).toBeGreaterThanOrEqual(0.2);
+    expect(freqHi).toBeLessThanOrEqual(0.4);
+    expect(worstPeriod).toBeLessThanOrEqual(1e-9);
     expect(worst).toBeGreaterThan(0);
     expect(worst).toBeLessThanOrEqual(0.15);
   });

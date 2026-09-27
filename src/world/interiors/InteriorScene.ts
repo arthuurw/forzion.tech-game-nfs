@@ -489,6 +489,45 @@ export class InteriorScene {
     return { x: p.x + a.getZ(i) * s, y: p.y, z: p.z + a.getW(i) * s };
   }
 
+  /**
+   * Só DEV: cada vértice da árvore `i` onde o vertex shader o põe agora (`aSway` × `aCrown` ×
+   * seno com o `uTime` aplicado, depois a matriz da instância), com a cor do vértice.
+   */
+  treeVertices(i: number): Array<{ x: number; y: number; z: number; r: number; g: number; b: number }> {
+    const m = new THREE.Matrix4();
+    this.trees.getMatrixAt(i, m);
+    const g = this.trees.geometry;
+    const pos = g.getAttribute('position');
+    const col = g.getAttribute('color');
+    const mask = g.getAttribute('aCrown');
+    const sway = g.getAttribute('aSway') as THREE.InstancedBufferAttribute;
+    const s = Math.sin(2 * Math.PI * sway.getX(i) * this.swayTime.value + sway.getY(i));
+    const v = new THREE.Vector3();
+    const out: Array<{ x: number; y: number; z: number; r: number; g: number; b: number }> = [];
+    for (let k = 0; k < pos.count; k++) {
+      const w = mask.getX(k) * s;
+      v.set(pos.getX(k) + sway.getZ(i) * w, pos.getY(k), pos.getZ(k) + sway.getW(i) * w).applyMatrix4(m);
+      out.push({ x: v.x, y: v.y, z: v.z, r: col.getX(k), g: col.getY(k), b: col.getZ(k) });
+    }
+    return out;
+  }
+
+  /** Só DEV: cada vagalume onde o vertex shader o põe agora (âncora + deriva com o `uTime` aplicado). */
+  fireflyPositions(): Array<{ x: number; y: number; z: number }> {
+    const pos = this.fireflies.geometry.getAttribute('position');
+    const prm = this.fireflies.geometry.getAttribute('aParams');
+    const t = this.swayTime.value;
+    const out: Array<{ x: number; y: number; z: number }> = [];
+    for (let k = 0; k < this.fireflyCount; k++) {
+      out.push({
+        x: pos.getX(k) + Math.sin(2 * Math.PI * 0.05 * t + prm.getX(k)),
+        y: pos.getY(k) + 0.4 * Math.sin(2 * Math.PI * 0.06 * t + prm.getZ(k)),
+        z: pos.getZ(k) + Math.sin(2 * Math.PI * 0.045 * t + prm.getY(k)),
+      });
+    }
+    return out;
+  }
+
   /** Liga o shader do terreno à luz rebatida: `aBounce` × nível da zona `aZone` × luz quente × albedo. */
   patchTerrainMaterial(material: THREE.MeshStandardMaterial): void {
     const u = this.terrainUniforms;
