@@ -1,174 +1,193 @@
 # Block-fill verification
 
-**Verdict**: FAIL
+**Verdict**: PASS
 **Profile**: standard
-**Diff range**: f5c3ade..2456366 (branch `block-fill`: bbf232d, 09d40cd, 50b591f, 9679601, 9198fe2, 0897717, 8ca79ca, 2456366) + a resolução do merge ff0934a (união do `purity.test.ts`, correções de Flow/Impact no `plan.md`); HEAD verificado = ff0934a
-**Round**: 1 - full
+**Diff range**: 8c02e15..bf52b81 (correções 9de7a69, 4fd983e, bf52b81, entradas por 8e791f9; a nota de docs fb05348 no `plan.md` Landing também foi lida); HEAD verificado = 8e791f9 (main). Rodada 1: f5c3ade..ff0934a
+**Round**: 2 - scoped
 **Verifier**: independent sub-agent (author != verifier)
 
 Resumo:
-- Os 38 checks têm prova localizada e verde em ff0934a: vitest 142/142 e Playwright 95/95 (porta 5202, 43.6 min, sem timeout de boot). As 5 faltas injetadas morreram.
-- O veredito é FAIL por **cobertura**, não por teste vermelho. Recalculando os ACs do plano, dois trechos que o próprio plano escreve não têm prova nenhuma:
-  1. AC 23 "vagalumes **perto das árvores**". Nenhuma asserção olha onde os vagalumes estão. C25 só conta e mede o movimento puro.
-  2. AC 7 "ruído **do seed** em **escala de 8 m**". C8 afirma só o intervalo [−1, 1] e que o ruído varia. Trocar a escala para 80 m ou ignorar o seed passa em tudo.
-- Risco de tempo: a prova unitária de C17 ("string lights sway") não tem timeout próprio e roda no limite do padrão de 5 s. Deu timeout 2 vezes com o Playwright rodando em paralelo (5315 ms e 5516 ms). Sem carga passou 3 de 3 (2.6 s, 4.5 s e 2.9 s) e passou nas duas rodadas completas do vitest.
+- As 5 lacunas da rodada 1 foram fechadas com prova localizada e verde em 8e791f9:
+  1. AC 23 "perto das árvores" (C25): `tests/e2e/interiors.spec.ts:378`, `:386`, nas duas qualidades (`:395`, `:401`).
+  2. AC 7 "do seed, em escala de 8 m" (C8): `tests/unit/interiorMotion.test.ts:83`, `:86`, `:106`.
+  3. Folga de tempo de C17: `{ timeout: 60_000 }` em `interiorMotion.test.ts:184`. Rodou em 141 ms com o Playwright em paralelo.
+  4. Máscara `aCrown` do tronco (C22): `interiors.spec.ts:303` (tronco parado vértice a vértice) e `:311` (copa se move).
+  5. Docs: C28 lista a prova de browser (`checks.md:152`) e a linha "startup config" do Coverage cita `Game.ts` (`checks.md:216`).
+- As edições do `checks.md` em C8, C17, C22, C25 e C28 **apertam** a obrigação aprovada, sem enfraquecer nem mudar o sentido (ver "Checks.md edits judged").
+- As sondas novas `treeVertices(i)` e `fireflyPositions()` fazem a mesma conta dos shaders, termo a termo, e leem os mesmos buffers que a GPU recebe (ver "DEV probes judged").
+- 5 faltas injetadas nas superfícies novas, 5 mortas.
+- vitest 148/148. Playwright `interiors.spec.ts` 18/18 (porta 5207, 12.1 min).
 
 ## Binding sources
 
-O `plan.md` não marca nenhuma fonte como binding. `Sources` só traz o pedido do usuário e as AD-008/AD-010. O profile é `standard`, então o passo 1 não roda.
+Carried from ff0934a. O `plan.md` não marca nenhuma fonte como binding e o profile é `standard`, então o passo 1 não roda. A correção não tocou interface.
 
 | Source | Opened | Contradiction | Uncovered |
 | --- | --- | --- | --- |
 | nenhuma fonte binding | n/a | - | - |
 
+## Checks.md edits judged
+
+Verified at 8e791f9 (`git diff 8c02e15 bf52b81 -- .specs/features/block-fill/checks.md`). Cada edição foi comparada com o AC do `plan.md` e com o texto aprovado antes.
+
+| Check | Antes | Depois | Julgamento |
+| --- | --- | --- | --- |
+| C8 (AC 7) | "O ruído vem do seed, em escala de 8 m, sempre em [−1, 1] (10 000 pontos)" | mantém o intervalo e os 10 000 pontos; "do seed" vira: mesmo seed dá o mesmo valor e 1338 difere de 1337 (> 1e-6) em ≥ 900 de 1000 pontos; "escala de 8 m" vira: ruído de valor com nós a cada 8 m, em 500 pontos dentro de células 8 × 8 m (u, v em [0.05, 0.95]) o valor é a interpolação smoothstep dos 4 cantos ± 1e-9 | Aperto. As três afirmações antigas continuam e as duas vagas ganharam valor concreto. A forma escolhida (smoothstep de nós a 8 m) é mais estrita que "escala de 8 m", e a F1 mostra que nós a 16 m quebram a igualdade |
+| C17 (AC 16) | "(± 1e-9)" por lâmpada | "(± 1e-9), no pior caso sobre todas as lâmpadas e instantes (teste com timeout de 60 s)" | Só harness. Os mesmos limites (0.15, [0.2, 0.4], 1e-9) |
+| C22 (AC 21) | uTime anda, matrizes de instância dos troncos não mudam | mantém tudo e soma: nas 5 primeiras árvores, com os vértices onde o shader os põe, todo vértice marrom (r > g, independente da máscara) fica parado e algum vértice verde (g > r) se move | Aperto. Fecha "o tronco fica parado" no nível do vértice. Classificar o tronco pela cor, e não pela máscara, é o que impede a prova de se apoiar no mesmo dado que ela testa |
+| C25 (AC 23) | teto 600/300, > 0, velocidade ≤ 0.5 m/s, pulso [0.3, 0.6] Hz | mantém tudo e soma: nas duas qualidades, em dois instantes separados por 2 s, todo vagalume a ≤ 6 m na horizontal de alguma árvore e entre 0.4 e 3.2 m acima do pé dela (± 0.01), com a conta do 6 m | Aperto. A conta confere: âncora `r = crown·(0.8 + 0.6·frac) < 1.4·crown` (`InteriorScene.ts:468`), `crown = 1.2 + 0.2·height ≤ 3.2` (`InteriorProps.ts:270`), deriva ±1 m em x e z (`InteriorScene.ts:746-748`): 1.4 × 3.2 + √2 ≈ 5.89 ≤ 6. Altura: 0.8 + [0, 2) ± 0.4 = [0.4, 3.2] (`:469`, `:747`) |
+| C28 (AC 26) | só a prova unitária listada | soma `Proof: npx playwright test tests/e2e/interiors.spec.ts -g "crane beacon blinks"` | Só docs. A prova existia e já contava na rodada 1 (Deviation 6) |
+| Coverage "startup config" | "`src/core/Game.ts` via `CityGenerator`" | "`src/core/Game.ts` (`findBlockInteriors` + `placeInteriorProps` no boot)" | Correção de docs. Confere em `src/core/Game.ts:154-155` |
+| "Sondas DEV" | 3 sondas | soma `treeVertices(i)` e `fireflyPositions()` (`checks.md:21-22`) | Aditivo |
+
+Nenhuma edição enfraquece ou troca o sentido de um check.
+
+**Diff dos testes.** Nenhuma asserção enfraqueceu:
+- C17 (`tests/unit/interiorMotion.test.ts:184-208`): os `expect` por passo viraram acumuladores de pior caso, `freqLo = min`, `freqHi = max` e `worstPeriod = max`, com os mesmos limites (`:203` ≥ 0.2, `:204` ≤ 0.4, `:205` ≤ 1e-9). As asserções de amplitude (`:206-207`) não mudaram. Um `NaN` também reprova: `Math.min`/`Math.max` propagam `NaN`, e `expect(NaN).toBeLessThanOrEqual(x)` falha.
+- C8, C22 e C25: só acréscimos. As asserções antigas estão intactas (`interiorMotion.test.ts:72-75`; `interiors.spec.ts:295-297`, `:393-394`, `:399-400`).
+
+## DEV probes judged
+
+Verified at 8e791f9. As duas sondas foram lidas contra o GLSL que o material de fato compila.
+
+- **`treeVertices(i)`** (`src/world/interiors/InteriorScene.ts:496-512`).
+  - O shader da copa (`:726-728`, injetado depois do `#include <begin_vertex>`, antes do `instanceMatrix` do `project_vertex`) faz `transformed.xz += aSway.zw * aCrown * sin(6.28318530718 * aSway.x * uTime + aSway.y)`.
+  - A sonda faz `s = sin(2π · sway.getX(i) · swayTime.value + sway.getY(i))` (`:504`), soma `sway.getZ/W(i) · mask.getX(k) · s` a x e z e depois aplica a matriz da instância `i` (`:507`). É a mesma ordem.
+  - `uTime` é o próprio objeto `swayTime` (`:716`, `:150`). `aSway` é o `InstancedBufferAttribute` da instância `i` (`:431`). `aCrown` e `color` são os buffers da geometria (`:708-709`). A sonda lê exatamente o que a GPU recebe.
+  - O `group` e a malha não têm transformação (nenhum `position`/`scale` em `InteriorScene.ts`), então a matriz do mundo é a identidade.
+- **`fireflyPositions()`** (`:516-529`).
+  - O vertex shader (`:744-749`) soma a `position` a deriva `(1.0·sin(2π·0.05·t + aParams.x), 0.4·sin(2π·0.06·t + aParams.z), 1.0·sin(2π·0.045·t + aParams.y))`.
+  - A sonda (`:522-526`) usa as mesmas frequências, amplitudes e componentes de `aParams`, com a mesma troca y ↔ z. Também lê o `position` reescrito por `anchorFireflies` (`:470`) e o `uTime` compartilhado.
+- **Resíduo, sem ser lacuna.** As sondas espelham o GLSL em JS. Uma edição só no texto do shader, sem mexer na sonda, não seria pega pelo teste. A equivalência hoje está provada pela leitura acima. As faltas F3 e F4 mostram que os dados que o shader consome (máscara e âncora) chegam às provas.
+
 ## Checks
 
-Tudo verificado em ff0934a, no worktree do Verifier (junction de `node_modules`; `git status --porcelain` vazio antes e depois).
-- `npx vitest run`: 35 arquivos, **142 passaram**, exit 0. Rodei de novo no fim, sem carga: 142/142.
-- `npx vitest run --reporter=verbose` nos 5 arquivos da feature (`interiors`, `interiorProps`, `interiorMotion`, `physics/interiors`, `purity`): 29 nomes, cada um com ✓. A exceção foi "string lights sway", com timeout de 5 s enquanto o Playwright rodava (ver resumo).
-- `E2E_PORT=5202 npx playwright test`: **95 passaram** em 43.6 min, exit 0. O `[WebServer] vite --port 5202 --strictPort` subiu no próprio run.
-  - Os 18 testes de `interiors.spec.ts` aparecem cada um com ✓ (#29-#46).
-  - Os logs de sonda mostram: C11 "(32, -36) facadeDist 5.50 on 0.2541 off 0.0468"; C12 "on 0.0468 off 0.0468"; C29 "beam 0.3976 outside 0.0123"; C34 "start 5.00 m, after 4 s 16.11 m".
-- Todo nome de prova existe no tree (achado com `rg`/leitura) e foi tocado pela feature. As exceções são C36 e C38, que são provas antigas de propósito. `render.spec.ts`, `world.spec.ts` e o trecho de `visual.spec.ts` que elas usam não mudaram no range da feature.
+Proofs re-run at 8e791f9, no worktree do Verifier (junction de `node_modules`, porcelain vazio antes e depois):
+- `npx vitest run`: 37 arquivos, **148 passaram**, exit 0. Os 6 a mais que na rodada 1 são de outras features entradas depois (corner-assist).
+- `npx vitest run <5 arquivos da feature> --reporter=verbose`: 29/29 ✓, cada nome aparece. "string lights sway" levou 141 ms com o Playwright rodando.
+- `E2E_PORT=5207 npx playwright test tests/e2e/interiors.spec.ts`: **18 passaram** em 12.1 min, exit 0. Cada um dos 18 nomes aparece com ✓ (#1-#18). Os logs de sonda mostram: C11 "(32, -36) facadeDist 5.50 on 0.2541 off 0.0468"; C12 "on 0.0468 off 0.0468"; C29 "beam 0.3976 outside 0.0123"; C34 "start 5.00 m, after 4 s 16.01 m". "tree crowns sway and trunks stay" levou 20.1 s e "fireflies within budget" levou 57.4 s.
+- C36 e C38 usam `render.spec.ts`, `world.spec.ts` e `visual.spec.ts`. Nenhum deles está no diff da correção, e os arquivos de código que a correção tocou (`Game.ts`, `InteriorScene.ts`) só ganharam sondas DEV que não rodam no quadro. O resultado vem de ff0934a (95/95).
+
+Os checks marcados "verified at 8e791f9" tiveram a asserção relida nesta rodada. Os "carried from ff0934a" mantêm o julgamento da asserção da rodada 1, com a citação atualizada onde o arquivo mudou (`interiorMotion.test.ts`, `interiors.spec.ts`). A prova de todos rodou de novo em 8e791f9, exceto C36 e C38, como explicado acima.
 
 | Check | Claim | Proof run | Evidence | Result |
 | --- | --- | --- | --- | --- |
-| C1 | regra de interior: estrada w/2+2, lote +1, água +0.5, borda 8 m; seed 1337 exaustivo | vitest `interior vertex rule` ✓ | `tests/unit/interiors.test.ts:132-133` (9.9 → −1, 10.1 → ≥0), `:135-136` (lote), `:138-139` (água), `:147` (borda 7.9/8.1), `:161-166` (as 4 condições em cada vértice interior do seed), `:169` `checked > 1000` | PASS |
-| C2 | zonas por vizinhança de 4, mínimo 25 | vitest `zones are 4-connected groups of at least 25` ✓ | `tests/unit/interiors.test.ts:189-190` (L de 30 → 1 zona, `cells` 30), `:202-203` (diagonal → 2 zonas `[30, 30]`), `:211`, `:214` (24 → nenhuma zona, `zoneOf` −1), `:224-225`, `:248` (seed 1337: contagem, ≥ 25, BFS alcança exatamente `cells`) | PASS |
-| C3 | kind pelo centroide; centroid, areaM2, bbox | vitest `zone kind and measures` ✓ | `tests/unit/interiors.test.ts:265` (500 → downtown, 500.1 → outer; o sintético usa z = 0.1 no caso outer, e a regra continua decidida por x), `:288-295` (centroide ± 1e-6, kind, `areaM2 = cells*16`, bbox) | PASS |
-| C4 | `facadeDist` exata, teto 60 | vitest `facade distance` ✓ | `tests/unit/interiors.test.ts:323` (12 ± 0.01 no lote girado 30°), `:332` (80 m → 60), `:346` (200 sorteados do seed 1337 ± 0.01) | PASS |
-| C5 | determinismo; 1338 difere em ≥ 1000 | vitest `interiors and props are deterministic` ✓ | `tests/unit/interiors.test.ts:356-359` (`zoneOf`, `facadeDist`, `zones`, `InteriorProps` com `toEqual`), `:364` `differ >= 1000` | PASS |
-| C6 | 1337 tem downtown e outer | vitest `seed 1337 has both zone kinds` ✓ | `tests/unit/interiors.test.ts:370-371` | PASS |
-| C7 | módulos novos puros | vitest `pure modules do not import three or rapier` ✓ | `tests/unit/purity.test.ts:46` `toBe(28)` (união com yaw-assist no merge ff0934a), `:49` `FORBIDDEN.test(source)` false para `BlockInteriors.ts`, `InteriorProps.ts` e `interiorMotion.ts` (lista em `:35-38`) | PASS |
-| C8 | `terrainColor`, 6 casos; ruído em [−1, 1] | vitest `terrain color` ✓ | `tests/unit/interiorMotion.test.ts:54-60` (os 6 casos + `none`, ± 1e-6), `:72-73` (10 000 pontos em [−1, 1]), `:75` (varia > 0.5). Nenhuma asserção cobre "escala de 8 m" nem "do seed" (ver Coverage) | PASS |
-| C9 | cor do chunk = `terrainColor` (± 1/255) | pw `ground uses the new terrain color` ✓ | `tests/e2e/interiors.spec.ts:104-107` (pátio downtown e vértice fora do miolo com slope < 0.05). O esperado é calculado no browser pelo módulo puro servido pelo Vite (`:74`, `:91`) | PASS |
-| C10 | `bounceWeight` 5 casos; atributo por vértice = função | vitest `bounce weight` ✓ · pw `ground bounce weight per vertex` ✓ | `tests/unit/interiorMotion.test.ts:80-84`; `tests/e2e/interiors.spec.ts:138-140` (50 vértices do chunk do spawn, ≥ 1 no miolo com peso > 0, ± 1e-4) | PASS |
-| C11 | on ≥ 2 × off e ≤ 0.35, downtown a ≤ 8 m | pw `ground bounce lights the block interior` ✓ | `tests/e2e/interiors.spec.ts:152-154`; log: 0.2541 vs 0.0468 | PASS |
-| C12 | longe (> 40 m): variação ≤ 5 % | pw `ground far from buildings is unchanged` ✓ | `tests/e2e/interiors.spec.ts:183`, `:195-197`; log: 0.0468 / 0.0468 | PASS |
-| C13 | `zoneLight`: [0.5, 1], patamares 20-60 s, rampa 3 s linear, determinista | vitest `zone light holds and ramps` ✓ | `tests/unit/interiorMotion.test.ts:94` (mesmo id/t), `:99` (intervalo), `:107-108` (patamar), `:118-119` (rampa 3 s ± 1/60, entre níveis diferentes), `:121` (segunda diferença ≤ 1e-9), `:126` | PASS |
-| C14 | ≤ 0.1 por 0.5 s; toda zona troca até 180 s; browser troca em 60 s | vitest `zone light is calm and always changes` ✓ · pw `ground light changes over time` ✓ | `tests/unit/interiorMotion.test.ts:141`, `:148` (as 39 zonas do seed); `tests/e2e/interiors.spec.ts:225-226`. `zoneLevel` lê `scene.zoneLevels`, o array da `DataTexture` do shader (`src/core/Game.ts:900`, `src/world/interiors/InteriorScene.ts:118`, `:550`) | PASS |
-| C15 | quintal ⇔ lote outer com 8 m interiores atrás | vitest `yard for every outer lot with 8 m behind` ✓ | `tests/unit/interiorProps.test.ts:65` (iff por lote, predicado recalculado em `:59-63`), `:67` | PASS |
-| C16 | poste 4-8 m, 2.5 m, 6 lâmpadas ≤ 0.5 m do segmento; browser conta e emissivo | vitest `yard lamp and six bulbs` ✓ · pw `yards are built` ✓ | `tests/unit/interiorProps.test.ts:78-79`, `:84-85`, `:87`, `:90`; `tests/e2e/interiors.spec.ts:241-243` | PASS |
-| C17 | `bulbOffset` ≤ 0.15, f em [0.2, 0.4], periódico; lâmpada se move em 0.5 s | vitest `string lights sway` ✓ (sem carga; timeout de 5 s sob carga, ver resumo) · pw `yard bulbs sway` ✓ | `tests/unit/interiorMotion.test.ts:159-160`, `:165`, `:169`; `tests/e2e/interiors.spec.ts:255` | PASS |
-| C18 | fração de piscina em [0.2, 0.4]; 4 × 8; cantos na mesma zona; y + 0.05 | vitest `pools fit in the yard` ✓ | `tests/unit/interiorProps.test.ts:97-98` (69/231 = 0.299), `:100-101`, `:108`, `:112`, `:114` | PASS |
-| C19 | normal map anda; emissivo ciano > 0 | pw `pool water is animated` ✓ | `tests/e2e/interiors.spec.ts:265-270` | PASS |
-| C20 | árvore: outer, facadeDist ≥ 6, slope ≤ 0.35, ≥ 7 m, ≤ área/120, ≥ 1 | vitest `trees on outer interior ground` ✓ | `tests/unit/interiorProps.test.ts:121`, `:134-137`, `:140`, `:143`, `:160` | PASS |
-| C21 | altura em [5, 10], < 6 e > 9 presentes | vitest `tree heights between 5 and 10` ✓ | `tests/unit/interiorProps.test.ts:166-170` | PASS |
-| C22 | copa ≤ 0.3 m a 0.2-0.4 Hz; uTime anda e troncos parados | vitest `tree crowns sway` ✓ · pw `tree crowns sway and trunks stay` ✓ | `tests/unit/interiorMotion.test.ts:193`, `:196-197`; `tests/e2e/interiors.spec.ts:287-288`. Prova fraca para "o tronco fica parado" (ver Ranked gaps) | PASS |
-| C23 | um collider por tronco, centrado, tocando o chão | vitest `one collider per tree trunk` ✓ | `tests/physics/interiors.test.ts:34` (2977), `:38-39`, `:43-45` | PASS |
-| C24 | 40 km/h no tronco → < 5 km/h em ≤ 1 s | pw `car stops at a tree trunk` ✓ | `tests/e2e/interiors.spec.ts:336`, `:340` | PASS |
-| C25 | vagalumes ≤ 600/300 e > 0; ≤ 0.5 m/s; pulso 0.3-0.6 Hz | vitest `fireflies drift and pulse slowly` ✓ · pw `fireflies within budget` ✓ | `tests/unit/interiorMotion.test.ts:216-220`; `tests/e2e/interiors.spec.ts:347-348`, `:352-353` | PASS |
-| C26 | canteiros = downtown ≥ 1500 m² por área, corte em 6, centroide ou vértice mais próximo | vitest `construction sites in the largest downtown zones` ✓ | `tests/unit/interiorProps.test.ts:179`, `:184-185`, `:188-199`, `:202`, `:225` (sintético 8 → 6) | PASS |
-| C27 | torre 40-60, lança 30, período 90-150, contínuo; lança gira no browser | vitest `crane jib turns slowly` ✓ · pw `construction crane turns` ✓ | `tests/unit/interiorMotion.test.ts:228-230`, `:232-234`, `:237`; `tests/e2e/interiors.spec.ts:367` (yaw lido da matriz da instância, `InteriorScene.ts:396-401`) | PASS |
-| C28 | `beaconOn` 6 casos; emissivo > 0 aceso e 0 apagado no browser | vitest `crane beacon blinks at 1 Hz` ✓ · pw `crane beacon blinks` ✓ (teste extra, não listado no Proof) | `tests/unit/interiorMotion.test.ts:243-248`; `tests/e2e/interiors.spec.ts:382`, `:385`, `:389-390` | PASS |
-| C29 | 2 holofotes; ±30°, período 20 s; facho > 1.5 × fora | vitest `floodlights sweep 30 degrees in 20 s` ✓ · pw `construction floodlight lights the ground` ✓ | `tests/unit/interiorMotion.test.ts:253`, `:263`, `:265-267`; `tests/e2e/interiors.spec.ts:399-400` (0.3976 vs 0.0123) | PASS |
-| C30 | um collider por torre, centrado | vitest `one collider per crane tower` ✓ | `tests/physics/interiors.test.ts:54`, `:57-58` | PASS |
-| C31 | `walkerBudget` 4 casos; browser ≤ 300 m, 0 < ativos ≤ 400 | vitest `walker budget` ✓ · pw `walkers near the car` ✓ | `tests/unit/interiorMotion.test.ts:273-278`; `tests/e2e/interiors.spec.ts:414-417` | PASS |
-| C32 | trechos entre vértices da zona, amostra de 1 m, 1.2-1.6 m/s | vitest `walkers stay inside their zone` ✓ | `tests/unit/interiorMotion.test.ts:301`, `:308-310`, `:315`, `:320` | PASS |
-| C33 | bob em ±0.03, período 0.5 s | vitest `walker bob` ✓ | `tests/unit/interiorMotion.test.ts:332`, `:334-336` | PASS |
-| C34 | foge a 3 m/s até 15 m, volta a andar, sempre na zona; browser ≥ 12 m em 4 s | vitest `walker flees the car` ✓ · pw `walkers step away from the car` ✓ | `tests/unit/interiorMotion.test.ts:360`, `:363-364`, `:369`, `:374-376`; `tests/e2e/interiors.spec.ts:458`, `:470` (16.11 m) | PASS |
-| C35 | total de colliders = soma esperada, estável 5 s | pw `walkers have no colliders` ✓ | `tests/e2e/interiors.spec.ts:485-491` (`total` vem do Rapier, `world.colliders.len()`, `src/core/Game.ts:948`), `:495` | PASS |
-| C36 | draw calls ≤ 220; ready ≤ 30 s | pw `draw calls at most 220 across the world` ✓ · pw `ready within 30 s at high quality` ✓ | `tests/e2e/render.spec.ts:52-53`; `tests/e2e/visual.spec.ts:451`. Os dois arquivos não mudaram no range da feature | PASS |
-| C37 | `summary()` = recálculo do seed 1337 | pw `game builds the interiors from the world seed` ✓ | `tests/e2e/interiors.spec.ts:506-508` (7 chaves); o esperado é calculado em `:44-65` com os módulos puros servidos pelo Vite | PASS |
-| C38 | C7/C8 da city-terrain, janelas estáveis, 3 de facade-glint seguem verdes | pw `world.spec` (2) ✓ · pw `visual.spec` (4) ✓ | `tests/e2e/world.spec.ts:65-66`, `:102`; `tests/e2e/visual.spec.ts:360-361`, `:483`, `:498`, `:508`. As asserções não mudaram na feature (o diff de `visual.spec.ts` entre f5c3ade e ff0934a é da car-feel) | PASS |
+| C1 | regra de interior; seed 1337 exaustivo | vitest ✓ (8e791f9) | carried from ff0934a: `tests/unit/interiors.test.ts:132-133`, `:135-139`, `:147`, `:161-166`, `:169` | PASS |
+| C2 | zonas 4-vizinhas, mínimo 25 | vitest ✓ | carried from ff0934a: `tests/unit/interiors.test.ts:189-190`, `:202-203`, `:211`, `:214`, `:248` | PASS |
+| C3 | kind pelo centroide, medidas | vitest ✓ | carried from ff0934a: `tests/unit/interiors.test.ts:265`, `:288-295` | PASS |
+| C4 | `facadeDist` exata, teto 60 | vitest ✓ | carried from ff0934a: `tests/unit/interiors.test.ts:323`, `:332`, `:346` | PASS |
+| C5 | determinismo; 1338 difere | vitest ✓ | carried from ff0934a: `tests/unit/interiors.test.ts:356-359`, `:364` | PASS |
+| C6 | 1337 tem downtown e outer | vitest ✓ | carried from ff0934a: `tests/unit/interiors.test.ts:370-371` | PASS |
+| C7 | módulos novos puros | vitest ✓ | carried from ff0934a: `tests/unit/purity.test.ts:46`, `:49` | PASS |
+| C8 | `terrainColor` 6 casos; ruído em [−1, 1], do seed, nós a 8 m | vitest `terrain color` ✓ | verified at 8e791f9: `tests/unit/interiorMotion.test.ts:54-60` (6 casos + `none`); `:72-73` intervalo; `:83` `expect(terrainNoise(1337, x, z)).toBe(n)`; `:86` `expect(differ).toBeGreaterThanOrEqual(900)`; `:106` `expect(worstCell).toBeLessThanOrEqual(1e-9)` (F1 e F2 mortas) | PASS |
+| C9 | cor do chunk = `terrainColor` | pw ✓ | carried from ff0934a: `tests/e2e/interiors.spec.ts:104-107` | PASS |
+| C10 | `bounceWeight`; atributo por vértice | vitest ✓ · pw ✓ | carried from ff0934a (citação atualizada): `tests/unit/interiorMotion.test.ts:111-115`; `tests/e2e/interiors.spec.ts:138-140` | PASS |
+| C11 | on ≥ 2 × off, ≤ 0.35 | pw ✓ (log "on 0.2541 off 0.0468") | carried from ff0934a: `tests/e2e/interiors.spec.ts:152-154` | PASS |
+| C12 | variação ≤ 5 % longe | pw ✓ (log "on 0.0468 off 0.0468") | carried from ff0934a: `tests/e2e/interiors.spec.ts:183`, `:195-197` | PASS |
+| C13 | `zoneLight` patamares, rampa | vitest ✓ | carried from ff0934a (citação atualizada): `tests/unit/interiorMotion.test.ts:125`, `:130`, `:138-139`, `:149-150`, `:152`, `:157` | PASS |
+| C14 | calma; troca até 180 s; browser em 60 s | vitest ✓ · pw ✓ | carried from ff0934a (citação atualizada): `tests/unit/interiorMotion.test.ts:171-172`, `:179`; `tests/e2e/interiors.spec.ts:225-226` | PASS |
+| C15 | quintal ⇔ 8 m atrás | vitest ✓ | carried from ff0934a: `tests/unit/interiorProps.test.ts:65`, `:67` | PASS |
+| C16 | poste, 6 lâmpadas; browser | vitest ✓ · pw ✓ | carried from ff0934a: `tests/unit/interiorProps.test.ts:78-79`, `:84-85`, `:87`, `:90`; `tests/e2e/interiors.spec.ts:241-243` | PASS |
+| C17 | `bulbOffset` ≤ 0.15, f em [0.2, 0.4], periódico (pior caso, 60 s); lâmpada se move | vitest `string lights sway` ✓ 141 ms · pw ✓ | verified at 8e791f9: `tests/unit/interiorMotion.test.ts:184` `{ timeout: 60_000 }`; `:203` `expect(freqLo).toBeGreaterThanOrEqual(0.2)`; `:204` `expect(freqHi).toBeLessThanOrEqual(0.4)` (F5 morta); `:205` `expect(worstPeriod).toBeLessThanOrEqual(1e-9)`; `:206-207`; `tests/e2e/interiors.spec.ts:255` | PASS |
+| C18 | piscinas | vitest ✓ | carried from ff0934a: `tests/unit/interiorProps.test.ts:97-98`, `:100-101`, `:108`, `:112`, `:114` | PASS |
+| C19 | água animada, emissivo ciano | pw ✓ | carried from ff0934a: `tests/e2e/interiors.spec.ts:265-269` | PASS |
+| C20 | regra das árvores | vitest ✓ | carried from ff0934a: `tests/unit/interiorProps.test.ts:121`, `:134-137`, `:140`, `:143`, `:160` | PASS |
+| C21 | altura [5, 10] | vitest ✓ | carried from ff0934a: `tests/unit/interiorProps.test.ts:166-170` | PASS |
+| C22 | copa ≤ 0.3 m, 0.2-0.4 Hz; uTime anda, matrizes paradas; tronco parado vértice a vértice, copa se move | vitest `tree crowns sway` ✓ · pw `tree crowns sway and trunks stay` ✓ | verified at 8e791f9: `tests/unit/interiorMotion.test.ts:230-231`, `:234-235`; `tests/e2e/interiors.spec.ts:296-297`; `:301` `expect(trunkA.length).toBeGreaterThan(0)`; `:303` `expect(trunkB).toEqual(trunkA)` (F3 morta); `:311` `expect(moved).toBeGreaterThan(0)` | PASS |
+| C23 | collider por tronco | vitest ✓ | carried from ff0934a: `tests/physics/interiors.test.ts:34`, `:38-39`, `:43-45` | PASS |
+| C24 | 40 km/h → < 5 km/h em 1 s | pw ✓ | carried from ff0934a (citação atualizada): `tests/e2e/interiors.spec.ts:360`, `:364` | PASS |
+| C25 | teto 600/300 e > 0; perto das árvores (≤ 6 m, 0.4-3.2 m) em 2 instantes, nas duas qualidades; ≤ 0.5 m/s; pulso 0.3-0.6 Hz | vitest `fireflies drift and pulse slowly` ✓ · pw `fireflies within budget` ✓ | verified at 8e791f9: `tests/e2e/interiors.spec.ts:378` (predicado ≤ 6 m e [t.y + 0.4, t.y + 3.2] ± 0.01), `:385` `expect(r.count).toBe(expected)`, `:386` `expect(r.bad).toBe(0)` (F4 morta), chamado em `:395` (high) e `:401` (low); `:393-394`, `:399-400`; `tests/unit/interiorMotion.test.ts:254-258` | PASS |
+| C26 | canteiros | vitest ✓ | carried from ff0934a: `tests/unit/interiorProps.test.ts:179`, `:184-185`, `:188-199`, `:202`, `:225` | PASS |
+| C27 | torre, lança, período; gira | vitest ✓ · pw ✓ | carried from ff0934a (citação atualizada): `tests/unit/interiorMotion.test.ts:266-268`, `:270-272`, `:275`; `tests/e2e/interiors.spec.ts:415` | PASS |
+| C28 | `beaconOn` 6 casos; emissivo aceso > 0 e apagado 0 | vitest ✓ · pw `crane beacon blinks` ✓ (agora listado, `checks.md:152`) | verified at 8e791f9: `tests/unit/interiorMotion.test.ts:281-286`; `tests/e2e/interiors.spec.ts:430`, `:433`, `:437-438` | PASS |
+| C29 | holofotes | vitest ✓ · pw ✓ | carried from ff0934a (citação atualizada): `tests/unit/interiorMotion.test.ts:291`, `:301`, `:303-305`; `tests/e2e/interiors.spec.ts:447-448` | PASS |
+| C30 | collider por torre | vitest ✓ | carried from ff0934a: `tests/physics/interiors.test.ts:54`, `:57-58` | PASS |
+| C31 | `walkerBudget`; ≤ 300 m, ≤ 400 | vitest ✓ · pw ✓ | carried from ff0934a (citação atualizada): `tests/unit/interiorMotion.test.ts:311-316`; `tests/e2e/interiors.spec.ts:462-465` | PASS |
+| C32 | trechos na zona, 1.2-1.6 m/s | vitest ✓ | carried from ff0934a (citação atualizada): `tests/unit/interiorMotion.test.ts:339`, `:346-348`, `:353`, `:355`, `:358` | PASS |
+| C33 | bob ±0.03, 0.5 s | vitest ✓ | carried from ff0934a (citação atualizada): `tests/unit/interiorMotion.test.ts:370`, `:372-374` | PASS |
+| C34 | foge a 3 m/s até 15 m | vitest ✓ · pw ✓ | carried from ff0934a (citação atualizada): `tests/unit/interiorMotion.test.ts:398`, `:401-402`, `:412-414`; `tests/e2e/interiors.spec.ts:506`, `:518` | PASS |
+| C35 | total de colliders | pw ✓ | carried from ff0934a (citação atualizada): `tests/e2e/interiors.spec.ts:533-539`, `:543` | PASS |
+| C36 | draw calls ≤ 220; ready ≤ 30 s | carried from ff0934a (95/95) | carried from ff0934a: `tests/e2e/render.spec.ts:52-53`; `tests/e2e/visual.spec.ts:451` | PASS |
+| C37 | `summary()` = recálculo | pw ✓ | carried from ff0934a (citação atualizada): `tests/e2e/interiors.spec.ts:554-556` | PASS |
+| C38 | provas antigas seguem verdes | carried from ff0934a (95/95) | carried from ff0934a: `tests/e2e/world.spec.ts:65-66`, `:102`; `tests/e2e/visual.spec.ts:360-361`, `:483`, `:498`, `:508` | PASS |
 
 ## Coverage
 
-Verified at ff0934a. As contagens do seed 1337 vêm de um script descartável que chama os geradores puros como o `Game` chama (arquivo temporário removido; porcelain vazio). O resultado: 39 zonas (9 downtown, 30 outer), 457 475 vértices interiores, 1224 lotes (934 fora do centro), 231 lotes que passam o predicado de 8 m, 231 quintais, 69 piscinas (0.2987), 2977 árvores (o teto por zona somaria 57 772), exatamente 6 zonas downtown ≥ 1500 m² (61 008 a 67 232 m²) e 6 canteiros, 21 942 pontos de pedestre, e 400/200 ativos em (0, 0) em high/low. A menor zona tem 26 vértices.
+As linhas cuja autoridade a correção tocou foram recalculadas em 8e791f9. As demais vêm de ff0934a.
 
 | Set (size) | Recomputed from | Member -> proof | Unproven |
 | --- | --- | --- | --- |
-| plan ACs (35) | `plan.md` Criteria, cada AC quebrado em suas afirmações | 1 C1 · 2 C2 · 3 C3 · 4 C4 · 5 C5 · 6 C6 · 7 base, ±8 %, rocha e areia C8, C9 · 8 C8, C9 · 9 C10, C12 · 10 C11 · 11 C12 · 12 C13 · 13 C14 · 14 C15 · 15 C16 · 16 C17 · 17 C18 · 18 C19 · 19 C20 · 20 C21 · 21 C22 · 22 C23, C24 · 23 teto, velocidade e pulso C25 · 24 C26 · 25 C27 · 26 C28 · 27 C29 · 28 C30 · 29 C31 · 30 C32 · 31 C33 · 32 C34 · 33 C35 · 34, 35 C36 | AC 23 "perto das árvores": nenhuma asserção sobre a posição dos vagalumes (a âncora é `InteriorScene.ts:457-474`). AC 7 "ruído do seed em escala de 8 m": `interiorMotion.ts:46` usa `GROUND_NOISE_SCALE`, mas nada afirma a escala nem que outro seed muda o ruído |
-| landing doors (2) | `plan.md` Landing (com o alargamento de bbf232d) e os `export` de `BlockInteriors.ts:37-58` e `InteriorProps.ts:21-91` | door 1: `spacing`/`origin`/`size` vêm do `Heightmap` (`BlockInteriors.ts:186`; o jogo usa `HM_SIZE` 769 e `HM_SPACING` 4, `TerrainGenerator.ts:28-29`), `zoneOf` C1-C3, `facadeDist` C4, `zones` C2, C3 · door 2: `yards` C15, C16 · `pools` C18 · `trees` C20, C21, C23 · `sites` C26, C27, C30 · `walkers` C32, C31; assinatura com `carved` usada em todas as provas de props e em `Game.ts:155` | - |
-| interior conditions (4) | AC 1 | estrada `interiors.test.ts:132-133` · lote `:135-136` · água `:138-139` · borda `:147` (F1 morre) | - |
-| zone kinds (2) | AC 3 | downtown, outer `interiors.test.ts:265`, `:290`, `:370-371` | - |
-| terrain color cases (6) | C8 / AC 7-8 | `interiorMotion.test.ts:54-60` (7 linhas, incluindo `none`) | - |
-| bounce weight cases (5) | AC 9 | `interiorMotion.test.ts:80-84` (F3 morre em `:82`) | - |
-| prop kinds (5) | door 2 | yards C15, C16 · pools C18 · trees C20, C21 · sites C26, C27 · walkers C31, C32 | - |
-| moving things (9) | plan Observable "o que se move" | luz da zona C13, C14 · lâmpadas C17 · água C19 · copas C22 · vagalumes C25 · lança C27 · farol C28 (unit + pw extra) · holofotes C29 · pedestres C32-C34 (F4 morre) | - |
-| static colliders added (2) | plan Flow 7 (sem piscina, corrigido em ff0934a) e `WorldPhysics.ts:81-99` | troncos C23 (F5 morre), C24 · torres C30 | - |
-| quality levels (2) | AC 23, AC 29 | high C25 pw, C31 pw · low C25 pw (`?quality=low`, `interiors.spec.ts:352-353`), C31 só na unidade (`interiorMotion.test.ts:276`), com o nível ligado em `InteriorScene.ts:278` | - |
-| beacon cases (6) | C28 | `interiorMotion.test.ts:243-248` | - |
-| walker budget cases (4) | C31 | `interiorMotion.test.ts:273-278` | - |
-| seed-1337 counts (7) | geradores puros do seed 1337 (script acima) | zones 39 · downtown 9 · outer 30 · yards 231 · pools 69 · trees 2977 · sites 6, todos iguais a `summary()` em C37 `interiors.spec.ts:508`; yards também em C16 `:241` | - |
-| DEV probes, Surface (`summary` 9 campos, `groundProbe`, `beamProbe`) | `plan.md` Surface e `checks.md` "Sondas DEV"; `src/core/Game.ts:878-961` | zones/downtown/outer/yards/pools/trees/sites C37 · fireflies C25 · walkersActive C31, C35 · `groundProbe` C11, C12 · `beamProbe` C29 | - |
-| startup config: interiors assembly (1) | `src/core/Game.ts:154-157` (leitura direta; a linha do `checks.md` ainda diz "via `CityGenerator`", o que está desatualizado, porque o Flow 1 foi corrigido no merge) e `src/world/CityScene.ts:119-120`, `:160` | C37 (contagens do `Game` = recálculo independente no browser); física com os mesmos `props` C35 `:488-489` | - |
+| plan ACs (35) - verified at 8e791f9 | `plan.md` Criteria (`:68-143`), cada AC quebrado em suas afirmações | como na rodada 1, mais os dois trechos que faltavam: AC 7 "do seed" C8 `interiorMotion.test.ts:83`, `:86` (F2 morre) · AC 7 "escala de 8 m" C8 `:106` (F1 morre) · AC 23 "perto das árvores" C25 `interiors.spec.ts:386` (F4 morre) · AC 21 "o tronco fica parado" agora no vértice, C22 `:303` (F3 morre) | - |
+| noise properties (3) - verified at 8e791f9 | AC 7 e C8 | intervalo `interiorMotion.test.ts:72-73` · seed `:83`, `:86` · escala `:106` | - |
+| tree vertex classes (2) - verified at 8e791f9 | `mergeTree` (`InteriorScene.ts:686-689`: tronco `#3b2a1e` com máscara 0, copa `#2f5a2a` com máscara ≥ 0) | tronco `interiors.spec.ts:301`, `:303` · copa `:311` | - |
+| firefly bounds (2) - verified at 8e791f9 | AC 23 e C25 (derivação em "Checks.md edits judged") | horizontal ≤ 6 m e vertical [0.4, 3.2] m, os dois no predicado de `interiors.spec.ts:378`, afirmados em `:386` | - |
+| quality levels (2) - verified at 8e791f9 | AC 23, AC 29 | high C25 (teto `:393-394`, perto `:395`), C31 pw · low C25 (teto `:399-400`, perto `:401`), C31 só na unidade (`interiorMotion.test.ts:314`) | - |
+| DEV probes (`summary` 9 campos, `groundProbe`, `beamProbe`, `treeVertices`, `fireflyPositions`) - verified at 8e791f9 | `checks.md:18-22` "Sondas DEV" e `src/core/Game.ts:878-961` | campos de `summary` C37, C25, C31, C35 · `groundProbe` C11, C12 · `beamProbe` C29 · `treeVertices` C22 (`Game.ts:940`) · `fireflyPositions` C25 (`Game.ts:942`); as duas novas espelham o shader (ver "DEV probes judged") | - |
+| startup config: interiors assembly (1) - verified at 8e791f9 | leitura direta de `src/core/Game.ts:154-155` (`findBlockInteriors(carved, network, lots)`, `placeInteriorProps(seed, interiors, lots, carved)`); a linha do `checks.md:216` agora bate | C37 `interiors.spec.ts:554-556`; física com os mesmos `props` C35 `:536-537` | - |
+| moving things (9) - verified at 8e791f9 | plan Observable "o que se move" | luz da zona C13, C14 · lâmpadas C17 · água C19 · copas C22 (agora também no vértice) · vagalumes C25 · lança C27 · farol C28 · holofotes C29 · pedestres C32-C34 | - |
+| landing doors (2) - carried from ff0934a | `plan.md` Landing; a nota fb05348 registra o de acordo do usuário ao alargamento (só docs) | door 1 C1-C4 · door 2 C15, C16, C18, C20, C21, C23, C26, C27, C30-C32 | - |
+| interior conditions (4) - carried from ff0934a | AC 1 | `interiors.test.ts:132-133`, `:135-136`, `:138-139`, `:147` | - |
+| zone kinds (2) - carried from ff0934a | AC 3 | `interiors.test.ts:265`, `:290`, `:370-371` | - |
+| terrain color cases (6) - carried from ff0934a | C8 | `interiorMotion.test.ts:54-60` | - |
+| bounce weight cases (5) - carried from ff0934a | AC 9 | `interiorMotion.test.ts:111-115` | - |
+| prop kinds (5) - carried from ff0934a | door 2 | yards C15, C16 · pools C18 · trees C20, C21 · sites C26, C27 · walkers C31, C32 | - |
+| static colliders added (2) - carried from ff0934a | plan Flow 7, `WorldPhysics.ts:81-99` | troncos C23, C24 · torres C30 | - |
+| beacon cases (6) - carried from ff0934a | C28 | `interiorMotion.test.ts:281-286` | - |
+| walker budget cases (4) - carried from ff0934a | C31 | `interiorMotion.test.ts:311-316` | - |
+| seed-1337 counts (7) - carried from ff0934a | geradores puros do seed 1337 | todos iguais a `summary()` em C37 `interiors.spec.ts:556` | - |
 
 ## Test policy rows
 
+Re-julgadas as linhas que classificam arquivos tocados (`InteriorScene.ts`, `Game.ts`, e `interiorMotion.ts` pelos testes). Na rodada 1 as linhas estavam atendidas com ressalva. As demais vêm de ff0934a.
+
 | Row | Files it classifies | Required proof | Expectation met |
 | --- | --- | --- | --- |
-| Decides, reached across a boundary | `src/world/interiors/BlockInteriors.ts` | própria C1-C6 · fronteira C37 | yes. Uma asserção por condição e por caso sintético; C37 prova que o `Game` monta do mesmo seed |
-| Decides, reached across a boundary | `src/world/interiors/InteriorProps.ts` | própria C15, C16, C18, C20, C21, C26 · fronteira C16 pw, C37 | yes |
-| Decides, reached across a boundary | `src/world/interiors/interiorMotion.ts` (inclui `terrainColor`, `bounceWeight`, `zoneLight`, movimento) | própria C8, C10, C13, C14, C17, C22, C25, C27-C29, C31-C34 · fronteira C9, C10, C14, C17, C22, C25, C27-C29, C31, C34 pw | yes, por arquivo. `walkerBob` (C33) e o trajeto de C32 só têm prova na unidade. Os shaders de copa e vagalume repetem as contas (`InteriorScene.ts:689`, `:706-713`) sem prova de fronteira dos valores |
-| Instrumentation, pass-throughs | `src/world/WorldPhysics.ts` | Rapier real C23, C30 · browser C24, C35 | yes (F5 morre em C23) |
-| Instrumentation, pass-throughs | `src/world/ChunkManager.ts`, `src/world/CityScene.ts`, `src/world/interiors/InteriorScene.ts`, `src/core/Game.ts` | provas Playwright C9-C12, C14, C16, C17, C19, C22, C24, C25, C27-C29, C31, C34-C37 | yes, com a ressalva de que `InteriorScene.ts` também decide coisas (a âncora dos vagalumes perto das árvores, a máscara do tronco) e ficou sem prova delas. Isso já está contado em Coverage e em Ranked gaps |
+| Decides, reached across a boundary - carried from ff0934a | `src/world/interiors/BlockInteriors.ts` | própria C1-C6 · fronteira C37 | yes |
+| Decides, reached across a boundary - carried from ff0934a | `src/world/interiors/InteriorProps.ts` | própria C15, C16, C18, C20, C21, C26 · fronteira C16 pw, C37 | yes |
+| Decides, reached across a boundary - verified at 8e791f9 | `src/world/interiors/interiorMotion.ts` | própria C8 (agora com seed e escala), C10, C13, C14, C17, C22, C25, C27-C29, C31-C34 · fronteira C9, C10, C14, C17, C22, C25, C27-C29, C31, C34 pw | yes. A ressalva da rodada 1 (copa e vagalume sem prova de fronteira dos valores) caiu: C22 e C25 agora afirmam posições por vértice e por vagalume, com as contas do shader aplicadas |
+| Instrumentation, pass-throughs - carried from ff0934a | `src/world/WorldPhysics.ts` | Rapier real C23, C30 · browser C24, C35 | yes |
+| Instrumentation, pass-throughs - verified at 8e791f9 | `src/world/ChunkManager.ts`, `src/world/CityScene.ts`, `src/world/interiors/InteriorScene.ts`, `src/core/Game.ts` | provas Playwright C9-C12, C14, C16, C17, C19, C22, C24, C25, C27-C29, C31, C34-C37 | yes. O que `InteriorScene.ts` decide agora tem prova: a âncora dos vagalumes (`:457-474`) por C25 `:386`, e a máscara do tronco (`:702`) por C22 `:303`. As sondas novas são só DEV: ficam em `interiorsDebug()` (`Game.ts:876`, `:940-942`), que só chega a `window.__game` por `exposeDebug` (`src/core/exposeDebug.ts:11` `if (!env.DEV) return;`), e só são chamadas pelos testes |
 
 ## Faults injected
 
-Verified at ff0934a, num worktree de rascunho separado (`git worktree add --detach <scratchpad>/fault-wt HEAD` + junction), nunca com `git stash`.
-- A porcelain do worktree do Verifier era vazia antes, e continuou vazia depois de tudo.
-- Cada falta foi revertida com `git checkout -- <arquivo>` no rascunho antes da próxima.
-- No fim apaguei a junction (`.Delete()`) e rodei `git worktree remove`. O `node_modules` compartilhado continuou intacto.
-- Todas as faltas são de unidade ou física, então nenhum servidor na 5202 serviu código mutado.
+Verified at 8e791f9, num worktree de rascunho separado (`git worktree add --detach <scratchpad>/fault-wt HEAD` + junction de `node_modules`), nunca com `git stash`.
+- A porcelain do worktree do Verifier estava vazia antes e continuou vazia depois.
+- Cada falta foi aplicada com `sed`, conferida com `diff` e revertida copiando o arquivo original antes da próxima.
+- As faltas de browser rodaram num servidor próprio na porta 5208, depois que a rodada principal na 5207 terminou. Assim nenhum servidor da prova serviu código mutado.
+- As 5 faltas miram as superfícies que a correção criou (as asserções novas de C8, C17, C22 e C25). Cada uma é derrubada por uma asserção diferente.
 
 | Mutation | Location | Killed |
 | --- | --- | --- |
-| F1 margem da estrada `ROAD_MARGIN` 2 → 1 | `src/world/interiors/BlockInteriors.ts:23` | yes. C1 `interiors.test.ts:132` "expected 1 to be -1" |
-| F2 menor zona `MIN_ZONE_CELLS` 25 → 20 | `src/world/interiors/BlockInteriors.ts:31` | yes. C2 `interiors.test.ts:211` "expected 1 to be +0" (o grupo sintético de 24 vira zona). Só o caso sintético pega: a menor zona do seed tem 26 vértices |
-| F3 alcance da luz rebatida `BOUNCE_RANGE` 25 → 40 | `src/world/interiors/interiorMotion.ts:76` | yes. C10 `interiorMotion.test.ts:82` "expected 0.6875 to be close to 0.5" |
-| F4 fuga desligada (`if (false && …) w.fleeing = true`) | `src/world/interiors/interiorMotion.ts:398` | yes. C34 `interiorMotion.test.ts:363` "step 0: expected 1.667… ≤ 0.01" |
-| F5 sem collider de tronco (laço sobre lista vazia) | `src/world/WorldPhysics.ts:82` | yes. C23 `tests/physics/interiors.test.ts:34` "expected +0 to be 2977" |
+| F1 escala do ruído `GROUND_NOISE_SCALE` 8 → 16 | `src/world/interiors/interiorMotion.ts:24` | yes. C8 `tests/unit/interiorMotion.test.ts:106` "expected 0.2018… to be less than or equal to 1e-9" |
+| F2 ruído ignora o seed (`seed ^ 0x6a55` → `0x6a55`) | `src/world/interiors/interiorMotion.ts:46` | yes. C8 `tests/unit/interiorMotion.test.ts:86` "expected 0 to be greater than or equal to 900" |
+| F5 frequência da lâmpada `0.2 + 0.2 * h` → `0.2 + 0.3 * h` (até 0.5 Hz) | `src/world/interiors/interiorMotion.ts:152` | yes. C17 `tests/unit/interiorMotion.test.ts:204` "expected 0.4997… to be less than or equal to 0.4" |
+| F3 máscara do tronco `aCrown` 0 → 1 | `src/world/interiors/InteriorScene.ts:702` | yes. C22 `tests/e2e/interiors.spec.ts:303` "tree 0 trunk", 72 coordenadas diferentes (porta 5208) |
+| F4 vagalumes ancorados 20 m ao lado da árvore (`t.x + 20 + sin(a)·r`) | `src/world/interiors/InteriorScene.ts:470` | yes. C25 `tests/e2e/interiors.spec.ts:386` "Expected: 0, Received: 503" (503 de 600 vagalumes longe de toda árvore, porta 5208) |
 
 ## Swept existing
 
-- **failure modes**: o erro de geração no boot cai no overlay. Confere em `src/main.ts:36-38` (`catch` → `showError`). `findBlockInteriors` e `placeInteriorProps` rodam dentro desse boot (`src/core/Game.ts:154-155`).
-- **data lifecycle**: as malhas de terreno seguem o descarte dos chunks. Confere em `src/world/ChunkManager.ts:69-75` (`geometry.dispose()`). `aBounce` e `aZone` são atributos dessa mesma geometria (`:329-330`), então são descartados junto. Os objetos do `InteriorScene` são globais e vivem a sessão inteira.
-- **dependency failure**: o miolo não carrega textura externa. O normal map da piscina é o procedural `waveNormalMap` (`src/world/Water.ts:38`, agora exportado), e o resto é geometria procedural. Confere.
+Carried from ff0934a. A correção não tocou `main.ts`, `ChunkManager.ts`, `Water.ts` nem o descarte, então as três leituras (falha no boot → `showError` em `src/main.ts:36-38`; descarte de geometria em `src/world/ChunkManager.ts:69-75`; normal map procedural em `src/world/Water.ts:38`) continuam valendo.
 
 ## Deviations judged
 
-1. **Alargamento dos literais do Landing** (bbf232d, antes do código).
-   - Door 1: `spacing: 4; origin: -1536; size: 769` viraram `number /* 4 */` etc., vindos do `Heightmap` recebido. A borda de 8 m passou a ser contada de `WORLD_HALF`.
-   - Door 2: `placeInteriorProps` ganhou `carved: Heightmap`.
-   - No jogo os valores continuam 4 / -1536 / 769 (`TerrainGenerator.ts:28-29`, `BlockInteriors.ts:186`). O parâmetro novo é aditivo e necessário, porque é ele que dá as alturas de poste, piscina e árvore. A AD-012 não fixa esses literais.
-   - Aceito tecnicamente. Mas é uma mudança de one-way door feita pelo builder: o usuário deve ficar sabendo e confirmar.
-2. **Piscina por embaralhamento, 30 % exatos** (`InteriorProps.ts:192-220`). Primeiro filtra os quintais onde a piscina cabe inteira, depois embaralha pelo seed e fica com `round(0.3 × quintais)` = 69/231.
-   - Atende "30 % dos quintais (sorteio pelo seed)": o seed escolhe quais.
-   - Se menos de 30 % coubessem, sairiam menos piscinas. C18, com [0.2, 0.4], pegaria. Aceito.
-3. **Árvores muito abaixo do teto**: 2977 contra o teto de 57 772 (chance de 6 % perto das casas e 0.3 % longe, `InteriorProps.ts:243`). O AC 19 é um limite máximo, então é cumprido. A densidade é ajuste pelo plano. Aceito.
-4. **Mudanças do builder nas provas C10 e C14** (2456366). São só de harness, sem enfraquecer nada.
-   - C10: `rand() * (cells + 1)` → `rand() * cells`. O índice 128 é o primeiro vértice do chunk vizinho, então a amostra agora fica dentro do chunk do spawn, como o check diz.
-   - C14: antes eram leituras a cada 0.5 s com `max - min > 0`. Agora é leitura por quadro (rAF) com `changed || last !== first`, mais `t1 - t0 >= 60`. Isso detecta pelo menos tudo o que a versão antiga detectava. O timeout de 600 s cobre os 7.2 min medidos no SwiftShader.
-5. **21 942 pontos de pedestre contra o teto de 400**. Os pontos são dados; o que fica ativo é limitado por `activeWalkerSpawns` (`interiorMotion.ts:261-283`: zonas a ≤ 300 m, `walkerBudget`, os mais perto primeiro). A malha é alocada com `cap` instâncias (`InteriorScene.ts:255-257`), e quem passa de 300 m sai (`:284`). O recálculo deu 400 (high) e 200 (low) em (0, 0). Aceito.
-6. **Teste extra "crane beacon blinks"**. Ele prova a metade de browser que a C28 promete ("No browser, o emissiveIntensity…"), e que o `checks.md` não lista como Proof. Conta como evidência de C28. O `checks.md` deveria ganhar essa linha de Proof.
-7. **Sem collider de piscina**. Nenhum AC pede, e o Flow 7 e o Impact já foram corrigidos no merge ff0934a. `WorldPhysics.ts:81-99` só cria troncos e torres, o que bate com C35. Aceito.
-8. **Não previstos no plano, e neutros para as provas**:
-   - `PATIO_LIFT` 0.03 m e os triângulos do pátio desenhados sob o espelho da rua (`ChunkManager.ts:305`, `:315-319`). O C38 (terreno e janelas) continuou verde.
-   - Quintal omitido quando nenhum vértice serve para o poste (`InteriorProps.ts:174`). Isso não acontece no seed 1337: 231 = 231.
-   - "Lote outer" lido como `!l.downtown`.
-   - O cache de agenda de `zoneLight` cresce com o tempo (`interiorMotion.ts:98-117`), cerca de 1 entrada a cada 40 s por zona, o que é desprezível.
+Carried from ff0934a (Deviations 1-8 da rodada 1), com duas atualizações:
+- **Deviation 1** (alargamento das doors): o commit fb05348 registra no `plan.md` Landing o de acordo do usuário. O ponto em aberto da rodada 1 (gap 6) está fechado.
+- **Deviation 6** (prova extra do farol): a linha de Proof agora está no `checks.md:152`.
+
+Nesta rodada, a correção não trouxe desvio novo. O código de produção só ganhou as duas sondas DEV (`InteriorScene.ts:492-529`, `Game.ts:939-942`), sem mudar render nem física.
 
 ## Gate
 
-`npx vitest run` - 142 passed, 0 failed · `E2E_PORT=5202 npx playwright test` - 95 passed, 0 failed (43.6 min) · `npx vitest run tests/unit/interiorMotion.test.ts -t "string lights sway"` - 1 failed sob carga (timeout de 5 s, 2 vezes), 1 passed sem carga (3 de 3)
+`npx vitest run` - 148 passed, 0 failed · `E2E_PORT=5207 npx playwright test tests/e2e/interiors.spec.ts` - 18 passed, 0 failed (12.1 min) · C36/C38 (`render`, `world`, `visual`) carried from ff0934a, 95 passed
 
 ## Ranked gaps
 
-1. **AC 23 sem prova de "perto das árvores"** - C25 - no evidence.
-   - `InteriorScene.ts:457-474` põe os vagalumes em volta das árvores mais próximas, mas nenhum teste lê essas posições.
-   - Uma âncora em (0, 0) ou no carro passaria em tudo.
-   - Correção: acrescentar ao C25 uma asserção de browser, por exemplo "todo vagalume a ≤ N m de alguma árvore", lendo o atributo `position` exposto no `__game`.
-2. **AC 7 sem prova de "do seed, escala de 8 m"** - C8 - `tests/unit/interiorMotion.test.ts:72-75` só cobre o intervalo.
-   - Uma mutação de `GROUND_NOISE_SCALE` ou de `seed ^ 0x6a55` passa.
-   - Correção: afirmar que o ruído muda com outro seed, e fixar a escala (correlação alta a 1 m e baixa a ≥ 16 m, ou valor conhecido em pontos da grade de 8 m).
-3. **Prova de C17 sem folga de tempo** - C17 - `tests/unit/interiorMotion.test.ts:153`.
-   - O teste faz cerca de 1.4 M `expect` (1386 lâmpadas × 515 instantes × 2) sem timeout próprio, contra 5 s de padrão.
-   - Levou de 2.6 a 4.5 s sem carga e deu timeout 2 vezes com o Playwright em paralelo.
-   - Correção: `{ timeout: 60_000 }` como os vizinhos, ou trocar o `expect` por passo por um acumulador de pior caso.
-4. **"O tronco fica parado" (AC 21) com prova fraca** - C22 - `tests/e2e/interiors.spec.ts:288`.
-   - As matrizes de instância nunca mudam por construção, e o balanço é por vértice no shader, com a máscara `aCrown` = 0 no tronco (`InteriorScene.ts:663`, `:689`).
-   - Uma máscara 1 no tronco sobreviveria. Não injetei essa falta (o teto era 5), então é uma sobrevivente provável, não uma confirmada.
-   - Correção: afirmar `aCrown` = 0 nos vértices do tronco, lido da geometria.
-5. **Documentação do checks.md**: a C28 não lista a prova de browser que existe ("crane beacon blinks"), e a linha "startup config" do Coverage ainda diz "via `CityGenerator`" (hoje é `Game.ts:154-155`).
-6. **Door alterada pelo builder** (bbf232d): tecnicamente aceitável (ver Deviations 1), mas pede o de acordo do usuário.
+Nenhuma lacuna aberta. As 6 da rodada 1 estão fechadas:
+1. AC 23 "perto das árvores": C25 `interiors.spec.ts:386`, F4.
+2. AC 7 "do seed, escala de 8 m": C8 `interiorMotion.test.ts:83`, `:86`, `:106`, F1 e F2.
+3. Folga de tempo de C17: `interiorMotion.test.ts:184`, 141 ms sob carga.
+4. Tronco parado: C22 `interiors.spec.ts:303`, F3.
+5. Docs: `checks.md:152` e `:216`.
+6. Door alterada: de acordo registrado em fb05348.
+
+Nota, sem ser lacuna: as sondas `treeVertices` e `fireflyPositions` espelham o GLSL em JS. Hoje a equivalência vale por leitura (`InteriorScene.ts:728` ↔ `:504-507`, `:745-748` ↔ `:522-526`), e uma edição só no texto do shader passaria despercebida pelas provas.

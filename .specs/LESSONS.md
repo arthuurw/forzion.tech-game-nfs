@@ -114,6 +114,12 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: corner-assist r2 F8 Car.ts:381 (tests/physics)
 - last seen: 2026-09-27T01:07:39Z
 
+### L-018 - Every qualitative word in a claim (from the seed, 8 m scale, near the trees) needs its own measured bound and proof, or the verifier finds it unproven.
+- signal: `ac_gap` · recurrence: 1 feature(s) · scope: `checks` · harmful: 0
+- features: block-fill
+- evidence: block-fill r1 C8/C25 (checks)
+- last seen: 2026-09-27T01:23:21Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.

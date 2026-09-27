@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 18,
+  "next_id": 19,
   "lessons": [
     {
       "id": "L-001",
@@ -313,6 +313,24 @@
       ],
       "created": "2026-09-27T01:07:39Z",
       "last_seen": "2026-09-27T01:07:39Z"
+    },
+    {
+      "id": "L-018",
+      "key": "ac_gap::every qualitative word in a claim from the seed 8 m scale near the trees needs its own measured bound and proof or the verifier finds it unproven",
+      "text": "Every qualitative word in a claim (from the seed, 8 m scale, near the trees) needs its own measured bound and proof, or the verifier finds it unproven.",
+      "signal": "ac_gap",
+      "scope": "checks",
+      "status": "candidate",
+      "features": [
+        "block-fill"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "block-fill r1 C8/C25 (checks)"
+      ],
+      "created": "2026-09-27T01:23:21Z",
+      "last_seen": "2026-09-27T01:23:21Z"
     }
   ]
 }

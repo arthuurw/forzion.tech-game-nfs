@@ -15,7 +15,7 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
    - 1.6 `car-feel` - balanço da carroceria, volante mais rápido, menos aderência, câmera inclinando junto (concluída)
    - 1.6.1 `yaw-assist` - ajuda de giro arcade: carro aponta rápido e vira mais, aderência ~1.0 g (concluída)
    - 1.6.2 `corner-assist` - força de curva arcade pelo centro de massa: curvas fechadas em alta sem capotar (concluída, verificada round 3)
-   - 1.7 `block-fill` - miolo das quadras: mapa em zonas, grama nova, luz rebatida, quintais, árvores ao vento, vagalumes, obras com guindaste, pedestres (checks escritos, em build)
+   - 1.7 `block-fill` - miolo das quadras: mapa em zonas, grama nova, luz rebatida, quintais, árvores ao vento, vagalumes, obras com guindaste, pedestres (concluída, verificada round 2)
    - 1.8 `block-life-extras` - vapor de dutos, holofotes para o céu, estacionamentos, gatos, trem de superfície
 2. corridas - checkpoints, cronômetro, sprint/circuito, IA oponente por waypoints
 3. garagem + tuning visual - pintura, rodas, vinil, body kit, underglow
@@ -44,13 +44,14 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 
 ## Handoff
 
-**Feature**: nenhuma em andamento - city-terrain, car-handling e facade-glint concluídas e juntadas em `main`
-**Where**: `main` com as três features; 103/103 unitários (vitest, com `tests/physics`) e 75/75 e2e verdes em 2026-09-26
+**Feature**: nenhuma em andamento - todas as features do sub-projeto 1 concluídas e juntadas em `main`
+**Where**: `main`; 148/148 unitários (vitest, com `tests/physics`) e 18/18 e2e da block-fill verdes em 2026-09-26; repositório público `arthuurw/forzion.tech-game-nfs`
 **In progress**: nada
-**Next step**: usuário testa o mapa, a direção nova e as fachadas; então sub-projeto 2 (corridas) em `.specs/features/races/`, lendo o `RoadNetwork` e o `CarSpec`
+**Next step**: usuário testa curvas (corner-assist) e o miolo das quadras (block-fill); então sub-projeto 2 (corridas) em `.specs/features/races/`, lendo o `RoadNetwork` e o `CarSpec`, ou 1.8 `block-life-extras`
 **Blockers**: none
 **Branch**: `main`
 
-Concluídas: free-roam-city (PASS rodada 4), engine-sound (PASS rodada 3), visual-upgrade (PASS rodada 4), city-terrain (PASS rodada 3, escopada ao collider do pilar), car-handling (PASS rodada 4, escopada ao freio-motor da ré; a rodada 4 foi autorizada pelo usuário depois de escalar), facade-glint (PASS rodada 1), yaw-assist (PASS rodada 2), car-feel (PASS rodada 2; traseira só no acelerador ficou fora de escopo por decisão do usuário).
-Decisões do usuário no build (2026-09-26): C1 da facade-glint isola o especular; metal com `metalness` 0.05 e `normalScale` 0.2, tijolo com `normalScale` 0.25 e piso de rugosidade 0.6; C4 da car-handling com sinal corrigido e C29 com velocidade horizontal; freio de mão com acelerador mantém o motor (power slide); freio-motor na ré.
-Resíduos conhecidos: o reflexo da rua (door 3 da visual-upgrade) ainda cintila um pouco com a câmera andando; tijolo passa o C1 da facade-glint com margem curta (0.00074 de 0.0010); o "R" da ré no HUD não tem prova no browser; o literal "23 módulos puros" do C45 da city-terrain virou 24 com o `carSpec.ts`.
+Concluídas: free-roam-city (PASS rodada 4), engine-sound (PASS rodada 3), visual-upgrade (PASS rodada 4), city-terrain (PASS rodada 3), car-handling (PASS rodada 4, autorizada pelo usuário depois de escalar), facade-glint (PASS rodada 1), car-feel (PASS rodada 2; traseira só no acelerador fora de escopo por decisão do usuário), yaw-assist (PASS rodada 2), corner-assist (PASS rodada 3), block-fill (PASS rodada 2).
+Decisões do usuário no build (2026-09-26): C1 da facade-glint isola o especular; metal com `metalness` 0.05 e `normalScale` 0.2, tijolo com `normalScale` 0.25 e piso de rugosidade 0.6; C4 da car-handling com sinal corrigido e C29 com velocidade horizontal; freio de mão com acelerador mantém o motor (power slide); freio-motor na ré; C7 da corner-assist trocou a prova; doors 1 e 2 da block-fill alargadas pelo builder e confirmadas.
+Resíduos conhecidos: o reflexo da rua (door 3 da visual-upgrade) ainda cintila um pouco com a câmera andando; tijolo passa o C1 da facade-glint com margem curta (0.00074 de 0.0010); o "R" da ré no HUD não tem prova no browser; margens estreitas da corner-assist (C1 +3.3 %, C4 0.067 g); as sondas DEV `treeVertices`/`fireflyPositions` espelham o GLSL em JS, então mudar só o shader não é pego; o "Cost" do `checks.md` da block-fill está desatualizado (25/2/20, real 27/2/22).
+Hashes de commit citados nos relatórios anteriores a 2026-09-26 foram reescritos quando o histórico trocou o e-mail do autor pelo noreply do GitHub; valem como rótulo, não resolvem no repositório.
