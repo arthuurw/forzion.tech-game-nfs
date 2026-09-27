@@ -126,6 +126,30 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: checks.md Handoff - C1/C2/C5 renegotiated (checks)
 - last seen: 2026-09-27T15:25:24Z
 
+### L-020 - A threshold claim needs a case just below and just above the number; two far-apart cases pass any value between them.
+- signal: `surviving_mutant` · recurrence: 1 feature(s) · scope: `tests` · harmful: 0
+- features: block-life-extras
+- evidence: verification.md round 2 F5 (tests)
+- last seen: 2026-09-27T21:49:54Z
+
+### L-021 - A GLSL/JS twin contract must name the colour space of every input; a shader fed linear colour while the twin assumes sRGB passes loose pixel checks.
+- signal: `spec_precision_gap` · recurrence: 1 feature(s) · scope: `render` · harmful: 0
+- features: block-life-extras
+- evidence: verification.md round 1 paint colour space (render)
+- last seen: 2026-09-27T21:49:54Z
+
+### L-022 - Before writing a pixel probe with the game camera, project the target and check it lands in the frame and is not occluded; a probe point behind a roof reads 0.
+- signal: `ac_gap` · recurrence: 1 feature(s) · scope: `tests/e2e` · harmful: 0
+- features: block-life-extras
+- evidence: checks.md C22 renegotiation (tests/e2e)
+- last seen: 2026-09-27T21:49:54Z
+
+### L-023 - Playwright reads happen in real time while the sim keeps stepping; compare deltas against the sim clock read in the same evaluate, never against a fixed advance.
+- signal: `spec_deviation` · recurrence: 1 feature(s) · scope: `tests/e2e` · harmful: 0
+- features: block-life-extras
+- evidence: checks.md C17 C21 C31 (tests/e2e)
+- last seen: 2026-09-27T21:49:54Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.

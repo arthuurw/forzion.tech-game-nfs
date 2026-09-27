@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { BULB_SWAY_GLSL, CROWN_SWAY_GLSL, FIREFLY_DRIFT_GLSL } from '../../src/world/interiors/InteriorScene';
-import { FIREFLY_DRIFT, fireflyDrift } from '../../src/world/interiors/interiorMotion';
+import { BULB_SWAY_GLSL, CROWN_SWAY_GLSL, FIREFLY_DRIFT_GLSL, STEAM_GLSL } from '../../src/world/interiors/InteriorScene';
+import { FIREFLY_DRIFT, STEAM_DRIFT, STEAM_GROW, STEAM_PERIOD, STEAM_RISE, fireflyDrift } from '../../src/world/interiors/interiorMotion';
+import { CAR_PAINT_GLSL, CAR_PAINT_GLSL_LITERALS, LUMA, PAINT_HUE_TOLERANCE, PAINT_MIN_SATURATION, PAINT_SWATCH } from '../../src/vehicle/carPaint';
 
 // residuals C8-C10: o balanço do miolo tem uma fonte só, lida pelo shader e pelas sondas DEV
 const TWO_PI = 6.28318530718;
@@ -73,5 +74,30 @@ describe('shared interior motion constants', () => {
     expect(numericLiterals(BULB_SWAY_GLSL)).toEqual([0.12, TWO_PI]);
     expect(templateSourceLiterals('BULB_SWAY_GLSL')).toEqual([TWO_PI]);
     expect(templateSourceLiterals('CROWN_SWAY_GLSL')).toEqual([TWO_PI]);
+  });
+
+  // block-life-extras C17: o vapor lê as constantes de interiorMotion.ts
+  it('steam shader reads the shared constants', () => {
+    for (const v of [STEAM_RISE, STEAM_PERIOD, STEAM_DRIFT, STEAM_GROW]) expect(STEAM_GLSL).toContain(v.toFixed(1));
+    expect([STEAM_RISE, STEAM_PERIOD, STEAM_DRIFT, STEAM_GROW]).toEqual([5, 4, 1.5, 3]);
+    const dotted = [...STEAM_GLSL.matchAll(/(?<![A-Za-z_\d.])\d+\.\d+/g)].map((m) => Number(m[0]));
+    for (const v of dotted) expect([STEAM_RISE, STEAM_PERIOD, STEAM_DRIFT, STEAM_GROW, TWO_PI], `literal ${v}`).toContain(v);
+    expect(templateSourceLiterals('STEAM_GLSL').filter((v) => !Number.isInteger(v))).toEqual([]);
+  });
+
+  // block-life-extras C2: a repintura lê as constantes de carPaint.ts
+  it('car paint shader reads the shared constants', () => {
+    const n = parseInt(PAINT_SWATCH.slice(1), 16);
+    for (const v of [(n >> 16) & 255, (n >> 8) & 255, n & 255]) expect(CAR_PAINT_GLSL).toContain((v / 255).toFixed(4));
+    expect(CAR_PAINT_GLSL).toContain(Math.cos((PAINT_HUE_TOLERANCE * Math.PI) / 180).toFixed(4));
+    expect(CAR_PAINT_GLSL).toContain(`sat >= ${PAINT_MIN_SATURATION}`);
+    for (const w of LUMA) expect(CAR_PAINT_GLSL).toContain(String(w));
+    // nenhum outro literal com ponto decimal
+    const dotted = [...CAR_PAINT_GLSL.matchAll(/(?<![A-Za-z_\d.])\d+\.\d+/g)].map((m) => Number(m[0]));
+    expect(dotted.length).toBeGreaterThan(0);
+    for (const v of dotted) expect(CAR_PAINT_GLSL_LITERALS, `literal ${v}`).toContain(v);
+    const src = readFileSync('src/vehicle/carPaint.ts', 'utf-8');
+    const tpl = src.match(/export const CAR_PAINT_GLSL = `([\s\S]*?)`;/)![1]!.replace(/\$\{[^}]*\}/g, ' ');
+    expect(tpl.match(/(?<![A-Za-z_\d.])\d+\.\d+/g)).toBeNull();
   });
 });

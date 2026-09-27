@@ -82,13 +82,83 @@ export interface WalkerSpawn {
   z: number;
 }
 
+// block-life-extras (door 1): estacionamentos, grades de vapor, gatos e holofotes
+
+export interface ParkedCar {
+  x: number;
+  /** terreno sob o carro */
+  y: number;
+  z: number;
+  heading: number;
+  paint: string;
+  zoneId: number;
+}
+
+export interface Vent {
+  x: number;
+  y: number;
+  z: number;
+  zoneId: number;
+}
+
+export interface CatSpawn {
+  zoneId: number;
+  x: number;
+  z: number;
+  /** índice do quintal em `yards`, ou `null` numa zona de fora */
+  yard: number | null;
+}
+
+export interface Searchlight {
+  x: number;
+  /** teto do prédio: `lot.y + lot.height` */
+  y: number;
+  z: number;
+  lotIndex: number;
+  /** segundos por volta */
+  period: number;
+  phase: number;
+}
+
 export interface InteriorProps {
   yards: Yard[];
   pools: Pool[];
   trees: Tree[];
   sites: ConstructionSite[];
   walkers: WalkerSpawn[];
+  parking: ParkedCar[];
+  vents: Vent[];
+  cats: CatSpawn[];
+  searchlights: Searchlight[];
 }
+
+/** cores dos carros estacionados */
+export const PARKED_PAINTS = ['#e8e8e8', '#b9bcc4', '#1a1a1e', '#7a1f22', '#1d2a55', '#1f4a2e', '#c9b48a', '#5a5c63'] as const;
+export const PARKING_MIN_AREA = 800;
+export const PARKING_PITCH = 2.8;
+/** fileiras a 6.5 m entre si (o mínimo é 6; a folga evita o empate de float) */
+export const PARKING_ROW_GAP = 6.5;
+export const PARKING_OCCUPANCY = 0.6;
+export const PARKING_MAX = 160;
+/** vagas por fileira e fileiras por pátio, para não lotar o pátio inteiro */
+export const PARKING_ROW_SLOTS = 8;
+export const PARKING_ROWS = 3;
+export const PARKING_SITE_CLEAR = 12;
+export const PARKING_PROP_CLEAR = 8;
+export const VENT_AREA = 500;
+export const VENT_MAX = 120;
+export const VENT_FACADE_MIN = 3;
+export const VENT_FACADE_MAX = 12;
+export const VENT_SPACING = 6;
+export const VENT_PARKING_CLEAR = 4;
+export const VENT_SITE_CLEAR = 12;
+export const CAT_YARD_CHANCE = 0.35;
+export const CAT_YARD_SALT = 0xca75;
+export const CAT_AREA = 2000;
+export const SEARCHLIGHTS = 4;
+export const SEARCHLIGHT_SPACING = 250;
+export const SEARCHLIGHT_PERIOD_MIN = 32;
+export const SEARCHLIGHT_PERIOD_MAX = 48;
 
 export const YARD_DEPTH = 8;
 export const YARD_LAMP_HEIGHT = 2.5;
@@ -334,7 +404,129 @@ export function placeInteriorProps(seed: number, interiors: BlockInteriors, lots
     }
   }
 
-  return { yards, pools, trees, sites, walkers };
+  // --- estacionamentos: fileiras nos pátios do centro com 800 m² ou mais (block-life-extras) ---
+  // um ponto é "bem dentro" do pátio quando ele e os 8 pontos a 6 m em volta caem na zona e o
+  // vértice mais perto fica a 7 m ou mais de qualquer lote: assim o carro fica a 2 m dos lotes
+  // e a `w/2 + 2` das estradas mesmo sem a rede aqui (o miolo já exclui `w/2 + 2` m de estrada)
+  const wellInside = (zoneId: number, x: number, z: number, radius: number, facade: number): boolean => {
+    if (zoneAtXZ(x, z) !== zoneId) return false;
+    if (bi.facadeDist[nearestVertex(bi, x, z)]! < facade) return false;
+    for (let k = 0; k < 8; k++) {
+      const a = (k * Math.PI) / 4;
+      if (zoneAtXZ(x + Math.sin(a) * radius, z + Math.cos(a) * radius) !== zoneId) return false;
+    }
+    return true;
+  };
+  const farFromProps = (x: number, z: number, clear: number): boolean => {
+    for (const y of yards) if (Math.hypot(y.lamp.x - x, y.lamp.z - z) < clear) return false;
+    for (const p of pools) if (Math.hypot(p.x - x, p.z - z) < clear) return false;
+    for (const t of trees) if (Math.hypot(t.x - x, t.z - z) < clear) return false;
+    return true;
+  };
+  const farFromSites = (x: number, z: number, clear: number): boolean => sites.every((s) => Math.hypot(s.x - x, s.z - z) >= clear);
+  const parkRng = mulberry32(seed ^ 0x9a4c);
+  const parking: ParkedCar[] = [];
+  for (const zone of bi.zones) {
+    if (zone.kind !== 'downtown' || zone.areaM2 < PARKING_MIN_AREA || parking.length >= PARKING_MAX) continue;
+    // os pátios são faixas ao longo da rua: a fileira corre ao longo da rua do lote mais perto do
+    // centro do pátio e os carros ficam de nariz para o prédio (heading = rua + 90°)
+    let street = 0;
+    let bestD = Infinity;
+    for (const l of lots) {
+      const d = (l.x - zone.centroid.x) ** 2 + (l.z - zone.centroid.z) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        street = l.rotation;
+      }
+    }
+    const heading = street + Math.PI / 2;
+    // fileira ao longo da rua (= direita do carro); fileiras separadas ao longo da frente do carro
+    const rx = Math.sin(street);
+    const rz = Math.cos(street);
+    const fx = Math.sin(heading);
+    const fz = Math.cos(heading);
+    // centro das fileiras: 40 m do centroide ao longo da rua (o canteiro de obra fica no centroide),
+    // no primeiro deslocamento que cai bem dentro da zona
+    let cx = zone.centroid.x;
+    let cz = zone.centroid.z;
+    for (const shift of [40, -40, 80, -80, 0]) {
+      const x = zone.centroid.x + rx * shift;
+      const z = zone.centroid.z + rz * shift;
+      if (wellInside(zone.id, x, z, 4, 5.5)) {
+        cx = x;
+        cz = z;
+        break;
+      }
+    }
+    for (let row = -Math.floor(PARKING_ROWS / 2); row <= Math.floor(PARKING_ROWS / 2); row++) {
+      for (let slot = -Math.floor(PARKING_ROW_SLOTS / 2); slot < Math.ceil(PARKING_ROW_SLOTS / 2); slot++) {
+        const x = cx + rx * slot * PARKING_PITCH + fx * row * PARKING_ROW_GAP;
+        const z = cz + rz * slot * PARKING_PITCH + fz * row * PARKING_ROW_GAP;
+        if (!wellInside(zone.id, x, z, 4, 5.5)) continue;
+        if (!farFromSites(x, z, PARKING_SITE_CLEAR) || !farFromProps(x, z, PARKING_PROP_CLEAR)) continue;
+        if (parkRng() >= PARKING_OCCUPANCY) continue;
+        if (parking.length >= PARKING_MAX) break;
+        const paint = PARKED_PAINTS[Math.floor(parkRng() * PARKED_PAINTS.length)]!;
+        parking.push({ x, y: heightAt(carved, x, z), z, heading, paint, zoneId: zone.id });
+      }
+    }
+  }
+
+  // --- grades de vapor: 1 por 500 m² de pátio, em vértices a 3-12 m do prédio, longe das vagas ---
+  const vents: Vent[] = [];
+  const ventQuota = new Map<number, number>();
+  for (let k = 0; k < bi.zoneOf.length && vents.length < VENT_MAX; k++) {
+    const zoneId = bi.zoneOf[k]!;
+    if (zoneId < 0) continue;
+    const zone = bi.zones[zoneId]!;
+    if (zone.kind !== 'downtown') continue;
+    const used = ventQuota.get(zoneId) ?? 0;
+    if (used >= Math.floor(zone.areaM2 / VENT_AREA)) continue;
+    const fd = bi.facadeDist[k]!;
+    if (fd < VENT_FACADE_MIN || fd > VENT_FACADE_MAX) continue;
+    const [x, z] = vertexXZ(bi, k);
+    if (!farFromSites(x, z, VENT_SITE_CLEAR)) continue;
+    if (vents.some((v) => Math.hypot(v.x - x, v.z - z) < VENT_SPACING)) continue;
+    if (parking.some((p) => Math.hypot(p.x - x, p.z - z) < VENT_PARKING_CLEAR)) continue;
+    vents.push({ x, y: H(k), z, zoneId });
+    ventQuota.set(zoneId, used + 1);
+  }
+
+  // --- gatos: 35 % dos quintais (no poste) e 1 por 2000 m² de zona de fora ---
+  const catYardRng = mulberry32(seed ^ CAT_YARD_SALT);
+  const cats: CatSpawn[] = [];
+  yards.forEach((yard, i) => {
+    if (catYardRng() < CAT_YARD_CHANCE) cats.push({ zoneId: yard.zoneId, x: yard.lamp.x, z: yard.lamp.z, yard: i });
+  });
+  const catRng = mulberry32(seed ^ 0x2ca7);
+  for (const zone of bi.zones) {
+    if (zone.kind !== 'outer') continue;
+    const verts = vertsOf[zone.id]!;
+    const count = Math.floor(zone.areaM2 / CAT_AREA);
+    for (let i = 0; i < count; i++) {
+      const [x, z] = vertexXZ(bi, verts[Math.floor(catRng() * verts.length)]!);
+      cats.push({ zoneId: zone.id, x, z, yard: null });
+    }
+  }
+
+  // --- holofotes: os 4 prédios mais altos do centro a 250 m ou mais entre si ---
+  const lightRng = mulberry32(seed ^ 0x5ea7);
+  const searchlights: Searchlight[] = [];
+  const tall = lots.map((l, i) => ({ l, i })).filter((e) => e.l.downtown).sort((a, b) => b.l.height - a.l.height || a.i - b.i);
+  for (const { l, i } of tall) {
+    if (searchlights.length >= SEARCHLIGHTS) break;
+    if (searchlights.some((s) => Math.hypot(s.x - l.x, s.z - l.z) < SEARCHLIGHT_SPACING)) continue;
+    searchlights.push({
+      x: l.x,
+      y: l.y + l.height,
+      z: l.z,
+      lotIndex: i,
+      period: SEARCHLIGHT_PERIOD_MIN + lightRng() * (SEARCHLIGHT_PERIOD_MAX - SEARCHLIGHT_PERIOD_MIN),
+      phase: lightRng() * Math.PI * 2,
+    });
+  }
+
+  return { yards, pools, trees, sites, walkers, parking, vents, cats, searchlights };
 }
 
 const FLOOD_SWEEP_RAD = Math.PI / 6;

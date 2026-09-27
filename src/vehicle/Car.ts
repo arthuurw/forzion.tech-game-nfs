@@ -12,6 +12,7 @@ import {
   type DriveInput,
   type DrivetrainState,
 } from './drivetrain';
+import { CAR_PAINT_GLSL, hexToRgb, rgbToHex } from './carPaint';
 import { cornerAssistForce } from './cornerAssist';
 import { yawAssistTorque } from './yawAssist';
 
@@ -58,7 +59,7 @@ const LOADED_SUSPENSION = WHEEL_REST - GRAVITY / (4 * RIDE_HEIGHT_REF_STIFFNESS)
 const RAPIER_ROLL_INFLUENCE = 0.1;
 /** passos na janela da aceleração lateral (0.5 s) */
 const LATERAL_G_WINDOW = 30;
-const MODEL_SCALE = 1.8;
+export const MODEL_SCALE = 1.8;
 const FRONT = [0, 1];
 const REAR = [2, 3];
 /** limiar de força de contato do chassi para gerar eventos (door 6 do visual-upgrade) */
@@ -88,6 +89,14 @@ export class Car {
 
   /** material da carroceria com a pintura deste carro (races AC 19); `null` no modelo glb do jogador */
   paintMaterial: THREE.MeshStandardMaterial | null = null;
+  /** pintura (sRGB) que o shader da carroceria lê (só o oponente com glb); o placeholder usa `paintMaterial.color` */
+  private paintUniform: { value: THREE.Vector3 } | null = null;
+
+  /** cor da carroceria como o jogador vê: a pintura do shader, ou a cor do material no placeholder; `null` sem pintura */
+  bodyColor(): string | null {
+    if (this.paintUniform) return rgbToHex([this.paintUniform.value.x, this.paintUniform.value.y, this.paintUniform.value.z]);
+    return this.paintMaterial ? `#${this.paintMaterial.color.getHexString()}` : null;
+  }
 
   private readonly wheelMeshes: THREE.Object3D[] = [];
   /**
@@ -542,8 +551,19 @@ export class Car {
     group.scale.setScalar(MODEL_SCALE);
     group.position.y = -(CHASSIS_HALF.y + WHEEL_REST * 0.4);
 
+    // a pintura troca o laranja da paleta no shader (block-life-extras door 3); a cor do material fica branca
     const material = (parts[0]!.material as THREE.MeshStandardMaterial).clone();
-    material.color.set(this.paint!);
+    material.color.set('#ffffff');
+    // o trecho GLSL trabalha em sRGB: a pintura vai como está no hex, sem a conversão para linear do `Color`
+    const paintUniform = { value: new THREE.Vector3(...hexToRgb(this.paint!)) };
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.uPaint = paintUniform;
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform vec3 uPaint;')
+        .replace('#include <map_fragment>', `#include <map_fragment>\nvec3 carPaint = uPaint;\n${CAR_PAINT_GLSL}`);
+    };
+    material.customProgramCacheKey = () => 'car-paint';
+    this.paintUniform = paintUniform;
     this.paintMaterial = material;
     const bodyGeo = mergeGeometries(
       parts.map((m) => m.geometry.clone().applyMatrix4(m.matrixWorld)),

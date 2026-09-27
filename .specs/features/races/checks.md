@@ -107,6 +107,7 @@ Proof: `npx playwright test tests/e2e/race.spec.ts -g "enter away from markers d
 O `DriveInput` que a sessão entrega aos carros durante a contagem é freio, sem acelerador e sem volante. No browser, segurando W durante toda a contagem, os 4 carros ficam < 1 km/h até o GO, e `#race-countdown` mostra `3` logo depois do Enter.
 Proof: `npx vitest run tests/unit/raceSession.test.ts -t "countdown 3 2 1 GO then racing"`
 Proof: `npx playwright test tests/e2e/race.spec.ts -g "countdown holds every car"`
+Nota (2026-09-27, block-life-extras C8): o carro é segurado pelo freio de mão (`handbrake: true, brake: false`), como o teste prova.
 
 ### S2 - portões, relógio, voltas e chegada · 6 files · 90 KB · ~22k
 

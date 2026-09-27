@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 20,
+  "next_id": 24,
   "lessons": [
     {
       "id": "L-001",
@@ -349,6 +349,78 @@
       ],
       "created": "2026-09-27T15:25:24Z",
       "last_seen": "2026-09-27T15:25:24Z"
+    },
+    {
+      "id": "L-020",
+      "key": "surviving_mutant::a threshold claim needs a case just below and just above the number two far apart cases pass any value between them",
+      "text": "A threshold claim needs a case just below and just above the number; two far-apart cases pass any value between them.",
+      "signal": "surviving_mutant",
+      "scope": "tests",
+      "status": "candidate",
+      "features": [
+        "block-life-extras"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "verification.md round 2 F5 (tests)"
+      ],
+      "created": "2026-09-27T21:49:54Z",
+      "last_seen": "2026-09-27T21:49:54Z"
+    },
+    {
+      "id": "L-021",
+      "key": "spec_precision_gap::a glsl js twin contract must name the colour space of every input a shader fed linear colour while the twin assumes srgb passes loose pixel checks",
+      "text": "A GLSL/JS twin contract must name the colour space of every input; a shader fed linear colour while the twin assumes sRGB passes loose pixel checks.",
+      "signal": "spec_precision_gap",
+      "scope": "render",
+      "status": "candidate",
+      "features": [
+        "block-life-extras"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "verification.md round 1 paint colour space (render)"
+      ],
+      "created": "2026-09-27T21:49:54Z",
+      "last_seen": "2026-09-27T21:49:54Z"
+    },
+    {
+      "id": "L-022",
+      "key": "ac_gap::before writing a pixel probe with the game camera project the target and check it lands in the frame and is not occluded a probe point behind a roof reads 0",
+      "text": "Before writing a pixel probe with the game camera, project the target and check it lands in the frame and is not occluded; a probe point behind a roof reads 0.",
+      "signal": "ac_gap",
+      "scope": "tests/e2e",
+      "status": "candidate",
+      "features": [
+        "block-life-extras"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "checks.md C22 renegotiation (tests/e2e)"
+      ],
+      "created": "2026-09-27T21:49:54Z",
+      "last_seen": "2026-09-27T21:49:54Z"
+    },
+    {
+      "id": "L-023",
+      "key": "spec_deviation::playwright reads happen in real time while the sim keeps stepping compare deltas against the sim clock read in the same evaluate never against a fixed advance",
+      "text": "Playwright reads happen in real time while the sim keeps stepping; compare deltas against the sim clock read in the same evaluate, never against a fixed advance.",
+      "signal": "spec_deviation",
+      "scope": "tests/e2e",
+      "status": "candidate",
+      "features": [
+        "block-life-extras"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "checks.md C17 C21 C31 (tests/e2e)"
+      ],
+      "created": "2026-09-27T21:49:54Z",
+      "last_seen": "2026-09-27T21:49:54Z"
     }
   ]
 }

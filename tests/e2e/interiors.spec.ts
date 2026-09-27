@@ -529,13 +529,13 @@ test.describe('block-fill - pedestres', () => {
       });
     const a = await read();
     expect(a.s.walkersActive).toBeGreaterThan(0);
-    // terreno, estradas, guarda-corpos, pilares, prédios, paredes, troncos, torres (+ o carro)
+    // terreno, estradas, guarda-corpos, pilares, prédios, paredes, troncos, torres, carros estacionados e colunas do trem (+ o carro)
     expect(a.c.roads).toBe(a.roads);
     expect(a.c.lots).toBe(a.lots);
     expect(a.c.walls).toBe(4);
     expect(a.c.trees).toBe(a.s.trees);
     expect(a.c.cranes).toBe(a.s.sites);
-    const expected = a.c.terrain + a.c.roads + a.c.rails + a.c.pillars + a.c.lots + a.c.walls + a.c.trees + a.c.cranes + a.c.car;
+    const expected = a.c.terrain + a.c.roads + a.c.rails + a.c.pillars + a.c.lots + a.c.walls + a.c.trees + a.c.cranes + a.c.parked + a.c.columns + a.c.car;
     expect(a.c.total).toBe(expected);
     await advanceSim(page, 5);
     const b = await read();

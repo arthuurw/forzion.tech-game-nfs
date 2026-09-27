@@ -345,3 +345,94 @@ test.describe('races', () => {
     expect(await speedKmh(page)).toBeGreaterThan(20);
   });
 });
+
+// block-life-extras: pintura dos oponentes e as provas que faltaram na races
+test.describe('block-life-extras - pintura e provas da races', () => {
+  test.beforeEach(async ({ page }) => {
+    await gotoGame(page);
+  });
+
+  /** matiz HSV (graus) de uma cor em [0, 1] */
+  const hue = (r: number, g: number, b: number): number => {
+    const mx = Math.max(r, g, b);
+    const mn = Math.min(r, g, b);
+    if (mx === mn) return 0;
+    const d = mx - mn;
+    let h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    h *= 60;
+    return h;
+  };
+
+  // C3 (AC 3)
+  test('opponent body reads its paint', async ({ page }) => {
+    await startRace(page, 'circuito-centro');
+    await advanceSim(page, 0.2);
+    const probe = (i: number) => page.evaluate((i) => (window as any).__game.race.bodyProbe(i), i);
+    const me = await probe(-1);
+    expect(me.onScreen).toBe(true);
+    const ops = [await probe(0), await probe(1), await probe(2)];
+    for (const [i, o] of ops.entries()) {
+      expect(o.onScreen, `oponente ${i}`).toBe(true);
+      expect(o.luminance, `oponente ${i}`).toBeGreaterThanOrEqual(0.6 * me.luminance);
+    }
+    // oponente 0 é azul #2f8cff (matiz 213°)
+    const h = hue(ops[0]!.r, ops[0]!.g, ops[0]!.b);
+    expect(Math.abs(h - 210)).toBeLessThanOrEqual(30);
+  });
+
+  // C4 (AC 4)
+  test('opponent material is white and body color is the paint', async ({ page }) => {
+    await startRace(page, 'circuito-centro', false);
+    const ops = (await race(page)).opponents as Array<{ index: number; paint: string; bodyColor: string; materialColor: string }>;
+    expect(ops).toHaveLength(3);
+    for (const o of ops) {
+      expect(o.bodyColor).toBe(o.paint.toLowerCase());
+      expect(o.materialColor).toBe('#ffffff');
+    }
+  });
+
+  // C6 (AC 6, races AC 27)
+  test('reset during countdown returns to the grid slot', async ({ page }) => {
+    await startRace(page, 'circuito-centro', false);
+    const slot = await page.evaluate(() => {
+      const g = (window as any).__game;
+      return { ...g.race.races.find((x: any) => x.id === 'circuito-centro').grid[3] };
+    });
+    // 20 m para trás ao longo do heading do lugar, na altura da estrada
+    const away = await page.evaluate((s) => {
+      const g = (window as any).__game;
+      const x = s.x - Math.sin(s.heading) * 20;
+      const z = s.z - Math.cos(s.heading) * 20;
+      return { x, y: g.world.nearestRoad(x, z).y + 1.2, z };
+    }, slot);
+    await place(page, { ...away, heading: slot.heading });
+    expect(await state(page)).toBe('countdown');
+    await page.keyboard.press('KeyR');
+    await advanceSim(page, 0.5);
+    const p = await position(page);
+    expect(Math.hypot(p.x - slot.x, p.z - slot.z)).toBeLessThanOrEqual(0.5);
+    expect(Math.abs(await speedKmh(page))).toBeLessThan(1);
+    const h = await page.evaluate(() => (window as any).__game.car.heading as number);
+    expect(Math.abs(Math.atan2(Math.sin(h - slot.heading), Math.cos(h - slot.heading)))).toBeLessThanOrEqual((5 * Math.PI) / 180);
+    expect((await race(page)).time).toBe(0);
+    expect(await state(page)).toBe('countdown');
+  });
+
+  // C7 (AC 7, races AC 10)
+  test('enter at 100 m from the marker does nothing', async ({ page }) => {
+    const pose = await nearMarker(page, 'circuito-centro', 100);
+    await place(page, pose);
+    const markers = (await race(page)).markers as Array<{ x: number; z: number }>;
+    const dists = markers.map((m) => Math.hypot(m.x - pose.x, m.z - pose.z)).sort((a, b) => a - b);
+    expect(Math.abs(dists[0]! - 100)).toBeLessThanOrEqual(0.5);
+    expect(dists[1]!).toBeGreaterThan(100);
+    const before = await counts(page);
+    const p0 = await position(page);
+    await page.keyboard.press('Enter');
+    await advanceSim(page, 0.5);
+    expect(await state(page)).toBe('free');
+    expect((await counts(page)).bodies).toBe(before.bodies);
+    const p1 = await position(page);
+    expect(Math.hypot(p1.x - p0.x, p1.z - p0.z)).toBeLessThanOrEqual(0.5);
+  });
+});

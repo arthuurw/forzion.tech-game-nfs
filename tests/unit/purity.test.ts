@@ -43,6 +43,10 @@ const PURE_MODULES = [
   'src/race/raceProgress.ts',
   'src/race/raceSession.ts',
   'src/race/aiDriver.ts',
+  // block-life-extras C38 (doors 2 e 3; roadQuery serve as corridas e o trem)
+  'src/vehicle/carPaint.ts',
+  'src/world/rail/trainLine.ts',
+  'src/world/roads/roadQuery.ts',
 ];
 
 // cobre `import x from 'three'`, `import 'three'`, `import('three')` e `require('three')`
@@ -50,7 +54,7 @@ const FORBIDDEN = /(from\s+|import\s+|import\s*\(\s*|require\s*\(\s*)['"](three|
 
 describe('pure modules', () => {
   it('pure modules do not import three or rapier', () => {
-    expect(PURE_MODULES.length).toBe(33);
+    expect(PURE_MODULES.length).toBe(36);
     for (const rel of PURE_MODULES) {
       const source = readFileSync(resolve(process.cwd(), rel), 'utf8');
       expect(FORBIDDEN.test(source), rel).toBe(false);
