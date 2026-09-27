@@ -86,7 +86,7 @@ Os 4 marcadores aparecem, e o jogador começa uma corrida por um deles.
 
    Gerar duas vezes com o mesmo seed SHALL dar corridas idênticas.
 2. The system SHALL montar o traçado de cada corrida com pontos consecutivos a no máximo 4 m um do outro na horizontal e cada ponto a no máximo meia largura da estrada de algum ponto de estrada. No circuito, o último ponto SHALL ficar a no máximo 4 m do primeiro.
-3. The system SHALL dar a cada traçado um comprimento (uma volta, no circuito) dentro destas faixas: `circuito-centro` 2200-2700 m, `circuito-anel` 6200-6400 m, `sprint-cruzada` 1800-2300 m, `sprint-morro` 2800-3000 m.
+3. The system SHALL dar a cada traçado um comprimento (uma volta, no circuito) dentro destas faixas: `circuito-centro` 2200-2700 m, `circuito-anel` 6200-6400 m, `sprint-cruzada` 1800-2300 m, `sprint-morro` 2800-3000 m, com ±0.01 m de tolerância em cada limite (renegociado em 2026-09-27: erro de float32 dos pontos).
 4. The system SHALL pôr portões a no máximo 250 m um do outro ao longo do traçado, cada um com meia largura = meia largura da estrada + 4 m. O último portão do sprint SHALL ficar a no máximo 4 m do fim do traçado. O último portão do circuito SHALL ser a linha de largada/chegada.
 5. The system SHALL pôr os 4 lugares do grid sobre o asfalto (a no máximo meia largura da estrada - 1 m do centro), atrás da linha de largada (entre 6 e 24 m antes dela), a pelo menos 5 m um do outro, virados para o traçado (diferença de heading ≤ 5°).
 6. IF a regra de uma corrida não encontra a estrada dela THEN the system SHALL deixar essa corrida de fora, manter as outras e escrever `race <id> skipped: <motivo>` no console.

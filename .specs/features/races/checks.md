@@ -11,7 +11,7 @@ Comandos: `npx vitest run <arquivo> -t "<nome>"` (unitários e `tests/physics`, 
 
 ### S1 - corridas na cidade e largada · 10 files · 150 KB · ~38k
 
-**C1** - `generateRaces(network)` do seed 1337 devolve exatamente 4 corridas, nesta ordem e com estes campos (AC 1, door 1):
+**C1** - ✅ `generateRaces(network)` do seed 1337 devolve exatamente 4 corridas, nesta ordem e com estes campos (AC 1, door 1):
 - `circuito-centro`: `circuit`, 2 voltas;
 - `circuito-anel`: `circuit`, 1 volta;
 - `sprint-cruzada`: `sprint`, 1 volta;
@@ -20,7 +20,7 @@ Comandos: `npx vitest run <arquivo> -t "<nome>"` (unitários e `tests/physics`, 
 Cada uma tem `name` não vazio, `route.points` com comprimento múltiplo de 3, `gates` não vazio, 4 `grid` e `marker.radius` = 10.
 Proof: `npx vitest run tests/unit/raceRoutes.test.ts -t "generates the four races of seed 1337"`
 
-**C2** - O traçado de cada corrida segue a regra dela (AC 1). O quadrado das avenidas, na C2 e na C5, é o de x ≈ ±300 e z ≈ ±300:
+**C2** - ✅ O traçado de cada corrida segue a regra dela (AC 1). O quadrado das avenidas, na C2 e na C5, é o de x ≈ ±300 e z ≈ ±300:
 - `circuito-centro`: todo ponto está a no máximo 40 m de uma das retas x = ±300 ou z = ±300, com |x| ≤ 340 e |z| ≤ 340, e o traçado passa a no máximo 40 m de cada um dos 4 cantos (±300, ±300).
 - `circuito-anel`: todo ponto está a no máximo 1 m de um ponto da estrada `highway`.
 - `sprint-cruzada`: o primeiro ponto fica a no máximo 20 m da ponta oeste (menor x) da avenida ao longo de x com z médio mais perto de 0, e o último a no máximo 20 m da ponta com z > 0 da avenida ao longo de z com x médio mais perto de 0. Algum ponto fica a no máximo 30 m de (0, 0).
@@ -28,17 +28,17 @@ Proof: `npx vitest run tests/unit/raceRoutes.test.ts -t "generates the four race
 
 Proof: `npx vitest run tests/unit/raceRoutes.test.ts -t "each route follows its rule"`
 
-**C3** - Duas chamadas de `generateRaces` sobre redes geradas do mesmo seed dão corridas iguais: `toEqual` sobre ids, pontos, portões, grid e marcador (AC 1)
+**C3** - ✅ Duas chamadas de `generateRaces` sobre redes geradas do mesmo seed dão corridas iguais: `toEqual` sobre ids, pontos, portões, grid e marcador (AC 1)
 Proof: `npx vitest run tests/unit/raceRoutes.test.ts -t "same seed same races"`
 
-**C4** - Em cada uma das 4 corridas (AC 2):
+**C4** - ✅ Em cada uma das 4 corridas (AC 2):
 - pontos consecutivos do traçado estão a no máximo 4.0 m um do outro na horizontal;
 - cada ponto está a no máximo meia largura de um ponto de alguma estrada da rede;
 - nos 2 circuitos, o último ponto está a no máximo 4.0 m do primeiro.
 
 Proof: `npx vitest run tests/unit/raceRoutes.test.ts -t "routes are continuous and on the asphalt"`
 
-**C5** - `route.length` (uma volta, no circuito) fica nestas faixas, com os limites incluídos (AC 3):
+**C5** - ✅ `route.length` (uma volta, no circuito) fica nestas faixas, com os limites incluídos e tolerância de ±0.01 m em cada limite, para o erro de float32 dos pontos das estradas (renegociado com o usuário em 2026-09-27: o morro mede 3000.000004 m) (AC 3):
 
 | Corrida | Faixa (m) |
 | --- | --- |
@@ -50,7 +50,7 @@ Proof: `npx vitest run tests/unit/raceRoutes.test.ts -t "routes are continuous a
 `route.length` bate com a soma das distâncias horizontais entre pontos consecutivos (fechando o laço no circuito), com erro ≤ 1 m.
 Proof: `npx vitest run tests/unit/raceRoutes.test.ts -t "route lengths within bands"`
 
-**C6** - Portões de cada corrida (AC 4):
+**C6** - ✅ Portões de cada corrida (AC 4):
 - `s` é crescente, e a distância ao longo do traçado entre dois portões consecutivos, e do começo ao primeiro, é ≤ 250 m;
 - `halfWidth` = meia largura da estrada sob o portão + 4 m, com erro ≤ 0.01;
 - no sprint, o último portão fica a no máximo 4 m do último ponto do traçado;
@@ -58,7 +58,7 @@ Proof: `npx vitest run tests/unit/raceRoutes.test.ts -t "route lengths within ba
 
 Proof: `npx vitest run tests/unit/raceRoutes.test.ts -t "gates spaced and sized"`
 
-**C7** - Grid de cada corrida (AC 5):
+**C7** - ✅ Grid de cada corrida (AC 5):
 - 4 lugares;
 - cada um a no máximo (meia largura da estrada − 1 m) do ponto de estrada mais próximo;
 - cada um entre 6 e 24 m antes da linha de largada ao longo do traçado;
@@ -67,7 +67,7 @@ Proof: `npx vitest run tests/unit/raceRoutes.test.ts -t "gates spaced and sized"
 
 Proof: `npx vitest run tests/unit/raceRoutes.test.ts -t "grid slots on the asphalt behind the start line"`
 
-**C8** - Numa rede sem estrada `hill` (a do seed 1337 sem as estradas de morro), `generateRaces` devolve só as outras 3, na mesma ordem, e chama `console.warn` uma vez com um texto que começa por `race sprint-morro skipped:` (AC 6)
+**C8** - ✅ Numa rede sem estrada `hill` (a do seed 1337 sem as estradas de morro), `generateRaces` devolve só as outras 3, na mesma ordem, e chama `console.warn` uma vez com um texto que começa por `race sprint-morro skipped:` (AC 6)
 Proof: `npx vitest run tests/unit/raceRoutes.test.ts -t "missing road skips only that race"`
 
 **C9** - No free roam, `__game.race.markers` lista 4 marcadores visíveis, cada um com raio 10 m e centro igual a `marker` da corrida. No minimapa, a função pura de ícones devolve um ícone para cada marcador dentro da janela de 320 m e nenhum para os de fora. Com o carro a 50 m de um marcador, o pixel do minimapa na posição do ícone tem a cor do ícone (L-002) (AC 7)
@@ -114,7 +114,7 @@ Proof: `npx playwright test tests/e2e/race.spec.ts -g "countdown holds every car
 Proof: `npx playwright test tests/e2e/race.spec.ts -g "only the next gate is shown"`
 Proof: `npx vitest run tests/unit/minimap.test.ts -t "next gate on the minimap"`
 
-**C15** - Cruzamento de portão, `raceProgress` puro (AC 13). Um passo que:
+**C15** - ✅ Cruzamento de portão, `raceProgress` puro (AC 13). Um passo que:
 - cruza o segmento do próximo portão para a frente, dentro de `halfWidth`: avança 1;
 - cruza a 0.1 m fora de `halfWidth`: não avança;
 - cruza o portão seguinte ao próximo: não avança;
@@ -153,7 +153,7 @@ Proof: `npx playwright test tests/e2e/race.spec.ts -g "hud shows time lap and po
 
 ### S3 - oponentes · 7 files · 120 KB · ~30k
 
-**C20** - O oponente só recebe `DriveInput`, e nenhuma outra ação fora do reset (AC 18, door 2). Em node, no mundo real, um oponente corre 20 s de `sprint-cruzada`, gravando o `DriveInput` de cada passo. Um `Car` novo, num mundo novo igual, recebe a mesma sequência pelo `fixedUpdate`. A posição dos dois fica igual passo a passo (erro ≤ 1e-4 m) e a orientação também (erro ≤ 1e-4 no quaternion).
+**C20** - ✅ O oponente só recebe `DriveInput`, e nenhuma outra ação fora do reset (AC 18, door 2). Em node, no mundo real, um oponente corre 20 s de `sprint-cruzada`, gravando o `DriveInput` de cada passo. Um `Car` novo, num mundo novo igual, recebe a mesma sequência pelo `fixedUpdate`. A posição dos dois fica igual passo a passo (erro ≤ 1e-4 m) e a orientação também (erro ≤ 1e-4 no quaternion).
 Proof: `npx vitest run tests/physics/raceAi.test.ts -t "ai is driven only through DriveInput"`
 
 **C21** - Oponentes (AC 19):
@@ -165,14 +165,14 @@ Proof: `npx vitest run tests/physics/raceAi.test.ts -t "ai is driven only throug
 Proof: `npx vitest run tests/unit/aiDriver.test.ts -t "skills offsets and paints"`
 Proof: `npx playwright test tests/e2e/race.spec.ts -g "opponents wear their own paint"`
 
-**C22** - Em node, no mundo físico real do seed 1337, cada oponente (habilidade 0.80, 0.88 e 0.95) corre sozinho cada uma das 4 corridas (12 corridas no total). Em cada uma (AC 20):
+**C22** - ✅ Em node, no mundo físico real do seed 1337, cada oponente (habilidade 0.80, 0.88 e 0.95) corre sozinho cada uma das 4 corridas (12 corridas no total). Em cada uma (AC 20):
 - termina antes de 420 s de simulação;
 - tem no máximo 1 reset de travado;
 - na mesma corrida, os tempos caem com a habilidade: t(0.95) < t(0.88) < t(0.80).
 
 Proof: `npx vitest run tests/physics/raceAi.test.ts -t "each opponent finishes every race in time"`
 
-**C23** - Reset de travado (AC 21). Detector puro:
+**C23** - ✅ Reset de travado (AC 21). Detector puro:
 - andou 4.9 m em 4 s: dispara;
 - andou 5.1 m: não dispara;
 - chassi em y = -1.51: dispara;
@@ -202,7 +202,7 @@ Proof: `npx playwright test tests/e2e/race.spec.ts -g "enter on the results retu
 
 ### S4 - posição e resultado · 4 files · 70 KB · ~17k
 
-**C26** - Ordem dos racers, `standings` puro, com um caso para cada chave, em que só ela decide (AC 24):
+**C26** - ✅ Ordem dos racers, `standings` puro, com um caso para cada chave, em que só ela decide (AC 24):
 - dois terminados: o de menor tempo na frente;
 - um terminado na frente de um não terminado, mesmo com volta maior;
 - volta 2 na frente de volta 1;
@@ -269,7 +269,7 @@ Proof: `npx playwright test tests/e2e/drive.spec.ts tests/e2e/world.spec.ts -g "
 **C34** - Em `racing` com os 3 oponentes, no grid de `circuito-centro` logo depois do GO (os 4 carros perto da câmera, o pior caso), `__game.render.calls` ≤ 220 (AC 32)
 Proof: `npx playwright test tests/e2e/race.spec.ts -g "draw calls within budget while racing"`
 
-**C35** - `src/race/raceRoutes.ts`, `raceProgress.ts`, `raceSession.ts` e `aiDriver.ts` estão na lista de módulos puros e não importam `three` nem `@dimforge/rapier3d-compat` (convenção AD-004)
+**C35** - ✅ `src/race/raceRoutes.ts`, `raceProgress.ts`, `raceSession.ts` e `aiDriver.ts` estão na lista de módulos puros e não importam `three` nem `@dimforge/rapier3d-compat` (convenção AD-004)
 Proof: `npx vitest run tests/unit/purity.test.ts -t "pure modules"`
 
 **C36** - O jogador também só dirige pelo `DriveInput` do teclado fora da contagem: em `racing`, segurar W por 2 s de simulação leva o jogador a > 20 km/h (a sessão não trava o input depois do GO) (AC 11, AC 18)
@@ -336,3 +336,8 @@ Cost: ~22 provas vitest em 5 arquivos, 4 de física real num arquivo novo, ~16 P
   - código e testes novos: ~100 KB ≈ 25k;
   - S1 38k, S2 entra em 60k, S3 em 90k, S4 em 107k, S5 em 127k. Tudo abaixo do budget de 150k: um builder só.
 - Mechanism: one builder (cabe no budget, sem pergunta)
+- **Settled mid-build (2026-09-27):**
+  - C5 ganhou tolerância de ±0.01 m nos limites, escolha do usuário: o morro mede 3000.000004 m por erro de float32 nos pontos.
+  - Ajuste da IA medido no mundo real: com a velocidade de curva `sqrt(habilidade · A · raio)`, a habilidade mudava o tempo menos que o ruído (cruzada 54.1/54.0/54.1 s). Ficou `habilidade² · sqrt(A · raio)` com A = 1 g, e a frenagem antes da curva também escala com a habilidade. Resultado: centro 170.4/162.0/156.1 s, anel 118.9/113.2/113.0 s, cruzada 55.7/54.7/54.2 s, morro 92.2/85.2/82.4 s, sem reset.
+  - O detector de travado usa uma marca que sobe a cada 5 m andados, e dispara 4 s depois da última marca. A janela fixa de 4 s podia atrasar o reset até 8 s depois de parar, e a C23 pede 4.1 s. Os limites da C23 (4.9/5.1 m, -1.51/-1.49) não mudaram.
+

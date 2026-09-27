@@ -62,6 +62,8 @@ const FRONT = [0, 1];
 const REAR = [2, 3];
 /** limiar de força de contato do chassi para gerar eventos (door 6 do visual-upgrade) */
 export const CONTACT_FORCE_THRESHOLD = 2000;
+/** cor da carroceria do jogador (races: os oponentes passam a sua no construtor) */
+export const PLAYER_PAINT = '#ff4d1a';
 
 export class Car {
   readonly body: RAPIER.RigidBody;
@@ -83,7 +85,12 @@ export class Car {
   /** impulso da força de curva no último passo (N·s, mundo); zero quando não houve força */
   readonly cornerAssistImpulse = { x: 0, y: 0, z: 0 };
 
+  /** material da carroceria com a pintura deste carro (races AC 19); `null` no modelo glb do jogador */
+  paintMaterial: THREE.MeshStandardMaterial | null = null;
+
   private readonly wheelMeshes: THREE.Object3D[] = [];
+  /** geometrias e materiais criados só para este carro, liberados no `dispose` */
+  private readonly owned: Array<{ dispose(): void }> = [];
   private wheelSpin = 0;
   private readonly lateralSamples: number[] = [];
   private readonly wheelX: number;
@@ -100,6 +107,8 @@ export class Car {
     assets: Assets,
     spawn: { x: number; y: number; z: number },
     readonly spec: CarSpec = DEFAULT_CAR,
+    /** pintura da carroceria; sem ela, o carro do jogador (o glb sem tinta, ou `PLAYER_PAINT` no placeholder) */
+    readonly paint: string | null = null,
   ) {
     this.placeholder = assets.placeholder;
     this.drive = initialDrivetrain(spec);
@@ -456,9 +465,34 @@ export class Car {
     return this.forward.set(0, 0, 1).applyQuaternion(this.quat);
   }
 
+  /**
+   * Tira o carro do mundo (races AC 23): controlador de veículo, corpo com o
+   * collider, malha da cena, e o que foi criado só para ele.
+   */
+  dispose(): void {
+    this.world.removeVehicleController(this.controller);
+    this.world.removeRigidBody(this.body);
+    this.mesh.removeFromParent();
+    this.owned.forEach((o) => o.dispose());
+    this.owned.length = 0;
+  }
+
   private buildVisual(assets: Assets): void {
     if (assets.carModel) {
-      const model = assets.carModel;
+      // o jogador usa o modelo carregado; um oponente usa uma cópia com a carroceria tingida
+      const model = this.paint ? assets.carModel.clone(true) : assets.carModel;
+      if (this.paint) {
+        const paint = new THREE.Color(this.paint);
+        model.traverse((obj) => {
+          const mesh = obj as THREE.Mesh;
+          if (!mesh.isMesh || !/^(body|spoiler)/.test(obj.name)) return;
+          const mat = (mesh.material as THREE.MeshStandardMaterial).clone();
+          mat.color.copy(paint);
+          mesh.material = mat;
+          this.owned.push(mat);
+          if (obj.name.startsWith('body')) this.paintMaterial = mat;
+        });
+      }
       model.scale.setScalar(MODEL_SCALE);
       // o modelo do Kenney tem o chão em y=0; o chassi físico tem centro em y=0
       model.position.y = -(CHASSIS_HALF.y + WHEEL_REST * 0.4);
@@ -471,7 +505,8 @@ export class Car {
       return;
     }
 
-    const bodyMat = new THREE.MeshStandardMaterial({ color: '#ff4d1a', roughness: 0.35, metalness: 0.6 });
+    const bodyMat = new THREE.MeshStandardMaterial({ color: this.paint ?? PLAYER_PAINT, roughness: 0.35, metalness: 0.6 });
+    this.paintMaterial = bodyMat;
     const cabinMat = new THREE.MeshStandardMaterial({ color: '#101018', roughness: 0.2, metalness: 0.8 });
     const wheelMat = new THREE.MeshStandardMaterial({ color: '#111111', roughness: 0.9 });
     const bodyMesh = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.5, 4.2), bodyMat);
@@ -481,6 +516,7 @@ export class Car {
     this.mesh.add(bodyMesh, cabin);
     const wheelGeo = new THREE.CylinderGeometry(this.wheelRadius, this.wheelRadius, 0.3, 12);
     wheelGeo.rotateZ(Math.PI / 2);
+    this.owned.push(bodyMat, cabinMat, wheelMat, bodyMesh.geometry, cabin.geometry, wheelGeo);
     for (const p of this.wheelLocal()) {
       const w = new THREE.Mesh(wheelGeo, wheelMat);
       w.position.set(p.x, WHEEL_Y - WHEEL_REST * 0.5, p.z);
