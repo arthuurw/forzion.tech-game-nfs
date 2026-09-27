@@ -29,6 +29,8 @@ Proof: `npx vitest run tests/physics/agility.test.ts -t "turns at least 20 degre
 **C4** - ✅ A 100 km/h, depois de 180 passos com `steer +1`, `steer` volta a 0 (acelerador mantendo 100 km/h): o giro fica abaixo de 3°/s (0.05236 rad/s) em algum passo dos 48 seguintes (0.8 s) e continua abaixo disso até o passo 60 depois de soltar (AC 4).
 Proof: `npx vitest run tests/physics/agility.test.ts -t "stops turning within 0.8 s after release"`
 
+> C5 foi superado pela corner-assist (C5 → C4 de `.specs/features/corner-assist/checks.md`), e o teste dele foi removido. A prova de C5 citada abaixo não existe mais.
+
 **C5** - ✅ Para 60, 90, 120, 150 e 180 km/h, com `steer +1` por 3 s, a aceleração lateral em janela de 0.5 s fica ≤ 1.05 g em todo passo.
 
 Substitui car-feel C8. (AC 5)

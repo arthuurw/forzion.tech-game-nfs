@@ -56,6 +56,10 @@ export interface CarSpec {
   yawAssistMaxNm: number;
   /** aceleração lateral (g) que limita o giro alvo da ajuda */
   yawAssistLateralG: number;
+  /** aceleração lateral (g) pedida pelo volante a partir da qual a força de curva entra (door 1 da corner-assist) */
+  cornerAssistStartG: number;
+  /** aceleração lateral (g) pedida que a força de curva completa; igual a `cornerAssistStartG` desliga a força */
+  cornerAssistMaxG: number;
 }
 
 export const DEFAULT_CAR: CarSpec = {
@@ -85,8 +89,8 @@ export const DEFAULT_CAR: CarSpec = {
   rollingResistance: 0.013,
   brakeForceN: 11500,
   brakeBiasFront: 0.65,
-  tireGrip: 0.97,
-  rearGripFactor: 1.25,
+  tireGrip: 0.7,
+  rearGripFactor: 1.6,
   handbrakeRearGrip: 0.4,
   steerMaxRad: 0.55,
   steerLateralG: 1.7,
@@ -95,7 +99,9 @@ export const DEFAULT_CAR: CarSpec = {
   suspensionStiffness: 17,
   suspensionCompression: 2.7,
   suspensionRelaxation: 0.8,
-  yawAssistGain: 10,
-  yawAssistMaxNm: 12000,
-  yawAssistLateralG: 1.25,
+  yawAssistGain: 40,
+  yawAssistMaxNm: 16000,
+  yawAssistLateralG: 1.7,
+  cornerAssistStartG: 0.9,
+  cornerAssistMaxG: 1.7,
 };

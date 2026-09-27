@@ -17,21 +17,21 @@ Plan: `.specs/features/corner-assist/plan.md`
 
 ### S1 - Curvas fechadas em velocidade · 5 files · 45 KB · ~11k
 
-**C1** - Giro em regime a 100 km/h ≥ 31.8°/s (0.5550 rad/s) (AC 1).
+**C1** - ✅ Giro em regime a 100 km/h ≥ 31.8°/s (0.5550 rad/s) (AC 1).
 Proof: `npx vitest run tests/physics/cornering.test.ts -t "radius at most 50 m at 100 kmh"`
 
-**C2** - Giro em regime a 140 km/h ≥ 22.3°/s (0.3892 rad/s) (AC 2).
+**C2** - ✅ Giro em regime a 140 km/h ≥ 22.3°/s (0.3892 rad/s) (AC 2).
 Proof: `npx vitest run tests/physics/cornering.test.ts -t "radius at most 100 m at 140 kmh"`
 
-**C3** - Giro em regime a 60 km/h ≥ 35°/s (0.6109 rad/s) (AC 3).
+**C3** - ✅ Giro em regime a 60 km/h ≥ 35°/s (0.6109 rad/s) (AC 3).
 Proof: `npx vitest run tests/physics/cornering.test.ts -t "still turns at least 35 degrees per second at 60 kmh"`
 
-**C4** - Para 60, 90, 120, 150 e 180 km/h, com `steer +1` por 3 s, a aceleração lateral em janela de 0.5 s fica ≤ 1.7 g em todo passo.
+**C4** - ✅ Para 60, 90, 120, 150 e 180 km/h, com `steer +1` por 3 s, a aceleração lateral em janela de 0.5 s fica ≤ 1.7 g em todo passo.
 
 Substitui yaw-assist C5. (AC 4)
 Proof: `npx vitest run tests/physics/cornering.test.ts -t "lateral acceleration never exceeds 1.7 g"`
 
-**C5** - A 100 km/h, depois de 180 passos com `steer +1`, `steer` volta a 0 (acelerador mantendo 100 km/h): a aceleração lateral em janela de 0.5 s fica abaixo de 0.15 g em algum passo dos 60 seguintes (1.0 s) (AC 5).
+**C5** - ✅ A 100 km/h, depois de 180 passos com `steer +1`, `steer` volta a 0 (acelerador mantendo 100 km/h): a aceleração lateral em janela de 0.5 s fica abaixo de 0.15 g em algum passo dos 60 seguintes (1.0 s) (AC 5).
 Proof: `npx vitest run tests/physics/cornering.test.ts -t "path straightens within 1 s after release"`
 
 ### S2 - A força não estraga o resto · 9 files · 60 KB · ~15k
