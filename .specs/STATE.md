@@ -45,7 +45,7 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 ## Handoff
 
 **Feature**: nenhuma em andamento - todas as features do sub-projeto 1 concluídas e juntadas em `main`
-**Where**: `main`; 148/148 unitários (vitest, com `tests/physics`) e 18/18 e2e da block-fill verdes em 2026-09-26; repositório público `arthuurw/forzion.tech-game-nfs`
+**Where**: `main`; 148/148 unitários (vitest, com `tests/physics`) e 18/18 e2e da block-fill verdes em 2026-09-26; repositório público `arthuurw/forzion.tech-game-nfs`, com `README.md` para quem chega
 **In progress**: nada
 **Next step**: usuário testa curvas (corner-assist) e o miolo das quadras (block-fill); então sub-projeto 2 (corridas) em `.specs/features/races/`, lendo o `RoadNetwork` e o `CarSpec`, ou 1.8 `block-life-extras`
 **Blockers**: none

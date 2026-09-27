@@ -1,8 +1,13 @@
 {
   "name": "jogo",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Jogo de corrida de rua noturno no navegador, estilo Need for Speed Underground 2 (Three.js + Rapier)",
+  "private": true,
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arthuurw/forzion.tech-game-nfs.git"
+  },
   "scripts": {
     "test": "vitest run",
     "dev": "vite",
@@ -11,9 +16,6 @@
     "test:e2e": "playwright test",
     "fetch:textures": "node scripts/fetch-textures.mjs"
   },
-  "keywords": [],
-  "type": "module",
-  "private": "true",
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",
     "three": "^0.186.1"
