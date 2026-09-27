@@ -54,7 +54,9 @@ Proof: `npx vitest run tests/unit/cornerAssist.test.ts -t "corner assist force f
 
 **C7** - O `Car` aplica a força e lê a ficha (door 1):
 - `CarSpec` tem `cornerAssistStartG` e `cornerAssistMaxG`, finitos, com `cornerAssistMaxG` > `cornerAssistStartG` > 0 em `DEFAULT_CAR`.
-- No harness, a 100 km/h, o giro em regime com `{ ...DEFAULT_CAR, cornerAssistMaxG: DEFAULT_CAR.cornerAssistStartG }` é pelo menos 20 % menor que com `DEFAULT_CAR`.
+- No harness, 180 passos com `steer +1` a 100 km/h: com `{ ...DEFAULT_CAR, cornerAssistMaxG: DEFAULT_CAR.cornerAssistStartG }`, `car.cornerAssistN` é 0 em todo passo; com `DEFAULT_CAR`, é > 0 em pelo menos 60 passos. A força vem da ficha.
+
+(Prova trocada com o usuário em 2026-09-26: a versão aprovada comparava o giro com e sem a força, mas sem a força a ajuda de giro faz o carro rodar e girar mais, o que não diz nada sobre ler a ficha.)
 - A força é aplicada no centro de massa: com a força ligada, a rolagem média dos passos 90–180 a 100 km/h difere em no máximo 1.0° da rolagem com a força desligada.
 - `car.cornerAssistN` é > 0 depois de 60 passos com `steer +1` a 100 km/h, e 0 parado. No browser, `__game.car.cornerAssistN` é 0 parado no spawn e > 0 depois de `W` por 2 s e `W` + `A` por 0.5 s.
 
