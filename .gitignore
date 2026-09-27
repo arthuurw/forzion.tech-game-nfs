@@ -1,5 +1,33 @@
+# dependências e build
 node_modules/
 dist/
+.vite/
+*.tsbuildinfo
+
+# testes
 test-results/
 playwright-report/
-.vite/
+blob-report/
+coverage/
+
+# segredos e config local
+.env
+.env.*
+*.local
+*.pem
+*.key
+
+# ferramentas e agentes
+.claude/
+.vscode/
+.idea/
+
+# logs e sistema
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# material de divulgação (não é código)
+prints/
