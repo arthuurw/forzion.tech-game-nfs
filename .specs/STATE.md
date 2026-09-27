@@ -17,7 +17,7 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
    - 1.6.2 `corner-assist` - força de curva arcade pelo centro de massa: curvas fechadas em alta sem capotar (concluída, verificada round 3)
    - 1.7 `block-fill` - miolo das quadras: mapa em zonas, grama nova, luz rebatida, quintais, árvores ao vento, vagalumes, obras com guindaste, pedestres (concluída, verificada round 2)
    - 1.7.1 `residuals` - reflexo da rua sem cintilar, guarda do tijolo, "R" da ré provado no browser, sondas do miolo com uma fonte só, custo da block-fill recontado
-   - 1.8 `block-life-extras` - vapor de dutos, holofotes para o céu, estacionamentos, gatos, trem elevado; mais a pintura viva dos oponentes e as provas que faltaram na races (construída, aguardando Verifier)
+   - 1.8 `block-life-extras` - vapor de dutos, holofotes para o céu, estacionamentos, gatos, trem elevado; mais a pintura viva dos oponentes e as provas que faltaram na races (concluída, verificada rodada 3)
 2. corridas - checkpoints, cronômetro, sprint/circuito, IA oponente por waypoints (`races`: concluída, verificada rodada 1)
 3. garagem + tuning visual - pintura, rodas, vinil, body kit, underglow
 4. tuning de performance - motor, turbo, pneus alterando parâmetros do Rapier
@@ -48,14 +48,14 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 
 ## Handoff
 
-**Feature**: `block-life-extras` construída na branch `block-life-extras` (39 checks com prova, todos verdes); `races` concluída e publicada
+**Feature**: `block-life-extras` concluída (Verifier PASS rodada 3, 2026-09-27, 39 checks; rodadas 1 e 2 pegaram fechamento do laço, estado `gone` do gato, limiar de 30 m e cor da pintura em linear) na branch `block-life-extras`, ainda não juntada em `main`
 **Where**: branch `block-life-extras`; 202/202 unitários e 132/132 e2e verdes em 2026-09-27; draw calls no grid do centro em corrida: 219 de 220
-**In progress**: Verifier da `block-life-extras` sobre `main..block-life-extras`
-**Next step**: com PASS, juntar em `main` local; `git push` só com ok do usuário; depois sub-projeto 3 (garagem)
+**In progress**: nada
+**Next step**: juntar `block-life-extras` em `main` local; `git push` só com ok do usuário; depois sub-projeto 3 (garagem)
 **Blockers**: none
 **Branch**: `block-life-extras`
 
-Concluídas: free-roam-city (PASS rodada 4), engine-sound (PASS rodada 3), visual-upgrade (PASS rodada 4), city-terrain (PASS rodada 3), car-handling (PASS rodada 4, autorizada pelo usuário depois de escalar), facade-glint (PASS rodada 1), car-feel (PASS rodada 2; traseira só no acelerador fora de escopo por decisão do usuário), yaw-assist (PASS rodada 2), corner-assist (PASS rodada 3), block-fill (PASS rodada 2), residuals (PASS rodada 1), races (PASS rodada 1).
+Concluídas: free-roam-city (PASS rodada 4), engine-sound (PASS rodada 3), visual-upgrade (PASS rodada 4), city-terrain (PASS rodada 3), car-handling (PASS rodada 4, autorizada pelo usuário depois de escalar), facade-glint (PASS rodada 1), car-feel (PASS rodada 2; traseira só no acelerador fora de escopo por decisão do usuário), yaw-assist (PASS rodada 2), corner-assist (PASS rodada 3), block-fill (PASS rodada 2), residuals (PASS rodada 1), races (PASS rodada 1), block-life-extras (PASS rodada 3).
 Decisões do usuário no build (2026-09-26): C1 da facade-glint isola o especular; metal com `metalness` 0.05 e `normalScale` 0.2, tijolo com `normalScale` 0.25 e piso de rugosidade 0.6; C4 da car-handling com sinal corrigido e C29 com velocidade horizontal; freio de mão com acelerador mantém o motor (power slide); freio-motor na ré; C7 da corner-assist trocou a prova; doors 1 e 2 da block-fill alargadas pelo builder e confirmadas.
-Resíduos conhecidos: races: pintura dos oponentes sai escura (a cor multiplica a textura laranja); C13 diz "freio" mas segura com freio de mão; C29 sem prova no `countdown`; C12 não mede os 100 m. margens estreitas da corner-assist (C1 +3.3 %, C4 0.067 g), fora da residuals por mexer na sensação do carro (sub-projeto 4); a sonda `treeVertices` ainda repete em JS a estrutura da conta do shader da copa (os números vêm de uma fonte só desde a residuals). Resolvidos pela residuals (2026-09-27): reflexo da rua, tijolo (mede 0.00058, guarda em 0.0007), "R" da ré, constantes do vagalume, e o "Cost" da block-fill, agora 27/2/22.
+Resíduos conhecidos: block-life-extras: nenhum check distingue pintura em sRGB de linear na tela (C2/C3); AC 28 (mundo carrega sem a linha do trem) sem prova no browser; fachos visíveis só na faixa de cima do quadro com a câmera parada (limite da câmera, não dos holofotes); draw calls no grid da corrida a 219 de 220. Resolvidos pela block-life-extras: pintura escura dos oponentes, C13 "freio de mão", R no countdown, Enter a 100 m. races: pintura dos oponentes sai escura (a cor multiplica a textura laranja); C13 diz "freio" mas segura com freio de mão; C29 sem prova no `countdown`; C12 não mede os 100 m. margens estreitas da corner-assist (C1 +3.3 %, C4 0.067 g), fora da residuals por mexer na sensação do carro (sub-projeto 4); a sonda `treeVertices` ainda repete em JS a estrutura da conta do shader da copa (os números vêm de uma fonte só desde a residuals). Resolvidos pela residuals (2026-09-27): reflexo da rua, tijolo (mede 0.00058, guarda em 0.0007), "R" da ré, constantes do vagalume, e o "Cost" da block-fill, agora 27/2/22.
 Hashes de commit citados nos relatórios anteriores a 2026-09-26 foram reescritos quando o histórico trocou o e-mail do autor pelo noreply do GitHub; valem como rótulo, não resolvem no repositório.
