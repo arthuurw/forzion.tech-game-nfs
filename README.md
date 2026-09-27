@@ -134,4 +134,4 @@ O código foi escrito em parceria com IA (Claude Code). Decisões de arquitetura
 - Texturas: [ambientCG](https://ambientcg.com), CC0
   ([licença](public/textures/LICENSE-ambientcg.txt)). `npm run fetch:textures` baixa de novo.
 
-O código ainda não tem licença definida.
+O código é licenciado sob a [licença MIT](LICENSE), © 2026 forzion.tech.

@@ -2,6 +2,8 @@
   "name": "jogo",
   "version": "1.0.0",
   "description": "Jogo de corrida de rua noturno no navegador, estilo Need for Speed Underground 2 (Three.js + Rapier)",
+  "license": "MIT",
+  "author": "forzion.tech",
   "private": true,
   "type": "module",
   "repository": {
