@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { BULB_SWAY_GLSL, CROWN_SWAY_GLSL, FIREFLY_DRIFT_GLSL } from '../../src/world/interiors/InteriorScene';
-import { FIREFLY_DRIFT, fireflyDrift } from '../../src/world/interiors/interiorMotion';
+import { BULB_SWAY_GLSL, CROWN_SWAY_GLSL, FIREFLY_DRIFT_GLSL, STEAM_GLSL } from '../../src/world/interiors/InteriorScene';
+import { FIREFLY_DRIFT, STEAM_DRIFT, STEAM_GROW, STEAM_PERIOD, STEAM_RISE, fireflyDrift } from '../../src/world/interiors/interiorMotion';
 import { CAR_PAINT_GLSL, CAR_PAINT_GLSL_LITERALS, LUMA, PAINT_HUE_TOLERANCE, PAINT_MIN_SATURATION, PAINT_SWATCH } from '../../src/vehicle/carPaint';
 
 // residuals C8-C10: o balanço do miolo tem uma fonte só, lida pelo shader e pelas sondas DEV
@@ -74,6 +74,15 @@ describe('shared interior motion constants', () => {
     expect(numericLiterals(BULB_SWAY_GLSL)).toEqual([0.12, TWO_PI]);
     expect(templateSourceLiterals('BULB_SWAY_GLSL')).toEqual([TWO_PI]);
     expect(templateSourceLiterals('CROWN_SWAY_GLSL')).toEqual([TWO_PI]);
+  });
+
+  // block-life-extras C17: o vapor lê as constantes de interiorMotion.ts
+  it('steam shader reads the shared constants', () => {
+    for (const v of [STEAM_RISE, STEAM_PERIOD, STEAM_DRIFT, STEAM_GROW]) expect(STEAM_GLSL).toContain(v.toFixed(1));
+    expect([STEAM_RISE, STEAM_PERIOD, STEAM_DRIFT, STEAM_GROW]).toEqual([5, 4, 1.5, 3]);
+    const dotted = [...STEAM_GLSL.matchAll(/(?<![A-Za-z_\d.])\d+\.\d+/g)].map((m) => Number(m[0]));
+    for (const v of dotted) expect([STEAM_RISE, STEAM_PERIOD, STEAM_DRIFT, STEAM_GROW, TWO_PI], `literal ${v}`).toContain(v);
+    expect(templateSourceLiterals('STEAM_GLSL').filter((v) => !Number.isInteger(v))).toEqual([]);
   });
 
   // block-life-extras C2: a repintura lê as constantes de carPaint.ts

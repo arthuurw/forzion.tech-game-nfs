@@ -23,7 +23,7 @@ Reusa o mapa do miolo (`BlockInteriors`, AD-012), o posicionador `placeInteriorP
 
 1. `core/Game` (exists) - no boot, depois de lotes e interiores: `placeInteriorProps` devolve também estacionamentos, grades de vapor, pontos de gato e holofotes; `buildTrainLine` (door 2) devolve a linha do trem a partir da `RoadNetwork`
 2. `world/interiors/InteriorProps` (door 1, alargada) - puro: fileiras de vagas nas zonas do centro, grades de vapor no pátio, pontos de partida dos gatos nos quintais e zonas de fora, holofotes nos 4 prédios mais altos do centro
-3. `world/rail/trainLine` (door 2) - puro: o laço fechado sobre as 4 avenidas de x ≈ ±300 e z ≈ ±300, cantos em arco, deck a 8 m, portais a cada 24 m fora dos cruzamentos
+3. `world/rail/trainLine` (door 2) - puro: o laço fechado sobre as 4 avenidas de x ≈ ±300 e z ≈ ±300, cantos em arco, deck a 8 m, portais a cada 24 m fora dos cruzamentos; lê as avenidas e os cruzamentos por `world/roads/roadQuery` (new, no door - placement per conventions), que recebeu os helpers que a `race/raceRoutes` já tinha, e as corridas passam a importar dali
 4. `world/interiors/interiorMotion` (exists) - puro: pose do trem em função do tempo, heading do holofote, passo, pausa e fuga do gato (generaliza `stepWalker` com uma spec de velocidade); o vapor é GLSL com gêmeo em JS, como `FIREFLY_DRIFT_GLSL`
 5. `world/interiors/InteriorScene` (exists) - 1 `InstancedMesh` de carros estacionados (carroceria + rodas numa geometria, cor por instância), 1 `Points` de vapor, 1 `InstancedMesh` de gatos, 1 `InstancedMesh` de cones de holofote; atualiza por quadro o que se move
 6. `world/rail/TrainScene` (new, no door - placement per conventions) - 1 malha estática (deck + portais juntos) e 1 `InstancedMesh` de 3 vagões com janelas emissivas; move os vagões pela pose pura
@@ -43,6 +43,8 @@ Reusa o mapa do miolo (`BlockInteriors`, AD-012), o posicionador `placeInteriorP
 | render | draw calls ≤ 220 continuam (city-terrain C38, races C34). Bases medidas em 2026-09-27 no HEAD `d0a5dd2`: spawn 188, morro 80, ponte 114, baía 120, nordeste 102; grid do `circuito-centro` livre 182 e em corrida 207; `sprint-cruzada` 162 e 181. Sobram 13 no pior caso, então a decoração nova perto do centro custa no máximo 12: 1 malha por tipo (6 malhas), todas fora do espelho da rua (2 passes cada: cena e GTAO). Se a medida real passar de 220, é stop-and-ask, não troca de limite (L-019) |
 | boot | `ready` em até 30 s continua (city-terrain C39) com ~250 colliders a mais |
 | docs da races | `races/checks.md` C13 recebe nota datada dizendo "freio de mão" (aditiva, o texto aprovado não é reescrito); C12 e C29 ganham as provas que faltavam, listadas nos checks desta feature |
+| código da races | `src/race/raceRoutes.ts` perde `findAvenue`, `avenueAxis`, `crossing`, `pointOf` e `count`, movidos sem mudança para `src/world/roads/roadQuery.ts`; as provas C1-C8 da races continuam verdes |
+| câmera e fachos | a câmera de perseguição (2.5 m acima, 14° para baixo, FOV 62° parado) só mostra céu até ~18° acima do horizonte; os fachos ficaram a 80° da vertical (usuário, 2026-09-27) e aparecem na faixa de cima do quadro, mais quando o FOV abre em velocidade |
 | stored data | nothing to migrate - nada é persistido; tudo sai do seed |
 
 ## Relations
@@ -127,7 +129,7 @@ Fachos varrendo o céu do centro.
 **Acceptance Criteria**
 
 19. The system SHALL pôr 4 holofotes, um no teto (`lot.y + lot.height`) de cada um dos 4 lotes `downtown` mais altos que fiquem a pelo menos 250 m entre si, com período de 32 a 48 s e fase por PRNG do seed
-20. WHILE o jogo roda cada facho SHALL girar em torno da vertical com heading `searchlightHeading(t, period, phase)` = `phase + 2π · t / period`, inclinado 20° da vertical, com 400 m de comprimento
+20. WHILE o jogo roda cada facho SHALL girar em torno da vertical com heading `searchlightHeading(t, period, phase)` = `phase + 2π · t / period`, inclinado 80° da vertical (10° acima do horizonte; era 20° da vertical, mudado em 2026-09-27 com o usuário porque a câmera não mostra céu acima de ~17°), com 400 m de comprimento
 21. The system SHALL desenhar os 4 fachos com 1 `InstancedMesh` chamada `searchlights`, aditiva, fora do espelho da rua
 22. WHEN a câmera está no spawn THEN the system SHALL ter, no ponto projetado a 150 m ao longo de um facho, luminância média (9 × 9 px) maior que a do céu 40 px ao lado, por pelo menos 0.02
 
@@ -200,8 +202,8 @@ Product capabilities only. Process and harness rules live in AGENTS.md or as Obs
 | aparência do gato | corpo 0.5 × 0.2 × 0.2 m, cabeça, rabo, olhos emissivos amarelos; cores preto, cinza, laranja e branco | low-poly como os pedestres; olhos brilhando é o que se vê à noite | n |
 | aparência do trem | vagões azul escuro 12 × 2.6 × 3 m, faixa de janelas quente, deck de concreto cinza com guarda-corpo | metrô de superfície genérico, sem marca | n |
 | velocidade e sentido do trem | 18 m/s (65 km/h), sentido horário visto de cima, um trem só | mais devagar que o carro; um trem basta para passar a cada ~2 min | n |
-| vapor | branco `#dfe6ee`, opacidade 0.35, aditivo; 24 partículas por grade em `high` | fumaça leve que o bloom pega sem virar nuvem | n |
-| cone do holofote | raio 1.5 m na base e 12 m no topo, cor `#cfe0ff`, opacidade 0.12, aditivo | facho longo e fino como os de Bayview | n |
+| vapor | branco `#dfe6ee`, opacidade 0.16 e ponto de 70 px a 1 m, aditivo; 24 partículas por grade em `high` | fumaça leve que o bloom pega sem virar nuvem; 0.35 e 220 px (o primeiro chute) saturavam a tela de branco a 12 m (medido em 2026-09-27) | n |
+| cone do holofote | raio 2 m na base e 22 m no topo, cor `#cfe0ff`, opacidade 0.12, aditivo, sem névoa | facho longo; 12 m no topo dava ~5 px de largura a 450 m, e com névoa o facho a 300 m sumia (medido em 2026-09-27) | n |
 | tolerância da repintura | matiz ± 25° do laranja e saturação ≥ 0.5 | ± 25° pega o quadrado `#ff7e44` e os gradientes `#ee6445`-`#fa6b41`; o marrom `#b06041` tem o mesmo matiz (17°) mas nenhuma primitiva do carro aponta para ele (medido em 2026-09-27), e o vidro `#6d6e83` (matiz 237°) e os cinzas ficam fora pela saturação | n |
 | `__game.race.opponents[i].bodyColor` | passa a ler o uniform `uPaint` | a prova C21 da races continua verde sem mudar a asserção | n |
 

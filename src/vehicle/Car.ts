@@ -59,7 +59,7 @@ const LOADED_SUSPENSION = WHEEL_REST - GRAVITY / (4 * RIDE_HEIGHT_REF_STIFFNESS)
 const RAPIER_ROLL_INFLUENCE = 0.1;
 /** passos na janela da aceleração lateral (0.5 s) */
 const LATERAL_G_WINDOW = 30;
-const MODEL_SCALE = 1.8;
+export const MODEL_SCALE = 1.8;
 const FRONT = [0, 1];
 const REAR = [2, 3];
 /** limiar de força de contato do chassi para gerar eventos (door 6 do visual-upgrade) */

@@ -31,6 +31,9 @@ import { generateTerrain, heightAt, riverCenterX } from '../world/terrain/Terrai
 import { WorldPhysics } from '../world/WorldPhysics';
 import { findBlockInteriors } from '../world/interiors/BlockInteriors';
 import { FLOOD_REACH, placeInteriorProps } from '../world/interiors/InteriorProps';
+import { SEARCHLIGHT_TILT } from '../world/interiors/interiorMotion';
+import { buildTrainLine, type TrainLine } from '../world/rail/trainLine';
+import { TrainScene } from '../world/rail/TrainScene';
 import { WORLD_HALF, nearestRoadPoint, needsWaterReset } from '../world/worldMath';
 import { addNightLights, createNightEnvironment } from '../world/Environment';
 import { GameLoop } from './GameLoop';
@@ -85,6 +88,9 @@ export class Game {
   readonly world: RAPIER.World;
   readonly city: CityScene;
   readonly physics: WorldPhysics;
+  /** linha do trem elevado e seu render (block-life-extras); `null` se uma avenida do quadrado falta */
+  readonly train: TrainLine | null;
+  readonly trainScene: TrainScene | null;
   readonly car: Car;
   /** quantas vezes o carro caiu na água e voltou para a estrada (door 9) */
   waterResets = 0;
@@ -157,8 +163,12 @@ export class Game {
     const interiors = findBlockInteriors(carved, network, lots);
     const props = placeInteriorProps(seed, interiors, lots, carved);
     const data: WorldData = { seed, raw, carved, network, lots, signs, lamps, interiors, props };
-    this.physics = new WorldPhysics(this.world, carved, raw, network, lots, props);
+    // block-life-extras: a linha do trem sai da rede por regra (door 2); colunas viram colliders
+    this.train = buildTrainLine(network);
+    this.physics = new WorldPhysics(this.world, carved, raw, network, lots, props, this.train);
     this.city = new CityScene(data, this.scene, assets, quality);
+    this.trainScene = this.train ? new TrainScene(this.train, carved) : null;
+    if (this.trainScene) this.scene.add(this.trainScene.group);
 
     // spawn: parado numa avenida do centro, alinhado a ela, 12 m antes do cruzamento
     // central (AC 33): à frente e à esquerda há pista livre (a avenida transversal)
@@ -215,15 +225,7 @@ export class Game {
     if (reflector) {
       const renderMirror = reflector.onBeforeRender.bind(reflector);
       reflector.onBeforeRender = (...args: Parameters<typeof reflector.onBeforeRender>) => {
-        const skip: THREE.Object3D[] = [
-          this.rain.points,
-          ...this.effects.objects,
-          ...this.headlightCones,
-          this.city.water.mesh,
-          ...this.city.chunks.outerObjects(),
-          ...this.city.interiors.objects(),
-          ...this.race.objects(),
-        ];
+        const skip = this.reflectorSkipList();
         const was = skip.map((o) => o.visible);
         skip.forEach((o) => (o.visible = false));
         renderMirror(...args);
@@ -350,6 +352,7 @@ export class Game {
     this.city.chunks.update(state.x, state.z);
     this.city.water.update(this.simTime);
     this.city.interiors.update(this.simTime);
+    this.trainScene?.update(this.simTime);
     this.city.interiors.follow(state.x, state.z);
     this.rain.update(this.simTime, { x: state.x, y: state.y, z: state.z });
     this.effects.render();
@@ -686,6 +689,14 @@ export class Game {
         setRotation: (q: { x: number; y: number; z: number; w: number }) => game.car.setRotation(q),
       },
       render: {
+        /** ponto do mundo em pixels do canvas pela câmera de perseguição (sondas) */
+        project: (x: number, y: number, z: number) => game.toPixel(x, y, z),
+        /** nomes de tudo que o espelho da rua pula (block-life-extras C35), com os filhos dos grupos */
+        get reflectorSkipped() {
+          const names: string[] = [];
+          for (const o of game.reflectorSkipList()) o.traverse((c) => c.name && names.push(c.name));
+          return names;
+        },
         get calls() {
           return game.drawCalls;
         },
@@ -1002,9 +1013,232 @@ export class Game {
         return game.waterResets;
       },
       interiors: game.interiorsDebug(),
+      extras: game.extrasDebug(),
       get lastWaterReset() {
         return game.lastWaterReset;
       },
+    };
+  }
+
+  /** O que o espelho da rua não reflete: partículas, cones, água, chunks de fora, miolo, corrida e trem. */
+  private reflectorSkipList(): THREE.Object3D[] {
+    return [
+      this.rain.points,
+      ...this.effects.objects,
+      ...this.headlightCones,
+      this.city.water.mesh,
+      ...this.city.chunks.outerObjects(),
+      ...this.city.interiors.objects(),
+      ...this.race.objects(),
+      ...(this.trainScene?.objects() ?? []),
+    ];
+  }
+
+  /** Cor média de 9 × 9 px em torno de (px, py) do canvas, lida do último render. */
+  private readPatch(px: number, py: number): { r: number; g: number; b: number; luminance: number; onScreen: boolean } {
+    const gl = this.renderer.getContext();
+    const W = gl.drawingBufferWidth;
+    const H = gl.drawingBufferHeight;
+    const onScreen = px >= 4 && px <= W - 5 && py >= 4 && py <= H - 5;
+    const buf = new Uint8Array(9 * 9 * 4);
+    gl.readPixels(Math.min(W - 9, Math.max(0, px - 4)), Math.min(H - 9, Math.max(0, py - 4)), 9, 9, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    for (let k = 0; k < 81; k++) {
+      r += buf[k * 4]!;
+      g += buf[k * 4 + 1]!;
+      b += buf[k * 4 + 2]!;
+    }
+    r /= 81 * 255;
+    g /= 81 * 255;
+    b /= 81 * 255;
+    return { r, g, b, luminance: 0.2126 * r + 0.7152 * g + 0.0722 * b, onScreen };
+  }
+
+  /** Ponto do mundo projetado na câmera de perseguição, em pixels do canvas (y para cima), e se está na frente da câmera. */
+  private toPixel(x: number, y: number, z: number): { px: number; py: number; front: boolean } {
+    const gl = this.renderer.getContext();
+    const W = gl.drawingBufferWidth;
+    const H = gl.drawingBufferHeight;
+    const v = new THREE.Vector3(x, y, z).project(this.chase.camera);
+    return { px: Math.round(((v.x + 1) / 2) * (W - 1)), py: Math.round(((v.y + 1) / 2) * (H - 1)), front: v.z < 1 && v.z > -1 };
+  }
+
+  /**
+   * Só DEV (block-life-extras C18): um quadro pelo composer com a câmera como está e a
+   * luminância média 1 m acima da grade `i` (`over`) e num ponto na mesma altura a 6 m de
+   * lado, de través à câmera (`aside`).
+   */
+  probeSteam(i: number): { over: number; aside: number; onScreen: boolean } {
+    const v = this.city.interiors.props.vents[i]!;
+    this.composer.render(0);
+    const cam = this.chase.camera;
+    // de través: perpendicular à direção câmera → grade, no plano xz
+    const dx = v.x - cam.position.x;
+    const dz = v.z - cam.position.z;
+    const l = Math.hypot(dx, dz) || 1;
+    const a = this.toPixel(v.x, v.y + 1, v.z);
+    const b = this.toPixel(v.x + (dz / l) * 6, v.y + 1, v.z - (dx / l) * 6);
+    const over = this.readPatch(a.px, a.py);
+    const aside = this.readPatch(b.px, b.py);
+    return { over: over.luminance, aside: aside.luminance, onScreen: a.front && b.front && over.onScreen && aside.onScreen };
+  }
+
+  /**
+   * Só DEV (block-life-extras C22): um quadro pelo composer com a câmera como está;
+   * procura ao longo do facho `i`, de 30 a 300 m da base a cada 10 m, o primeiro ponto
+   * projetado dentro da tela com 40 px de margem horizontal e 8 px vertical e devolve
+   * a luminância média nele (`beam`), 40 px ao lado (`sky`) e no mesmo ponto com os
+   * fachos escondidos (`without`), ou `null` se nenhum ponto cabe.
+   */
+  probeSearchlight(i: number): { beam: number; sky: number; without: number; distance: number } | null {
+    const it = this.city.interiors;
+    const s = it.props.searchlights[i]!;
+    const h = it.searchlightHeadings[i]!;
+    const tilt = (SEARCHLIGHT_TILT * Math.PI) / 180;
+    const dir = { x: Math.sin(tilt) * Math.sin(h), y: Math.cos(tilt), z: Math.sin(tilt) * Math.cos(h) };
+    const gl = this.renderer.getContext();
+    const W = gl.drawingBufferWidth;
+    const H = gl.drawingBufferHeight;
+    // dois quadros inteiros, com e sem os fachos; as leituras vêm deles
+    const frame = () => {
+      this.composer.render(0);
+      const buf = new Uint8Array(W * H * 4);
+      gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+      return buf;
+    };
+    const withBeams = frame();
+    it.searchlightMesh.visible = false;
+    const without = frame();
+    it.searchlightMesh.visible = true;
+    const patch = (buf: Uint8Array, px: number, py: number): number => {
+      let sum = 0;
+      for (let dy = -4; dy <= 4; dy++) {
+        for (let dx = -4; dx <= 4; dx++) {
+          const k = (Math.min(H - 1, Math.max(0, py + dy)) * W + Math.min(W - 1, Math.max(0, px + dx))) * 4;
+          sum += (0.2126 * buf[k]! + 0.7152 * buf[k + 1]! + 0.0722 * buf[k + 2]!) / 255;
+        }
+      }
+      return sum / 81;
+    };
+    // o ponto do facho dentro do quadro onde os fachos mais clareiam (perto da base o próprio telhado esconde o facho)
+    let best: { beam: number; sky: number; without: number; distance: number } | null = null;
+    for (let d = 30; d <= 300; d += 10) {
+      const p = this.toPixel(s.x + dir.x * d, s.y + dir.y * d, s.z + dir.z * d);
+      if (!p.front || p.px < 40 || p.px > W - 41 || p.py < 8 || p.py > H - 9) continue;
+      const beam = patch(withBeams, p.px, p.py);
+      const bare = patch(without, p.px, p.py);
+      const sky = patch(withBeams, p.px + (p.px + 40 <= W - 5 ? 40 : -40), p.py);
+      if (!best || beam - bare > best.beam - best.without) best = { beam, sky, without: bare, distance: d };
+    }
+    return best;
+  }
+
+  /** Só DEV: pixels do quadro que mudam quando os fachos somem, e a maior diferença de luminância. */
+  private searchlightFrameDiff(): { changed: number; maxDiff: number; total: number } {
+    const it = this.city.interiors;
+    const gl = this.renderer.getContext();
+    const W = gl.drawingBufferWidth;
+    const H = gl.drawingBufferHeight;
+    const read = () => {
+      this.composer.render(0);
+      const buf = new Uint8Array(W * H * 4);
+      gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+      return buf;
+    };
+    const withBeams = read();
+    it.searchlightMesh.visible = false;
+    const without = read();
+    it.searchlightMesh.visible = true;
+    let changed = 0;
+    let maxDiff = 0;
+    for (let k = 0; k < W * H; k++) {
+      const a = (0.2126 * withBeams[k * 4]! + 0.7152 * withBeams[k * 4 + 1]! + 0.0722 * withBeams[k * 4 + 2]!) / 255;
+      const b = (0.2126 * without[k * 4]! + 0.7152 * without[k * 4 + 1]! + 0.0722 * without[k * 4 + 2]!) / 255;
+      const d = Math.abs(a - b);
+      if (d > 1 / 255) changed++;
+      if (d > maxDiff) maxDiff = d;
+    }
+    return { changed, maxDiff, total: W * H };
+  }
+
+  /** `__game.world.extras` (só DEV): estacionados, vapor, gatos, holofotes e trem (block-life-extras). */
+  private extrasDebug(): unknown {
+    const it = this.city.interiors;
+    const game = this;
+    const train = this.trainScene;
+    return {
+      parking: {
+        get count() {
+          return it.props.parking.length;
+        },
+        meshName: it.parkedMesh.name,
+        get instanceCount() {
+          return it.parkedMesh.count;
+        },
+        placeholder: it.parkedPlaceholder,
+        colorAt: (i: number) => {
+          const c = new THREE.Color();
+          it.parkedMesh.getColorAt(i, c);
+          return `#${c.getHexString()}`;
+        },
+        list: () => it.props.parking.map((p) => ({ ...p })),
+      },
+      steam: {
+        name: it.steam.name,
+        get points() {
+          return it.steam.geometry.getAttribute('position').count;
+        },
+        get uTime() {
+          return it.steamMaterial.uniforms.uTime!.value as number;
+        },
+        perVent: it.steamPerVent,
+        vents: () => it.props.vents.map((v) => ({ ...v })),
+      },
+      cats: {
+        name: it.catMesh.name,
+        vertices: it.catMesh.geometry.getAttribute('position').count,
+        get active() {
+          return it.cats.filter((c) => c.state !== 'gone').length;
+        },
+        cap: it.catCap,
+        spawns: () => it.props.cats.map((c) => ({ ...c })),
+      },
+      searchlights: {
+        name: it.searchlightMesh.name,
+        count: it.searchlightMesh.count,
+        additive: (it.searchlightMesh.material as THREE.Material).blending === THREE.AdditiveBlending,
+        get headings() {
+          return [...it.searchlightHeadings];
+        },
+        list: it.props.searchlights.map((s) => ({ ...s })),
+        /** sondas: esconde os fachos ou muda a opacidade do cone */
+        setVisible: (on: boolean) => {
+          it.searchlightMesh.visible = on;
+        },
+        setOpacity: (v: number) => {
+          (it.searchlightMesh.material as THREE.MeshBasicMaterial).opacity = v;
+        },
+        /** quantos pixels do último quadro mudam quando os fachos somem, e a maior diferença de luminância */
+        frameDiff: () => game.searchlightFrameDiff(),
+      },
+      train: train
+        ? {
+            lineMesh: train.lineMesh.name,
+            lineInstanced: (train.lineMesh as THREE.Object3D as { isInstancedMesh?: boolean }).isInstancedMesh === true,
+            name: train.wagons.name,
+            count: train.wagons.count,
+            windowEmissive: train.windowMaterial.emissiveIntensity,
+            length: train.line.length,
+            frames: train.line.frames.length,
+            get s() {
+              return [...train.s];
+            },
+          }
+        : null,
+      steamProbe: (i: number) => game.probeSteam(i),
+      beamProbe: (i: number) => game.probeSearchlight(i),
     };
   }
 

@@ -10,7 +10,8 @@
 import { mulberry32 } from '../CityGenerator';
 import { valueNoise } from '../terrain/noise';
 import { nearestVertex, type BlockInteriors, type InteriorZone } from './BlockInteriors';
-import type { WalkerSpawn } from './InteriorProps';
+import type { WalkerSpawn, CatSpawn } from './InteriorProps';
+import { lineAt, type TrainLine } from '../rail/trainLine';
 
 // ---------------------------------------------------------------- cor do chão
 
@@ -424,28 +425,41 @@ export function stepWalker(w: Walker, dt: number, car: { x: number; z: number },
   if (w.fleeing) {
     if (toCar >= FLEE_STOP) {
       w.fleeing = false;
-      // volta a andar a partir do vértice da zona mais próximo
-      const v = nearestVertex(bi, w.x, w.z);
-      w.fromX = w.x;
-      w.fromZ = w.z;
-      w.toX = bi.origin + (v % bi.size) * bi.spacing;
-      w.toZ = bi.origin + Math.floor(v / bi.size) * bi.spacing;
+      restartAtNearestVertex(w, bi);
     } else {
-      const base = toCar > 1e-6 ? Math.atan2(w.x - car.x, w.z - car.z) : nextRand(w) * Math.PI * 2;
-      const step = FLEE_SPEED * dt;
-      for (const turn of [0, 15, -15, 30, -30, 45, -45, 60, -60, 75, -75]) {
-        const a = base + (turn * Math.PI) / 180;
-        const nx = w.x + Math.sin(a) * step;
-        const nz = w.z + Math.cos(a) * step;
-        if (!inZone(bi, w.zoneId, nx, nz)) continue;
-        w.x = nx;
-        w.z = nz;
-        break;
-      }
+      fleeStep(w, FLEE_SPEED * dt, car, bi);
       return;
     }
   }
-  const step = w.speed * dt;
+  advance(w, w.speed * dt, bi);
+}
+
+/** Volta a andar a partir do vértice da zona mais próximo. */
+function restartAtNearestVertex(w: Walker, bi: BlockInteriors): void {
+  const v = nearestVertex(bi, w.x, w.z);
+  w.fromX = w.x;
+  w.fromZ = w.z;
+  w.toX = bi.origin + (v % bi.size) * bi.spacing;
+  w.toZ = bi.origin + Math.floor(v / bi.size) * bi.spacing;
+}
+
+/** Um passo de `step` m para longe do carro, só por pontos da zona (desvia até ±75° se preciso). */
+function fleeStep(w: Walker, step: number, car: { x: number; z: number }, bi: BlockInteriors): void {
+  const toCar = Math.hypot(w.x - car.x, w.z - car.z);
+  const base = toCar > 1e-6 ? Math.atan2(w.x - car.x, w.z - car.z) : nextRand(w) * Math.PI * 2;
+  for (const turn of [0, 15, -15, 30, -30, 45, -45, 60, -60, 75, -75]) {
+    const a = base + (turn * Math.PI) / 180;
+    const nx = w.x + Math.sin(a) * step;
+    const nz = w.z + Math.cos(a) * step;
+    if (!inZone(bi, w.zoneId, nx, nz)) continue;
+    w.x = nx;
+    w.z = nz;
+    break;
+  }
+}
+
+/** Um passo de `step` m ao longo do trecho; ao chegar ao fim, sorteia o próximo e continua com o resto. */
+function advance(w: Walker, step: number, bi: BlockInteriors): void {
   const left = Math.hypot(w.toX - w.x, w.toZ - w.z);
   if (left > step) {
     w.x += ((w.toX - w.x) / left) * step;
@@ -462,6 +476,173 @@ export function stepWalker(w: Walker, dt: number, car: { x: number; z: number },
   const [nx, nz] = pointOnSegmentAt(px, pz, step, w);
   w.x = nx;
   w.z = nz;
+}
+
+// ------------------------------------------------------------------ block-life-extras
+
+/** vapor das grades: sobe 5 m em 4 s, deriva até 1.5 m de lado e cresce 3× */
+export const STEAM_RISE = 5;
+export const STEAM_PERIOD = 4;
+export const STEAM_DRIFT = 1.5;
+export const STEAM_GROW = 3;
+export const STEAM_PER_VENT_HIGH = 24;
+export const STEAM_PER_VENT_LOW = 12;
+
+/** Deslocamento e tamanho de uma partícula de vapor no instante `t` (ciclo de 4 s; direção da deriva por `seed`). */
+export function steamPoint(t: number, seed: number): { dx: number; dy: number; dz: number; size: number } {
+  const u = (((t % STEAM_PERIOD) + STEAM_PERIOD) % STEAM_PERIOD) / STEAM_PERIOD;
+  const a = hash01(seed, 1) * Math.PI * 2;
+  return { dx: STEAM_DRIFT * u * Math.sin(a), dy: STEAM_RISE * u, dz: STEAM_DRIFT * u * Math.cos(a), size: 1 + (STEAM_GROW - 1) * u };
+}
+
+/**
+ * holofotes para o céu: inclinação da vertical (graus) e comprimento do facho (m).
+ * 80° da vertical (10° acima do horizonte): a câmera de perseguição só mostra céu
+ * até ~17° acima do horizonte, então um facho mais empinado sai do quadro (usuário, 2026-09-27)
+ */
+export const SEARCHLIGHT_TILT = 80;
+export const SEARCHLIGHT_LENGTH = 400;
+
+export function searchlightHeading(t: number, period: number, phase: number): number {
+  return phase + (2 * Math.PI * t) / period;
+}
+
+/** gatos: alcance, tetos por qualidade, velocidades e ritmo de sentar */
+export const CAT_RANGE = 200;
+export const CAT_CAP_HIGH = 60;
+export const CAT_CAP_LOW = 30;
+export const CAT_SPEED_MIN = 0.5;
+export const CAT_SPEED_MAX = 0.9;
+export const CAT_SIT_AFTER_MIN = 6;
+export const CAT_SIT_AFTER_MAX = 12;
+export const CAT_SIT_MIN = 2;
+export const CAT_SIT_MAX = 5;
+export const CAT_CROUCH = 0.3;
+export const CAT_FLEE_START = 6;
+export const CAT_FLEE_STOP = 12;
+export const CAT_FLEE_SPEED = 4;
+/** a menos disto do centro do carro o gato é empurrado para fora ou some */
+export const CAT_CLEAR = 1.5;
+export const CAT_GONE_S = 10;
+export const CAT_GONE_CAR = 30;
+
+export type CatState = 'walk' | 'sit' | 'flee' | 'gone';
+
+export interface Cat extends Walker {
+  state: CatState;
+  /** 0 andando, `CAT_CROUCH` sentado */
+  crouch: number;
+  /** metros andados desde o último sentar e quando sentar de novo */
+  walked: number;
+  nextSit: number;
+  sitLeft: number;
+  goneLeft: number;
+  spawnX: number;
+  spawnZ: number;
+}
+
+/** Pontos de gato ativos: os a até 200 m do carro, do mais perto ao mais longe, até 60 (high) ou 30 (low). */
+export function activeCatSpawns(spawns: ReadonlyArray<CatSpawn>, car: { x: number; z: number }, quality: 'high' | 'low'): number[] {
+  const cap = quality === 'low' ? CAT_CAP_LOW : CAT_CAP_HIGH;
+  const near: Array<{ i: number; d: number }> = [];
+  spawns.forEach((s, i) => {
+    const d = Math.hypot(s.x - car.x, s.z - car.z);
+    if (d <= CAT_RANGE) near.push({ i, d });
+  });
+  near.sort((a, b) => a.d - b.d || a.i - b.i);
+  return near.slice(0, cap).map((n) => n.i);
+}
+
+export function createCat(spawn: CatSpawn, index: number): Cat {
+  const w = createWalker({ zoneId: spawn.zoneId, x: spawn.x, z: spawn.z }, index + 7919);
+  const c: Cat = { ...w, state: 'walk', crouch: 0, walked: 0, nextSit: 0, sitLeft: 0, goneLeft: 0, spawnX: spawn.x, spawnZ: spawn.z };
+  c.speed = CAT_SPEED_MIN + nextRand(c) * (CAT_SPEED_MAX - CAT_SPEED_MIN);
+  c.nextSit = CAT_SIT_AFTER_MIN + nextRand(c) * (CAT_SIT_AFTER_MAX - CAT_SIT_AFTER_MIN);
+  return c;
+}
+
+/**
+ * Um passo de `dt` do gato. Anda a 0.5-0.9 m/s por trechos da zona (como o
+ * pedestre) e a cada 6-12 m senta por 2-5 s; com o carro a menos de 6 m foge a
+ * 4 m/s até 12 m. A menos de 1.5 m do centro do carro é empurrado para fora
+ * (dentro da zona) ou some por 10 s, voltando ao ponto de partida com o carro
+ * a mais de 30 m: nunca fica debaixo do carro.
+ */
+export function stepCat(c: Cat, dt: number, car: { x: number; z: number }, bi: BlockInteriors): void {
+  if (c.state === 'gone') {
+    c.goneLeft -= dt;
+    if (c.goneLeft <= 0 && Math.hypot(c.spawnX - car.x, c.spawnZ - car.z) > CAT_GONE_CAR) {
+      c.x = c.fromX = c.toX = c.spawnX;
+      c.z = c.fromZ = c.toZ = c.spawnZ;
+      c.state = 'walk';
+      c.walked = 0;
+      c.crouch = 0;
+    }
+    return;
+  }
+  const toCar = Math.hypot(c.x - car.x, c.z - car.z);
+  if (c.state !== 'flee' && toCar < CAT_FLEE_START) {
+    c.state = 'flee';
+    c.crouch = 0;
+  }
+  if (c.state === 'flee') {
+    if (toCar >= CAT_FLEE_STOP) {
+      c.state = 'walk';
+      c.walked = 0;
+      restartAtNearestVertex(c, bi);
+    } else {
+      fleeStep(c, CAT_FLEE_SPEED * dt, car, bi);
+    }
+  } else {
+    if (c.state === 'sit') {
+      c.sitLeft -= dt;
+      c.crouch = CAT_CROUCH;
+      if (c.sitLeft > 0) return;
+      // levanta e já anda neste passo
+      c.state = 'walk';
+      c.crouch = 0;
+      c.walked = 0;
+      c.nextSit = CAT_SIT_AFTER_MIN + nextRand(c) * (CAT_SIT_AFTER_MAX - CAT_SIT_AFTER_MIN);
+    }
+    const step = c.speed * dt;
+    advance(c, step, bi);
+    c.walked += step;
+    if (c.walked >= c.nextSit) {
+      c.state = 'sit';
+      c.crouch = CAT_CROUCH;
+      c.sitLeft = CAT_SIT_MIN + nextRand(c) * (CAT_SIT_MAX - CAT_SIT_MIN);
+    }
+  }
+  // nunca debaixo do carro: empurra para fora ou some
+  const dx = c.x - car.x;
+  const dz = c.z - car.z;
+  const d = Math.hypot(dx, dz);
+  if (d < CAT_CLEAR) {
+    const a = d > 1e-6 ? Math.atan2(dx, dz) : nextRand(c) * Math.PI * 2;
+    const nx = car.x + Math.sin(a) * CAT_CLEAR;
+    const nz = car.z + Math.cos(a) * CAT_CLEAR;
+    if (inZone(bi, c.zoneId, nx, nz)) {
+      c.x = c.fromX = c.toX = nx;
+      c.z = c.fromZ = c.toZ = nz;
+    } else {
+      c.state = 'gone';
+      c.goneLeft = CAT_GONE_S;
+      c.crouch = 0;
+    }
+  }
+}
+
+/** trem: 3 vagões de 12 m com 1 m entre eles a 18 m/s */
+export const TRAIN_SPEED = 18;
+export const WAGON_LENGTH = 12;
+export const WAGON_GAP = 1;
+export const WAGONS = 3;
+
+/** Pose do vagão `k` no instante `t`: centro em `s = (18 t − 13 k) mod comprimento`, heading tangente. */
+export function trainPose(t: number, line: TrainLine, k: number, cum: Float32Array): { x: number; y: number; z: number; heading: number; s: number } {
+  const L = line.length;
+  const s = ((((TRAIN_SPEED * t - (WAGON_LENGTH + WAGON_GAP) * k) % L) + L) % L);
+  return { ...lineAt(line, cum, s), s };
 }
 
 // ------------------------------------------------------------------ util

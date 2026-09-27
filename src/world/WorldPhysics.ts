@@ -4,7 +4,8 @@ import type { Lot } from './lots/LotGenerator';
 import type { RoadNetwork } from './roads/RoadGenerator';
 import { bridgeMeshes, bridgeParts, PILLAR_SIZE } from './roads/bridges';
 import { roadStripGeometry } from './roads/roadMesh';
-import type { Heightmap } from './terrain/TerrainGenerator';
+import { COLUMN_HALF, DECK_HEIGHT, frameColumns, type TrainLine } from './rail/trainLine';
+import { heightAt, type Heightmap } from './terrain/TerrainGenerator';
 import { WORLD_HALF } from './worldMath';
 
 /**
@@ -24,6 +25,10 @@ export class WorldPhysics {
   readonly trees: RAPIER.Collider[] = [];
   /** colliders das torres dos guindastes, na ordem de `props.sites` (block-fill) */
   readonly cranes: RAPIER.Collider[] = [];
+  /** colliders dos carros estacionados, na ordem de `props.parking` (block-life-extras) */
+  readonly parked: RAPIER.Collider[] = [];
+  /** colliders das colunas dos portais do trem, 2 por portal na ordem de `train.frames` (block-life-extras) */
+  readonly columns: RAPIER.Collider[] = [];
 
   constructor(
     private readonly world: RAPIER.World,
@@ -32,6 +37,7 @@ export class WorldPhysics {
     network: RoadNetwork,
     lots: Lot[],
     props: InteriorProps | null = null,
+    train: TrainLine | null = null,
   ) {
     this.body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
 
@@ -98,6 +104,32 @@ export class WorldPhysics {
       );
     }
 
+    // block-life-extras: carro estacionado como caixa de 1.8 × 1.2 × 4.2 m com o centro 0.6 m acima do terreno
+    for (const p of props?.parking ?? []) {
+      this.parked.push(
+        world.createCollider(
+          RAPIER.ColliderDesc.cuboid(PARKED_HALF.x, PARKED_HALF.y, PARKED_HALF.z)
+            .setTranslation(p.x, p.y + PARKED_HALF.y, p.z)
+            .setRotation(yaw(p.heading)),
+          this.body,
+        ),
+      );
+    }
+
+    // block-life-extras: colunas dos portais, 0.5 × 0.5 m do terreno ao deck (o deck e os vagões não têm collider)
+    for (const f of train?.frames ?? []) {
+      for (const c of frameColumns(f)) {
+        const bottom = heightAt(carved, c.x, c.z);
+        const half = (f.y + DECK_HEIGHT - bottom) / 2;
+        this.columns.push(
+          world.createCollider(
+            RAPIER.ColliderDesc.cuboid(COLUMN_HALF, half, COLUMN_HALF).setTranslation(c.x, bottom + half, c.z).setRotation(yaw(f.heading)),
+            this.body,
+          ),
+        );
+      }
+    }
+
     // paredes invisíveis nas bordas (AC 35)
     const t = 1;
     const wallH = 200;
@@ -123,6 +155,8 @@ export class WorldPhysics {
 /** raio do collider do tronco e quanto ele entra no chão (m) */
 const TRUNK_RADIUS = 0.3;
 const TRUNK_SINK = 0.5;
+/** meias medidas do collider do carro estacionado (m) */
+export const PARKED_HALF = { x: 0.9, y: 0.6, z: 2.1 };
 
 function yaw(heading: number): { x: number; y: number; z: number; w: number } {
   return { x: 0, y: Math.sin(heading / 2), z: 0, w: Math.cos(heading / 2) };
