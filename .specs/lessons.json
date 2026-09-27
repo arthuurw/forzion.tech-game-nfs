@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 19,
+  "next_id": 20,
   "lessons": [
     {
       "id": "L-001",
@@ -331,6 +331,24 @@
       ],
       "created": "2026-09-27T01:23:21Z",
       "last_seen": "2026-09-27T01:23:21Z"
+    },
+    {
+      "id": "L-019",
+      "key": "spec_precision_gap::re measure a baseline at head before writing a threshold on it a value copied from an older verification report can already be stale",
+      "text": "Re-measure a baseline at HEAD before writing a threshold on it; a value copied from an older verification report can already be stale.",
+      "signal": "spec_precision_gap",
+      "scope": "checks",
+      "status": "candidate",
+      "features": [
+        "residuals"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "checks.md Handoff - C1/C2/C5 renegotiated (checks)"
+      ],
+      "created": "2026-09-27T15:25:24Z",
+      "last_seen": "2026-09-27T15:25:24Z"
     }
   ]
 }
