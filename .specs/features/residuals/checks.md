@@ -38,15 +38,15 @@ Proof: `npx playwright test tests/e2e/drive.spec.ts -g "reverse drives backward 
 
 ### S4 - sondas do miolo com uma só fonte · 3 files · 60 KB · ~15k
 
-**C8** - O movimento do vagalume tem as 6 constantes (amplitudes x/y/z 1.0, 0.4 e 1.0; frequências x/y/z 0.05, 0.06 e 0.045 Hz) exportadas uma vez de `src/world/interiors/InteriorScene.ts`. O texto do vertex shader do vagalume contém cada uma formatada, e os literais numéricos da expressão de deslocamento são exatamente essas 6 e mais 2π (6.28318530718). Nenhum outro literal (AC 7)
+**C8** - ✅ O movimento do vagalume tem as 6 constantes (amplitudes x/y/z 1.0, 0.4 e 1.0; frequências x/y/z 0.05, 0.06 e 0.045 Hz) exportadas uma vez de `src/world/interiors/interiorMotion.ts` (`FIREFLY_DRIFT`, ao lado de `BULB_AMPLITUDE`). O texto do vertex shader do vagalume contém cada uma formatada, e os literais numéricos da expressão de deslocamento são exatamente essas 6 e mais 2π (6.28318530718). Nenhum outro literal (AC 7)
 Proof: `npx vitest run tests/unit/shaderConstants.test.ts -t "firefly shader reads the shared constants"`
 
-**C9** - A sonda `fireflyPositions` usa as mesmas constantes exportadas. Com uma constante trocada no teste, a posição devolvida pela função pura da sonda muda pelo valor esperado (AC 7, AC 8)
+**C9** - ✅ A sonda `fireflyPositions` usa as mesmas constantes exportadas. Com uma constante trocada no teste, a posição devolvida pela função pura da sonda muda pelo valor esperado (AC 7, AC 8)
 Proof: `npx vitest run tests/unit/shaderConstants.test.ts -t "firefly probe follows the shared constants"`
 
-**C10** - O balanço de árvore e de lâmpada tem frequência e amplitude só nos atributos `aSway` gerados em TS e em `BULB_AMPLITUDE`, interpolado. As expressões de balanço no GLSL não têm literal numérico além de 2π, e as sondas C22 e C25 da block-fill continuam verdes (AC 7, AC 8)
+**C10** - ✅ O balanço de árvore e de lâmpada tem frequência e amplitude só nos atributos `aSway` gerados em TS e em `BULB_AMPLITUDE`, interpolado. As expressões de balanço no GLSL não têm literal numérico além de 2π, e as sondas C22 e C25 da block-fill continuam verdes (AC 7, AC 8)
 Proof: `npx vitest run tests/unit/shaderConstants.test.ts -t "sway shaders carry no numeric literal besides two pi"`
-Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "C22|C25"`
+Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "tree crowns sway and trunks stay|fireflies within budget"`
 
 ### S5 - documento da block-fill · 2 files · 30 KB · ~1k
 
@@ -97,3 +97,5 @@ Cost: 5 provas Playwright novas em 2 arquivos, 3 unitárias num arquivo novo, 1 
 
 - S1 = 25k (CityScene 21 KB, Game 56 KB, visual.spec 23 KB). S2 soma 11k sobre arquivos já lidos. S3 soma 2k, S4 15k (InteriorScene 33 KB, teste novo) e S5 1k. Total ~54k, abaixo do budget de 150k: um builder só
 - Mechanism: one builder (cabe no budget, sem pergunta)
+
+- **Settled mid-build:** C8 nomeava `InteriorScene.ts` como lugar das constantes. A mesma conta já existia em `interiorMotion.fireflyMotion` (puro, ao lado de `BULB_AMPLITUDE`), então a fonte única ficou lá, e `InteriorScene.ts` exporta os trechos de GLSL montados a partir dela. O seletor `-g "C22|C25"` da C10 não casava com nenhum teste (os nomes não têm o número do check). Trocado pelos nomes reais, sem mudar a asserção.

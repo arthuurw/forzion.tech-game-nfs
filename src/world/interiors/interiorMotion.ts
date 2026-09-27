@@ -181,6 +181,34 @@ export function crownSway(t: number, x: number, z: number): { dx: number; dz: nu
   return { dx: s * p.dirX, dz: s * p.dirZ };
 }
 
+/**
+ * Deriva do vagalume por eixo: amplitude (m) e frequência (Hz). Fonte única da conta do
+ * vertex shader do vagalume (`InteriorScene.ts`) e da sonda DEV `fireflyPositions`.
+ * |v| ≤ √((1.0·2π·0.05)² + (1.0·2π·0.045)² + (0.4·2π·0.06)²) ≈ 0.45 m/s
+ */
+export type FireflyDriftSpec = Record<'x' | 'y' | 'z', { amp: number; freq: number }>;
+
+export const FIREFLY_DRIFT: Readonly<FireflyDriftSpec> = {
+  x: { amp: 1.0, freq: 0.05 },
+  y: { amp: 0.4, freq: 0.06 },
+  z: { amp: 1.0, freq: 0.045 },
+};
+
+/** Deslocamento do vagalume em torno da âncora (m): `A · sin(2π f t + fase)` em cada eixo. */
+export function fireflyDrift(
+  t: number,
+  phaseX: number,
+  phaseY: number,
+  phaseZ: number,
+  drift: Readonly<FireflyDriftSpec> = FIREFLY_DRIFT,
+): { dx: number; dy: number; dz: number } {
+  return {
+    dx: drift.x.amp * Math.sin(2 * Math.PI * drift.x.freq * t + phaseX),
+    dy: drift.y.amp * Math.sin(2 * Math.PI * drift.y.freq * t + phaseY),
+    dz: drift.z.amp * Math.sin(2 * Math.PI * drift.z.freq * t + phaseZ),
+  };
+}
+
 /** Deriva e brilho do vagalume `i` em torno da sua âncora: lento (≤ 0.5 m/s) e pulsando a 0.3-0.6 Hz. */
 export function fireflyMotion(
   t: number,
@@ -190,10 +218,7 @@ export function fireflyMotion(
   const phaseZ = hash01(i * 0.414 + 2.1, 3.9) * Math.PI * 2;
   const phaseY = hash01(i * 0.732 + 4.4, 0.6) * Math.PI * 2;
   const pulseHz = 0.3 + 0.3 * hash01(i * 0.271 + 6.2, 7.1);
-  // |v| ≤ √((1.0·2π·0.05)² + (1.0·2π·0.045)² + (0.4·2π·0.06)²) ≈ 0.45 m/s
-  const dx = 1.0 * Math.sin(2 * Math.PI * 0.05 * t + phaseX);
-  const dz = 1.0 * Math.sin(2 * Math.PI * 0.045 * t + phaseZ);
-  const dy = 0.4 * Math.sin(2 * Math.PI * 0.06 * t + phaseY);
+  const { dx, dy, dz } = fireflyDrift(t, phaseX, phaseY, phaseZ);
   const glow = 0.5 + 0.5 * Math.sin(2 * Math.PI * pulseHz * t + phaseX);
   return { dx, dy, dz, glow, pulseHz, phaseX, phaseY, phaseZ };
 }
