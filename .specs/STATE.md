@@ -17,7 +17,7 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
    - 1.6.2 `corner-assist` - força de curva arcade pelo centro de massa: curvas fechadas em alta sem capotar (concluída, verificada round 3)
    - 1.7 `block-fill` - miolo das quadras: mapa em zonas, grama nova, luz rebatida, quintais, árvores ao vento, vagalumes, obras com guindaste, pedestres (concluída, verificada round 2)
    - 1.7.1 `residuals` - reflexo da rua sem cintilar, guarda do tijolo, "R" da ré provado no browser, sondas do miolo com uma fonte só, custo da block-fill recontado
-   - 1.8 `block-life-extras` - vapor de dutos, holofotes para o céu, estacionamentos, gatos, trem de superfície
+   - 1.8 `block-life-extras` - vapor de dutos, holofotes para o céu, estacionamentos, gatos, trem elevado; mais a pintura viva dos oponentes e as provas que faltaram na races (construída, aguardando Verifier)
 2. corridas - checkpoints, cronômetro, sprint/circuito, IA oponente por waypoints (`races`: concluída, verificada rodada 1)
 3. garagem + tuning visual - pintura, rodas, vinil, body kit, underglow
 4. tuning de performance - motor, turbo, pneus alterando parâmetros do Rapier
@@ -48,12 +48,12 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 
 ## Handoff
 
-**Feature**: `races` concluída (Verifier PASS rodada 1, 2026-09-27, 36 checks, 5/5 falhas mortas) juntada em `main` e publicada
-**Where**: `main`; 178/178 unitários e 118/118 e2e verdes em 2026-09-27
-**In progress**: nada
-**Next step**: 1.8 `block-life-extras` ou sub-projeto 3 (garagem)
+**Feature**: `block-life-extras` construída na branch `block-life-extras` (39 checks com prova, todos verdes); `races` concluída e publicada
+**Where**: branch `block-life-extras`; 202/202 unitários e 132/132 e2e verdes em 2026-09-27; draw calls no grid do centro em corrida: 219 de 220
+**In progress**: Verifier da `block-life-extras` sobre `main..block-life-extras`
+**Next step**: com PASS, juntar em `main` local; `git push` só com ok do usuário; depois sub-projeto 3 (garagem)
 **Blockers**: none
-**Branch**: `main`
+**Branch**: `block-life-extras`
 
 Concluídas: free-roam-city (PASS rodada 4), engine-sound (PASS rodada 3), visual-upgrade (PASS rodada 4), city-terrain (PASS rodada 3), car-handling (PASS rodada 4, autorizada pelo usuário depois de escalar), facade-glint (PASS rodada 1), car-feel (PASS rodada 2; traseira só no acelerador fora de escopo por decisão do usuário), yaw-assist (PASS rodada 2), corner-assist (PASS rodada 3), block-fill (PASS rodada 2), residuals (PASS rodada 1), races (PASS rodada 1).
 Decisões do usuário no build (2026-09-26): C1 da facade-glint isola o especular; metal com `metalness` 0.05 e `normalScale` 0.2, tijolo com `normalScale` 0.25 e piso de rugosidade 0.6; C4 da car-handling com sinal corrigido e C29 com velocidade horizontal; freio de mão com acelerador mantém o motor (power slide); freio-motor na ré; C7 da corner-assist trocou a prova; doors 1 e 2 da block-fill alargadas pelo builder e confirmadas.

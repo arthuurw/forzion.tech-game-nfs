@@ -1332,6 +1332,8 @@ export class Game {
         walls: game.physics.walls.length,
         trees: game.physics.trees.length,
         cranes: game.physics.cranes.length,
+        parked: game.physics.parked.length,
+        columns: game.physics.columns.length,
         car: game.car.body.numColliders(),
       }),
       /** posição da lâmpada `i` lida da malha: matriz da instância + balanço com o `uTime` aplicado */
@@ -1695,7 +1697,8 @@ export class Game {
     cam.up.copy(fwd);
     cam.lookAt(center);
     cam.updateMatrixWorld();
-    const hidden: THREE.Object3D[] = [this.rain.points, ...this.effects.objects, this.car.mesh];
+    // o viaduto do trem cobre a avenida vista de cima: a sonda mede o asfalto, não o deck
+    const hidden: THREE.Object3D[] = [this.rain.points, ...this.effects.objects, this.car.mesh, ...(this.trainScene?.objects() ?? [])];
     if (this.city.reflector) hidden.push(this.city.reflector);
     const was = hidden.map((o) => o.visible);
     hidden.forEach((o) => (o.visible = false));

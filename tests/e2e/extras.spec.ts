@@ -107,15 +107,23 @@ test.describe('block-life-extras - extras do miolo e trem', () => {
 
   // C21 (AC 20, 21)
   test('four additive searchlight cones turn with the sim clock', async ({ page }) => {
-    const a = await extras(page);
-    expect(a.searchlights.name).toBe('searchlights');
-    expect(a.searchlights.count).toBe(4);
-    expect(a.searchlights.additive).toBe(true);
+    const e = await extras(page);
+    expect(e.searchlights.name).toBe('searchlights');
+    expect(e.searchlights.count).toBe(4);
+    expect(e.searchlights.additive).toBe(true);
+    // headings e simTime lidos juntos (o relógio anda em tempo real entre as leituras)
+    const clock = () =>
+      page.evaluate(() => {
+        const g = (window as any).__game;
+        return { h: g.world.extras.searchlights.headings as number[], t: g.simTime as number };
+      });
+    const a = await clock();
     await advanceSim(page, 2);
-    const b = await extras(page);
+    const b = await clock();
+    expect(b.t - a.t).toBeGreaterThanOrEqual(2);
     for (let i = 0; i < 4; i++) {
-      const turned = b.searchlights.headings[i]! - a.searchlights.headings[i]!;
-      const expected = (2 * Math.PI * 2) / a.searchlights.list[i]!.period;
+      const turned = b.h[i]! - a.h[i]!;
+      const expected = (2 * Math.PI * (b.t - a.t)) / e.searchlights.list[i]!.period;
       expect(Math.abs(Math.atan2(Math.sin(turned - expected), Math.cos(turned - expected))), `light ${i}`).toBeLessThanOrEqual(0.01);
     }
   });
