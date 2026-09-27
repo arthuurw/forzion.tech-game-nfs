@@ -8,7 +8,11 @@
 
 Corroborated across multiple features. Safe to apply as guidance.
 
-_none_
+### L-012 - A force defined as against the direction of motion owes a case in each direction; a single-direction case cannot tell a sign from a constant.
+- signal: `surviving_mutant` · recurrence: 2 feature(s) · scope: `vehicle` · harmful: 0
+- features: car-handling, corner-assist
+- evidence: round3 F5 drivetrain.ts:181 (vehicle) (+1 more)
+- last seen: 2026-09-27T00:44:25Z
 
 ## Candidates (under observation - do NOT load as guidance yet)
 
@@ -79,12 +83,6 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - features: car-handling
 - evidence: round1 drivetrain.ts:176 (vehicle) (+1 more)
 - last seen: 2026-09-26T19:03:24Z
-
-### L-012 - A force defined as against the direction of motion owes a case in each direction; a single-direction case cannot tell a sign from a constant.
-- signal: `surviving_mutant` · recurrence: 1 feature(s) · scope: `vehicle` · harmful: 0
-- features: car-handling
-- evidence: round3 F5 drivetrain.ts:181 (vehicle)
-- last seen: 2026-09-26T19:11:40Z
 
 ### L-013 - A test proving a value is read from config must use a probe value that differs from the default; equal values cannot tell reading from hardcoding.
 - signal: `surviving_mutant` · recurrence: 1 feature(s) · scope: `vehicle` · harmful: 0
