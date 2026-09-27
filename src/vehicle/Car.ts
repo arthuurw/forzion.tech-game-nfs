@@ -80,6 +80,8 @@ export class Car {
   yawAssistNm = 0;
   /** força de curva aplicada no último passo (N, positiva = esquerda do carro; door 1 da corner-assist) */
   cornerAssistN = 0;
+  /** impulso da força de curva no último passo (N·s, mundo); zero quando não houve força */
+  readonly cornerAssistImpulse = { x: 0, y: 0, z: 0 };
 
   private readonly wheelMeshes: THREE.Object3D[] = [];
   private wheelSpin = 0;
@@ -376,6 +378,9 @@ export class Car {
   private applyCornerAssist(handbrake: boolean, dt: number): void {
     const forwardSpeed = this.speedMs();
     this.cornerAssistN = cornerAssistForce(this.spec, this.drive.steer, forwardSpeed, this.wheelsOnGround(), handbrake);
+    this.cornerAssistImpulse.x = 0;
+    this.cornerAssistImpulse.y = 0;
+    this.cornerAssistImpulse.z = 0;
     if (this.cornerAssistN === 0) return;
     const v = this.body.linvel();
     const speed = Math.hypot(v.x, v.z);
@@ -383,7 +388,9 @@ export class Car {
     // esquerda da velocidade: +Y × v (de frente, +Z → +X, o lado esquerdo do carro); de ré, o outro lado
     const side = Math.sign(forwardSpeed) / speed;
     const k = this.cornerAssistN * dt * side;
-    this.body.applyImpulse({ x: v.z * k, y: 0, z: -v.x * k }, true);
+    this.cornerAssistImpulse.x = v.z * k;
+    this.cornerAssistImpulse.z = -v.x * k;
+    this.body.applyImpulse(this.cornerAssistImpulse, true);
   }
 
   private sampleLateralG(): void {
