@@ -134,5 +134,41 @@ describe('corner assist - spec', () => {
       }
       expect(pushed, `${v0} km/h`).toBeGreaterThanOrEqual(5);
     }
+
+    // o registro volta a zero num passo sem força, depois de passos com força
+    const stale = createHarness();
+    stale.settle();
+    stale.setForwardKmh(100);
+    let forced = 0;
+    for (let i = 0; i < 40; i++) {
+      stale.step({ ...NO_INPUT, steer: 1 });
+      if (stale.car.cornerAssistN > 0) forced++;
+    }
+    expect(forced).toBeGreaterThanOrEqual(5);
+    stale.setForwardKmh(0);
+    stale.step({ ...NO_INPUT, steer: 1 });
+    expect(stale.car.cornerAssistN).toBe(0);
+    const zero = stale.car.cornerAssistImpulse;
+    expect(Math.abs(zero.x), 'x after force').toBe(0);
+    expect(Math.abs(zero.y), 'y after force').toBe(0);
+    expect(Math.abs(zero.z), 'z after force').toBe(0);
+
+    // no corpo, de ré: a força empurra o carro para a esquerda dele (+X do chassi)
+    const leftDrift = (spec: CarSpec) => {
+      const h = createHarness({ spec });
+      h.settle();
+      h.setForwardKmh(-28);
+      let sum = 0;
+      for (let i = 0; i < 40; i++) {
+        h.step({ ...NO_INPUT, steer: 1 });
+        const left = axis(h.car, 1, 0, 0);
+        const v = h.car.body.linvel();
+        sum += v.x * left.x + v.y * left.y + v.z * left.z;
+      }
+      return sum;
+    };
+    const driftOn = leftDrift(DEFAULT_CAR);
+    const driftOff = leftDrift(offSpec);
+    expect(driftOn, `reverse left drift on ${driftOn.toFixed(2)} off ${driftOff.toFixed(2)}`).toBeGreaterThan(driftOff);
   });
 });
