@@ -936,6 +936,10 @@ export class Game {
         }
         return out;
       },
+      /** vértices da árvore `i` onde o shader os põe agora, com a cor (tronco marrom, copa verde) */
+      treeVertices: (i: number) => scene.treeVertices(i),
+      /** vagalumes onde o shader os põe agora (âncora + deriva) */
+      fireflyPositions: () => scene.fireflyPositions(),
       trees: props.trees.map((t) => ({ ...t })),
       sites: props.sites.map((s) => ({ ...s, floodlights: s.floodlights.map((f) => ({ ...f })) })),
       /** yaw (rad) da lança do canteiro `i`, lido da matriz da instância na cena */

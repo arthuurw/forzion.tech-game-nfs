@@ -280,12 +280,36 @@ test.describe('block-fill - árvores', () => {
         const it = (window as any).__game.world.interiors;
         return { time: it.crownTime as number, matrices: it.treeMatrices(50) as number[][] };
       });
+    // vértices das 5 primeiras árvores onde o vertex shader os põe (máscara `aCrown` por vértice aplicada);
+    // tronco = vértice de cor marrom (r > g), copa = verde (g > r), independente da máscara
+    const vertices = () =>
+      page.evaluate(() => {
+        const it = (window as any).__game.world.interiors;
+        return [0, 1, 2, 3, 4].map((i) => it.treeVertices(i) as Array<{ x: number; y: number; z: number; r: number; g: number }>);
+      });
     const a = await read();
+    const va = await vertices();
     await advanceSim(page, 0.2);
     const b = await read();
+    const vb = await vertices();
     expect(a.matrices.length).toBeGreaterThan(0);
     expect(b.time).toBeGreaterThan(a.time);
     expect(b.matrices).toEqual(a.matrices);
+    for (let i = 0; i < va.length; i++) {
+      const trunkA = va[i]!.filter((v) => v.r > v.g).map(({ x, y, z }) => [x, y, z]);
+      const trunkB = vb[i]!.filter((v) => v.r > v.g).map(({ x, y, z }) => [x, y, z]);
+      expect(trunkA.length, `tree ${i} trunk vertices`).toBeGreaterThan(0);
+      // o tronco fica parado: nenhum vértice marrom se move
+      expect(trunkB, `tree ${i} trunk`).toEqual(trunkA);
+      // a copa balança: algum vértice verde se move
+      let moved = 0;
+      for (let k = 0; k < va[i]!.length; k++) {
+        const p = va[i]![k]!;
+        const q = vb[i]![k]!;
+        if (p.g > p.r) moved = Math.max(moved, Math.hypot(q.x - p.x, q.z - p.z));
+      }
+      expect(moved, `tree ${i} crown`).toBeGreaterThan(0);
+    }
   });
 
   // C24 (AC 22)
@@ -342,15 +366,39 @@ test.describe('block-fill - árvores', () => {
 
   // C25 (AC 23) - parte browser
   test('fireflies within budget', async ({ page }) => {
+    // perto das árvores: âncora a < 1.4 × copa (copa ≤ 3.2 m) do tronco, entre 0.8 e 2.8 m acima do
+    // pé, mais a deriva de ±1 m em x e z e ±0.4 m em y: ≤ 1.4 × 3.2 + √2 ≈ 5.9 m na horizontal
+    const NEAR_M = 6;
+    const farFromTrees = () =>
+      page.evaluate((near) => {
+        const it = (window as any).__game.world.interiors;
+        const trees = it.trees as Array<{ x: number; y: number; z: number }>;
+        const flies = it.fireflyPositions() as Array<{ x: number; y: number; z: number }>;
+        const bad = flies.filter(
+          (f) => !trees.some((t) => Math.hypot(f.x - t.x, f.z - t.z) <= near && f.y >= t.y + 0.4 - 0.01 && f.y <= t.y + 3.2 + 0.01),
+        );
+        return { count: flies.length, bad: bad.length, sample: bad[0] ?? null };
+      }, NEAR_M);
+    const nearTrees = async (expected: number) => {
+      for (let s = 0; s < 2; s++) {
+        const r = await farFromTrees();
+        expect(r.count).toBe(expected);
+        expect(r.bad, `firefly away from trees: ${JSON.stringify(r.sample)}`).toBe(0);
+        await advanceSim(page, 2);
+      }
+    };
+    test.setTimeout(240_000);
     await gotoGame(page);
     const high = await page.evaluate(() => (window as any).__game.world.interiors.summary().fireflies as number);
     expect(high).toBeGreaterThan(0);
     expect(high).toBeLessThanOrEqual(600);
+    await nearTrees(high);
     await page.goto('/?quality=low');
     await page.waitForFunction(() => (window as any).__game?.ready === true, null, { timeout: 30_000 });
     const low = await page.evaluate(() => (window as any).__game.world.interiors.summary().fireflies as number);
     expect(low).toBeGreaterThan(0);
     expect(low).toBeLessThanOrEqual(300);
+    await nearTrees(low);
   });
 });
 
