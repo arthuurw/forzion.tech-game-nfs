@@ -18,6 +18,8 @@ Plan: `.specs/features/block-fill/plan.md`
 - `summary()`: `{ zones, downtown, outer, yards, pools, trees, sites, fireflies, walkersActive }`.
 - `groundProbe(x, z, { bounce })`: põe a câmera 3 m acima de (x, z) olhando para baixo, esconde carro, farol, chuva, partículas e espelho da rua, renderiza 1 quadro e devolve a luminância média do quarto central da tela; `bounce: false` zera só a luz rebatida. Restaura tudo ao sair.
 - `beamProbe(siteIndex)`: com o holofote 0 do canteiro parado no meio da varredura, devolve a luminância média de 9 × 9 px no centro do facho no chão e a de um ponto do mesmo canteiro a 12 m fora do facho.
+- `treeVertices(i)`: cada vértice da árvore `i` onde o vertex shader da copa o põe agora (máscara `aCrown` do vértice aplicada, depois a matriz da instância), com a cor do vértice.
+- `fireflyPositions()`: cada vagalume onde o vertex shader o põe agora (âncora + deriva com o `uTime` aplicado).
 
 ## Checks
 
@@ -68,7 +70,7 @@ Proof: `npx vitest run tests/unit/purity.test.ts -t "pure modules do not import 
 | h 0.5, slope 0, noise 0 | grama misturada 50 % com areia `#5a5242` (como hoje) |
 | h 10, slope 0, noise 0, `downtown` | `#55555a` |
 
-O ruído vem do seed, em escala de 8 m, sempre em [−1, 1] (varredura de 10 000 pontos no teste).
+O ruído `terrainNoise(seed, x, z)` fica sempre em [−1, 1] (varredura de 10 000 pontos no teste). É do seed: em 1000 pontos sorteados, o mesmo seed dá o mesmo valor e o seed 1338 difere do 1337 (> 1e-6) em pelo menos 900. É em escala de 8 m: ruído de valor com nós a cada 8 m, então em 500 pontos sorteados dentro de células de 8 × 8 m (u, v em [0.05, 0.95]) o valor é a interpolação smoothstep dos 4 cantos da célula, ± 1e-9. Com nós a 16 m ou a 4 m essa igualdade quebra.
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "terrain color"`
 
 **C9** - ✅ O chunk usa essa cor: no browser, a cor por vértice da malha de terreno do chunk do spawn, num vértice `downtown` interior e num vértice fora do miolo com slope < 0.05, é igual a `terrainColor` com os mesmos argumentos (± 1/255) (AC 7, AC 8).
@@ -104,7 +106,7 @@ Proof: `npx vitest run tests/unit/interiorProps.test.ts -t "yard for every outer
 Proof: `npx vitest run tests/unit/interiorProps.test.ts -t "yard lamp and six bulbs"`
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "yards are built"`
 
-**C17** - ✅ Balanço das lâmpadas (AC 16): `bulbOffset(t, phase, freq)` tem |valor| ≤ 0.15 para t de 0 a 60 s; a frequência atribuída a cada lâmpada do seed 1337 está em [0.2, 0.4] Hz; `bulbOffset` com a mesma fase e t separados por 1/freq dá o mesmo valor (± 1e-9). No browser, a posição de uma lâmpada lida da malha (matriz de instância ou uniform de tempo aplicado) muda entre dois quadros separados por 0.5 s.
+**C17** - ✅ Balanço das lâmpadas (AC 16): `bulbOffset(t, phase, freq)` tem |valor| ≤ 0.15 para t de 0 a 60 s; a frequência atribuída a cada lâmpada do seed 1337 está em [0.2, 0.4] Hz; `bulbOffset` com a mesma fase e t separados por 1/freq dá o mesmo valor (± 1e-9), no pior caso sobre todas as lâmpadas e instantes (teste com timeout de 60 s). No browser, a posição de uma lâmpada lida da malha (matriz de instância ou uniform de tempo aplicado) muda entre dois quadros separados por 0.5 s.
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "string lights sway"`
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "yard bulbs sway"`
 
@@ -122,7 +124,7 @@ Proof: `npx vitest run tests/unit/interiorProps.test.ts -t "trees on outer inter
 **C21** - ✅ Altura (AC 20): toda árvore tem `height` em [5, 10], e o seed 1337 tem árvores abaixo de 6 e acima de 9.
 Proof: `npx vitest run tests/unit/interiorProps.test.ts -t "tree heights between 5 and 10"`
 
-**C22** - ✅ Balanço da copa (AC 21): `crownSway(t, x, z)` tem |deslocamento horizontal| ≤ 0.3 m para t de 0 a 60 s em 100 posições; a frequência por posição fica em [0.2, 0.4] Hz. No browser, o uniform de tempo do material da copa avança entre dois quadros e as matrizes de instância dos troncos não mudam entre esses quadros.
+**C22** - ✅ Balanço da copa (AC 21): `crownSway(t, x, z)` tem |deslocamento horizontal| ≤ 0.3 m para t de 0 a 60 s em 100 posições; a frequência por posição fica em [0.2, 0.4] Hz. No browser, o uniform de tempo do material da copa avança entre dois quadros e as matrizes de instância dos troncos não mudam entre esses quadros. Nas 5 primeiras árvores, com os vértices postos onde o vertex shader os põe (`treeVertices(i)`: `aSway` × `aCrown` do vértice × seno com o `uTime` aplicado, depois a matriz da instância), todo vértice de tronco (cor marrom, r > g, independente da máscara) fica na mesma posição entre os dois quadros, e algum vértice de copa (verde, g > r) se move.
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "tree crowns sway"`
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "tree crowns sway and trunks stay"`
 
@@ -132,7 +134,7 @@ Proof: `npx vitest run tests/physics/interiors.test.ts -t "one collider per tree
 **C24** - ✅ Batida no tronco (AC 22): no browser, o carro é teleportado a 15 m de uma árvore, de frente para ela, com 40 km/h; com `W` segurado, a velocidade fica abaixo de 5 km/h em algum instante até 1 s depois do primeiro contato (distância horizontal ao tronco ≤ 3 m).
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "car stops at a tree trunk"`
 
-**C25** - ✅ Vagalumes (AC 23): no browser, `summary().fireflies` ≤ 600 em high e ≤ 300 em low (reinício com `?quality=low`), e > 0 nos dois; `fireflyMotion` puro dá velocidade ≤ 0.5 m/s entre quaisquer dois passos de 1/60 em 60 s, e frequência de pulso em [0.3, 0.6] Hz para 200 vagalumes.
+**C25** - ✅ Vagalumes (AC 23): no browser, `summary().fireflies` ≤ 600 em high e ≤ 300 em low (reinício com `?quality=low`), e > 0 nos dois; nas duas qualidades, em dois instantes separados por 2 s, todo vagalume onde o shader o põe (`fireflyPositions()`: âncora + deriva) está a ≤ 6 m na horizontal de alguma árvore e entre 0.4 e 3.2 m acima do pé dela (± 0.01). O 6 m vem da âncora (< 1.4 × copa, copa ≤ 3.2 m) mais a deriva de ±1 m em x e z: 1.4 × 3.2 + √2 ≈ 5.9 m; `fireflyMotion` puro dá velocidade ≤ 0.5 m/s entre quaisquer dois passos de 1/60 em 60 s, e frequência de pulso em [0.3, 0.6] Hz para 200 vagalumes.
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "fireflies drift and pulse slowly"`
 Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "fireflies within budget"`
 
@@ -147,6 +149,7 @@ Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "construction crane t
 
 **C28** - ✅ Farol do guindaste (AC 26): `beaconOn(t)` é true se e só se `t mod 1` < 0.2 (casos 0, 0.19, 0.2, 0.5, 1.1, 1.25). No browser, o `emissiveIntensity` da luz vermelha é > 0 com `beaconOn` true e 0 com false, lido em dois instantes.
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "crane beacon blinks at 1 Hz"`
+Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "crane beacon blinks"`
 
 **C29** - ✅ Holofotes (AC 27): todo canteiro tem 2 holofotes; `floodSweep(t, base)` fica em [base − 30°, base + 30°] e repete a cada 20 s (± 1e-9). No browser, `beamProbe(0)`: luminância no facho > 1.5 × a luminância fora dele.
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "floodlights sweep 30 degrees in 20 s"`
@@ -210,7 +213,7 @@ Proof: `npx playwright test tests/e2e/visual.spec.ts -g "lit windows stay stable
 | quality levels (2) | high C25, C31 · low C25, C31 | - |
 | beacon cases (6) | 0 C28 · 0.19 C28 · 0.2 C28 · 0.5 C28 · 1.1 C28 · 1.25 C28 | - |
 | walker budget cases (4) | 10 000 m² C31 · 200 000 high C31 · 200 000 low C31 · 0 C31 | - |
-| startup config: interiors assembly (1) | `src/core/Game.ts` via `CityGenerator` C37 | - |
+| startup config: interiors assembly (1) | `src/core/Game.ts` (`findBlockInteriors` + `placeInteriorProps` no boot) C37 | - |
 
 - **Checks cruzando a fronteira do browser:** C9, C10 (2ª prova), C11, C12, C14 (2ª), C16 (2ª), C17 (2ª), C19, C22 (2ª), C24, C25 (2ª), C27 (2ª), C28, C29 (2ª), C31 (2ª), C34 (2ª), C35-C38.
 - **Checks com física real:** C23, C30.
