@@ -14,7 +14,7 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
    - 1.5 `facade-glint` - farol não faz fachada piscar (antialiasing de especular no shader da fachada, metal e tijolo mais foscos) (concluída)
    - 1.6 `car-feel` - balanço da carroceria, volante mais rápido, menos aderência, câmera inclinando junto (concluída)
    - 1.6.1 `yaw-assist` - ajuda de giro arcade: carro aponta rápido e vira mais, aderência ~1.0 g (concluída)
-   - 1.6.2 `corner-assist` - força de curva arcade pelo centro de massa: curvas fechadas em alta sem capotar (checks escritos, em build)
+   - 1.6.2 `corner-assist` - força de curva arcade pelo centro de massa: curvas fechadas em alta sem capotar (concluída, verificada round 3)
    - 1.7 `block-fill` - miolo das quadras: mapa em zonas, grama nova, luz rebatida, quintais, árvores ao vento, vagalumes, obras com guindaste, pedestres (checks escritos, em build)
    - 1.8 `block-life-extras` - vapor de dutos, holofotes para o céu, estacionamentos, gatos, trem de superfície
 2. corridas - checkpoints, cronômetro, sprint/circuito, IA oponente por waypoints

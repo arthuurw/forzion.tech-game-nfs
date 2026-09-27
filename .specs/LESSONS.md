@@ -102,6 +102,18 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: round1 yawAssist.ts:32 (vehicle)
 - last seen: 2026-09-26T23:09:45Z
 
+### L-016 - A proof that reads a recorded mirror field does not prove the value applied to the body; assert the physical effect too.
+- signal: `surviving_mutant` · recurrence: 1 feature(s) · scope: `tests/physics` · harmful: 0
+- features: corner-assist
+- evidence: corner-assist r2 F9 Car.ts:393 (tests/physics)
+- last seen: 2026-09-27T01:07:39Z
+
+### L-017 - A per-step debug field needs an assertion on a zero step right after a non-zero step, or stale values pass.
+- signal: `surviving_mutant` · recurrence: 1 feature(s) · scope: `tests/physics` · harmful: 0
+- features: corner-assist
+- evidence: corner-assist r2 F8 Car.ts:381 (tests/physics)
+- last seen: 2026-09-27T01:07:39Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.
