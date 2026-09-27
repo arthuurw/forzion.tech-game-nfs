@@ -428,12 +428,15 @@ export class Game {
               position: { x: p.x, y: p.y, z: p.z },
               speedKmh: o.car.speedKmh(),
               paint: o.car.paint,
-              bodyColor: o.car.paintMaterial ? `#${o.car.paintMaterial.color.getHexString()}` : null,
+              bodyColor: o.car.bodyColor(),
+              materialColor: o.car.paintMaterial ? `#${o.car.paintMaterial.color.getHexString()}` : null,
               resets: o.resets,
               progress: { ...o.progress },
             };
           });
         },
+        /** block-life-extras C3: cor média do teto da carroceria do oponente `i` (−1 = jogador) na tela */
+        bodyProbe: (i: number) => game.probeBody(i),
         get gate() {
           const m = game.race.gateMesh;
           return { visible: m.visible, x: m.position.x, y: m.position.y, z: m.position.z, height: m.scale.y };
@@ -1112,6 +1115,62 @@ export class Game {
     return () => {
       u.value = was;
     };
+  }
+
+  /**
+   * Só DEV (block-life-extras C3): vista ortográfica de cima do grid (40 m,
+   * centrada entre os carros; chuva, partículas e espelho ocultos) renderizada
+   * direto no canvas, e a cor média de 9 × 9 px no ponto projetado do teto da
+   * carroceria (centro do chassi + 0.7 m) do oponente `i`, ou do jogador com
+   * `i` = −1. `onScreen` diz se o ponto, com a margem dos 9 px, cai no canvas.
+   */
+  probeBody(i: number): { r: number; g: number; b: number; luminance: number; onScreen: boolean } {
+    const cars = [this.car, ...this.race.opponents.map((o) => o.car)];
+    const car = i < 0 ? this.car : this.race.opponents[i]!.car;
+    const t = car.body.translation();
+    let cx = 0;
+    let cz = 0;
+    for (const c of cars) {
+      const p = c.body.translation();
+      cx += p.x / cars.length;
+      cz += p.z / cars.length;
+    }
+    const gl = this.renderer.getContext();
+    const W = gl.drawingBufferWidth;
+    const H = gl.drawingBufferHeight;
+    const span = 40;
+    const aspect = W / H;
+    const cam = new THREE.OrthographicCamera((-span / 2) * aspect, (span / 2) * aspect, span / 2, -span / 2, 1, 400);
+    cam.position.set(cx, t.y + 150, cz);
+    cam.up.set(0, 0, -1);
+    cam.lookAt(cx, t.y, cz);
+    cam.updateMatrixWorld();
+    for (const c of cars) c.sync();
+    const hidden: THREE.Object3D[] = [this.rain.points, ...this.effects.objects];
+    if (this.city.reflector) hidden.push(this.city.reflector);
+    const was = hidden.map((o) => o.visible);
+    hidden.forEach((o) => (o.visible = false));
+    this.renderer.setRenderTarget(null);
+    this.renderer.render(this.scene, cam);
+    hidden.forEach((o, k) => (o.visible = was[k]!));
+    const v = new THREE.Vector3(t.x, t.y + 0.7, t.z).project(cam);
+    const px = Math.round(((v.x + 1) / 2) * (W - 1));
+    const py = Math.round(((v.y + 1) / 2) * (H - 1));
+    const onScreen = px >= 4 && px <= W - 5 && py >= 4 && py <= H - 5;
+    const buf = new Uint8Array(9 * 9 * 4);
+    gl.readPixels(Math.min(W - 9, Math.max(0, px - 4)), Math.min(H - 9, Math.max(0, py - 4)), 9, 9, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    for (let k = 0; k < 81; k++) {
+      r += buf[k * 4]!;
+      g += buf[k * 4 + 1]!;
+      b += buf[k * 4 + 2]!;
+    }
+    r /= 81 * 255;
+    g /= 81 * 255;
+    b /= 81 * 255;
+    return { r, g, b, luminance: 0.2126 * r + 0.7152 * g + 0.0722 * b, onScreen };
   }
 
   /** Luminância média do quarto central da tela no último `composer.render` (lida com `readPixels`). */

@@ -12,6 +12,7 @@ import {
   type DriveInput,
   type DrivetrainState,
 } from './drivetrain';
+import { CAR_PAINT_GLSL } from './carPaint';
 import { cornerAssistForce } from './cornerAssist';
 import { yawAssistTorque } from './yawAssist';
 
@@ -88,6 +89,14 @@ export class Car {
 
   /** material da carroceria com a pintura deste carro (races AC 19); `null` no modelo glb do jogador */
   paintMaterial: THREE.MeshStandardMaterial | null = null;
+  /** pintura que o shader da carroceria lê (só o oponente com glb); o placeholder usa `paintMaterial.color` */
+  private paintUniform: { value: THREE.Color } | null = null;
+
+  /** cor da carroceria como o jogador vê: a pintura do shader, ou a cor do material no placeholder; `null` sem pintura */
+  bodyColor(): string | null {
+    const c = this.paintUniform?.value ?? this.paintMaterial?.color;
+    return c ? `#${c.getHexString()}` : null;
+  }
 
   private readonly wheelMeshes: THREE.Object3D[] = [];
   /**
@@ -542,8 +551,18 @@ export class Car {
     group.scale.setScalar(MODEL_SCALE);
     group.position.y = -(CHASSIS_HALF.y + WHEEL_REST * 0.4);
 
+    // a pintura troca o laranja da paleta no shader (block-life-extras door 3); a cor do material fica branca
     const material = (parts[0]!.material as THREE.MeshStandardMaterial).clone();
-    material.color.set(this.paint!);
+    material.color.set('#ffffff');
+    const paintUniform = { value: new THREE.Color(this.paint!) };
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.uPaint = paintUniform;
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform vec3 uPaint;')
+        .replace('#include <map_fragment>', `#include <map_fragment>\nvec3 carPaint = uPaint;\n${CAR_PAINT_GLSL}`);
+    };
+    material.customProgramCacheKey = () => 'car-paint';
+    this.paintUniform = paintUniform;
     this.paintMaterial = material;
     const bodyGeo = mergeGeometries(
       parts.map((m) => m.geometry.clone().applyMatrix4(m.matrixWorld)),

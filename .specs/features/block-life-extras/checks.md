@@ -11,7 +11,7 @@ Comandos: `npx vitest run <arquivo> -t "<nome>"` (unitários e `tests/physics`, 
 
 ### S1 - pintura viva dos oponentes · 6 files · 114 KB · ~29k
 
-**C1** - `recolorTexel(texel, paint)` sobre os texels que o `car.glb` usa (AC 1). Com `paint` = `#2f8cff`:
+**C1** - ✅ `recolorTexel(texel, paint)` sobre os texels que o `car.glb` usa (AC 1). Com `paint` = `#2f8cff`:
 
 | Texel | Origem | Resultado |
 | --- | --- | --- |
@@ -25,28 +25,29 @@ Comandos: `npx vitest run <arquivo> -t "<nome>"` (unitários e `tests/physics`, 
 Luminância = 0.2126 r + 0.7152 g + 0.0722 b em sRGB (a mesma conta do GLSL). Matiz medido a no máximo `PAINT_HUE_TOLERANCE` = 25° de `#ff7e44` e saturação ≥ 0.5 é o que decide a troca.
 Proof: `npx vitest run tests/unit/carPaint.test.ts -t "recolors the orange swatch and keeps glass wheel and trim"`
 
-**C2** - `CAR_PAINT_GLSL` lê as constantes da mesma fonte que `recolorTexel` (AC 2): o trecho contém os 3 canais de `PAINT_SWATCH` em [0, 1] com 4 casas, o cosseno de `PAINT_HUE_TOLERANCE` ou a tolerância em radianos, e o corte de saturação 0.5; fora esses e os pesos de luminância, nenhum outro literal numérico com ponto decimal aparece no trecho (mesmo padrão da prova "sway shaders carry no numeric literal").
+**C2** - ✅ `CAR_PAINT_GLSL` lê as constantes da mesma fonte que `recolorTexel` (AC 2): o trecho contém os 3 canais de `PAINT_SWATCH` em [0, 1] com 4 casas, o cosseno de `PAINT_HUE_TOLERANCE` ou a tolerância em radianos, e o corte de saturação 0.5; fora esses e os pesos de luminância, nenhum outro literal numérico com ponto decimal aparece no trecho (mesmo padrão da prova "sway shaders carry no numeric literal").
 Proof: `npx vitest run tests/unit/shaderConstants.test.ts -t "car paint shader reads the shared constants"`
 
-**C3** - No grid do `circuito-centro` logo depois da largada (AC 3), `__game.race.bodyProbe(i)` lê a média de 9 × 9 px no ponto projetado do teto da carroceria (centro do chassi + 0.7 m) do oponente `i`, e `bodyProbe(-1)` a do jogador, ambos do último `composer.render`. Para o oponente 0 (`#2f8cff`): matiz a no máximo 30° de 210°; para os oponentes 0, 1 e 2: luminância ≥ 0.6 × a do jogador. Todos os 4 pontos projetados ficam dentro da tela.
+**C3** - ✅ No grid do `circuito-centro` logo depois da largada (AC 3), `__game.race.bodyProbe(i)` lê a média de 9 × 9 px no ponto projetado do teto da carroceria (centro do chassi + 0.7 m) do oponente `i`, e `bodyProbe(-1)` a do jogador, numa vista ortográfica de cima do grid renderizada direto no canvas (sem bloom, chuva, partículas nem espelho), como a `probeBeam` da block-fill. Para o oponente 0 (`#2f8cff`): matiz a no máximo 30° de 210°; para os oponentes 0, 1 e 2: luminância ≥ 0.6 × a do jogador. Todos os 4 pontos projetados ficam dentro da tela.
+Renegociado em 2026-09-27 (usuário: "Vista de cima, ortográfica"): a versão anterior lia o último `composer.render` com a câmera de perseguição, e o ponto caía no vidro (jogador lia azul-cinza) ou saía rasante (oponente do lado).
 Proof: `npx playwright test tests/e2e/race.spec.ts -g "opponent body reads its paint"`
 
-**C4** - `__game.race.opponents[i].bodyColor` = `AI_PAINTS[i]` e `__game.race.opponents[i].materialColor` = `#ffffff` para os 3 oponentes (AC 4); a prova C21 da races ("opponents have their own paint and skill") continua verde.
+**C4** - ✅ `__game.race.opponents[i].bodyColor` = `AI_PAINTS[i]` e `__game.race.opponents[i].materialColor` = `#ffffff` para os 3 oponentes (AC 4); a prova C21 da races ("opponents wear their own paint") continua verde.
 Proof: `npx playwright test tests/e2e/race.spec.ts -g "opponent material is white and body color is the paint"`
-Proof: `npx playwright test tests/e2e/race.spec.ts -g "opponents have their own paint and skill"`
+Proof: `npx playwright test tests/e2e/race.spec.ts -g "opponents wear their own paint"`
 
-**C5** - Sem `car.glb` (assets placeholder), um `Car` com `paint` `#2f8cff` tem `paintMaterial.color` = `#2f8cff` (AC 5, AD-009).
+**C5** - ✅ Sem `car.glb` (assets placeholder), um `Car` com `paint` `#2f8cff` tem `paintMaterial.color` = `#2f8cff` (AC 5, AD-009).
 Proof: `npx vitest run tests/physics/extras.test.ts -t "placeholder body takes the paint"`
 
 ### S2 - provas que faltaram na races · 2 files · 35 KB · ~9k
 
-**C6** - Em `countdown` do `circuito-centro`, o carro é levado (teleport) a 20 m do lugar 3 do grid; R o põe parado (< 1 km/h) a no máximo 0.5 m do lugar 3, com heading a no máximo 5° do lugar, e `__game.race.time` continua 0 (AC 6, races AC 27).
+**C6** - ✅ Em `countdown` do `circuito-centro`, o carro é levado (teleport) a 20 m do lugar 3 do grid; R o põe parado (< 1 km/h) a no máximo 0.5 m do lugar 3, com heading a no máximo 5° do lugar, e `__game.race.time` continua 0 (AC 6, races AC 27).
 Proof: `npx playwright test tests/e2e/race.spec.ts -g "reset during countdown returns to the grid slot"`
 
-**C7** - Carro parado sobre a estrada a 100 m (± 0.5 m, medido pela prova) do marcador mais próximo, a mais de 100 m de todos os outros; Enter mantém `free`, o mesmo `bodies` e o carro a no máximo 0.5 m de onde estava (AC 7, races AC 10).
+**C7** - ✅ Carro parado sobre a estrada a 100 m (± 0.5 m, medido pela prova) do marcador mais próximo, a mais de 100 m de todos os outros; Enter mantém `free`, o mesmo `bodies` e o carro a no máximo 0.5 m de onde estava (AC 7, races AC 10).
 Proof: `npx playwright test tests/e2e/race.spec.ts -g "enter at 100 m from the marker does nothing"`
 
-**C8** - `.specs/features/races/checks.md` tem, logo abaixo da C13, a linha "Nota (2026-09-27, block-life-extras C8): o carro é segurado pelo freio de mão (`handbrake: true, brake: false`), como o teste prova"; o texto aprovado da C13 não muda (AC 8).
+**C8** - ✅ `.specs/features/races/checks.md` tem, logo abaixo da C13, a linha "Nota (2026-09-27, block-life-extras C8): o carro é segurado pelo freio de mão (`handbrake: true, brake: false`), como o teste prova"; o texto aprovado da C13 não muda (AC 8).
 Proof: `grep -n "block-life-extras C8" .specs/features/races/checks.md`
 
 ### S3 - estacionamentos nos pátios do centro · 6 files · 81 KB · ~20k
