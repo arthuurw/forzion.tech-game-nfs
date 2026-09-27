@@ -5,8 +5,8 @@
  *
  * - volante: mira um ponto do traçado à frente (8-40 m, cresce com a velocidade),
  *   deslocado de lado pela faixa do oponente; esquerda = +1, como a tecla A
- * - velocidade: a de curva em cada ponto à frente, `sqrt(habilidade · A_LAT · raio)`,
- *   com a distância de frenagem até ele; acelera abaixo do alvo, freia acima
+ * - velocidade: a de curva em cada ponto à frente, `habilidade² · sqrt(A_LAT · raio)`,
+ *   com a distância de frenagem (`A_BRAKE · habilidade`) até ele; acelera abaixo do alvo, freia acima
  */
 import type { DriveInput } from '../vehicle/drivetrain';
 import type { RaceDef } from './raceRoutes';

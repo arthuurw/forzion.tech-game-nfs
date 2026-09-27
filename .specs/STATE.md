@@ -18,7 +18,7 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
    - 1.7 `block-fill` - miolo das quadras: mapa em zonas, grama nova, luz rebatida, quintais, árvores ao vento, vagalumes, obras com guindaste, pedestres (concluída, verificada round 2)
    - 1.7.1 `residuals` - reflexo da rua sem cintilar, guarda do tijolo, "R" da ré provado no browser, sondas do miolo com uma fonte só, custo da block-fill recontado
    - 1.8 `block-life-extras` - vapor de dutos, holofotes para o céu, estacionamentos, gatos, trem de superfície
-2. corridas - checkpoints, cronômetro, sprint/circuito, IA oponente por waypoints (`races`: construída, aguardando Verifier)
+2. corridas - checkpoints, cronômetro, sprint/circuito, IA oponente por waypoints (`races`: concluída, verificada rodada 1)
 3. garagem + tuning visual - pintura, rodas, vinil, body kit, underglow
 4. tuning de performance - motor, turbo, pneus alterando parâmetros do Rapier
 5. carreira - progressão, dinheiro, desbloqueios, save em `localStorage`
@@ -47,14 +47,14 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 
 ## Handoff
 
-**Feature**: `races` construída na branch `races` (34 checks com prova, todos verdes); `residuals` concluída (Verifier PASS rodada 1) e juntada em `main`
+**Feature**: `races` concluída (Verifier PASS rodada 1, 2026-09-27, 36 checks, 5/5 falhas mortas) na branch `races`, ainda não juntada em `main`
 **Where**: branch `races`; 178/178 unitários e 118/118 e2e verdes em 2026-09-27
-**In progress**: Verifier da `races` sobre `main..races`
-**Next step**: com PASS, juntar `races` em `main` local; `git push` só com ok do usuário
+**In progress**: nada
+**Next step**: juntar `races` em `main` local; `git push` só com ok do usuário; depois 1.8 `block-life-extras` ou sub-projeto 3 (garagem)
 **Blockers**: none
 **Branch**: `races`
 
-Concluídas: free-roam-city (PASS rodada 4), engine-sound (PASS rodada 3), visual-upgrade (PASS rodada 4), city-terrain (PASS rodada 3), car-handling (PASS rodada 4, autorizada pelo usuário depois de escalar), facade-glint (PASS rodada 1), car-feel (PASS rodada 2; traseira só no acelerador fora de escopo por decisão do usuário), yaw-assist (PASS rodada 2), corner-assist (PASS rodada 3), block-fill (PASS rodada 2).
+Concluídas: free-roam-city (PASS rodada 4), engine-sound (PASS rodada 3), visual-upgrade (PASS rodada 4), city-terrain (PASS rodada 3), car-handling (PASS rodada 4, autorizada pelo usuário depois de escalar), facade-glint (PASS rodada 1), car-feel (PASS rodada 2; traseira só no acelerador fora de escopo por decisão do usuário), yaw-assist (PASS rodada 2), corner-assist (PASS rodada 3), block-fill (PASS rodada 2), residuals (PASS rodada 1), races (PASS rodada 1).
 Decisões do usuário no build (2026-09-26): C1 da facade-glint isola o especular; metal com `metalness` 0.05 e `normalScale` 0.2, tijolo com `normalScale` 0.25 e piso de rugosidade 0.6; C4 da car-handling com sinal corrigido e C29 com velocidade horizontal; freio de mão com acelerador mantém o motor (power slide); freio-motor na ré; C7 da corner-assist trocou a prova; doors 1 e 2 da block-fill alargadas pelo builder e confirmadas.
-Resíduos conhecidos: margens estreitas da corner-assist (C1 +3.3 %, C4 0.067 g), fora da residuals por mexer na sensação do carro (sub-projeto 4); a sonda `treeVertices` ainda repete em JS a estrutura da conta do shader da copa (os números vêm de uma fonte só desde a residuals). Resolvidos pela residuals (2026-09-27): reflexo da rua, tijolo (mede 0.00058, guarda em 0.0007), "R" da ré, constantes do vagalume, e o "Cost" da block-fill, agora 27/2/22.
+Resíduos conhecidos: races: pintura dos oponentes sai escura (a cor multiplica a textura laranja); C13 diz "freio" mas segura com freio de mão; C29 sem prova no `countdown`; C12 não mede os 100 m. margens estreitas da corner-assist (C1 +3.3 %, C4 0.067 g), fora da residuals por mexer na sensação do carro (sub-projeto 4); a sonda `treeVertices` ainda repete em JS a estrutura da conta do shader da copa (os números vêm de uma fonte só desde a residuals). Resolvidos pela residuals (2026-09-27): reflexo da rua, tijolo (mede 0.00058, guarda em 0.0007), "R" da ré, constantes do vagalume, e o "Cost" da block-fill, agora 27/2/22.
 Hashes de commit citados nos relatórios anteriores a 2026-09-26 foram reescritos quando o histórico trocou o e-mail do autor pelo noreply do GitHub; valem como rótulo, não resolvem no repositório.
