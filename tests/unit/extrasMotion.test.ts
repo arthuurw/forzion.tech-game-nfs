@@ -194,14 +194,14 @@ describe('extras motion', () => {
       else expect(Math.hypot(cornered.x - chaser.x, cornered.z - chaser.z), `cornered step ${step}`).toBeGreaterThanOrEqual(0.5);
     }
     expect(goneAt).toBeGreaterThan(0);
-    // some por 10 s; volta ao ponto de partida só com o carro a mais de 30 m
-    const near = { x: 10, z: 0 };
-    for (let step = 0; step < 60 * 11; step++) stepCat(cornered, DT, near, small);
+    // some por 10 s; volta ao ponto de partida só com o carro a mais de 30 m dele: a 29 m fica sumido, a 31 m volta
+    const at29 = { x: 29, z: 0 };
+    for (let step = 0; step < 60 * 11; step++) stepCat(cornered, DT, at29, small);
     expect(cornered.state).toBe('gone');
-    const far = { x: 1e5, z: 1e5 };
-    stepCat(cornered, DT, far, small);
+    stepCat(cornered, DT, { x: 31, z: 0 }, small);
     expect(cornered.state).toBe('walk');
     expect(Math.hypot(cornered.x, cornered.z)).toBeLessThanOrEqual(1e-9);
+    const far = { x: 1e5, z: 1e5 };
     // e antes dos 10 s não volta, mesmo com o carro longe
     const early = createCat({ zoneId: 0, x: 0, z: 0, yard: null }, 98);
     const chaser2 = { x: -10, z: 0 };

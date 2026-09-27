@@ -47,7 +47,7 @@ const CORNER_POINTS = CORNER_RADIUS / 2;
 const BEZIER_K = 0.5523;
 /** mínimo de trechos por canto e passo máximo entre pontos do arco (m) */
 const CORNER_SEGMENTS = 16;
-const CORNER_STEP = 1.9;
+const CORNER_STEP = 1.8;
 
 interface Leg {
   road: Road;
