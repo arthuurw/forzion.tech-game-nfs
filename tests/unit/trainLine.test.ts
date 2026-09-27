@@ -46,7 +46,7 @@ describe('train line of seed 1337', () => {
     const p = pts(line);
     const avenues = squareAvenues(network);
     expect(avenues.length).toBe(4);
-    expect(Math.hypot(p[0]!.x - p[p.length - 1]!.x, p[0]!.z - p[p.length - 1]!.z)).toBeLessThanOrEqual(2.5);
+    expect(Math.hypot(p[0]!.x - p[p.length - 1]!.x, p[0]!.z - p[p.length - 1]!.z)).toBeLessThanOrEqual(2);
     expect(line.length).toBeGreaterThanOrEqual(2300);
     expect(line.length).toBeLessThanOrEqual(2500);
     let sum = 0;
@@ -113,9 +113,13 @@ describe('train line of seed 1337', () => {
       const cols = frameColumns(f);
       expect(cols.length).toBe(2);
       for (const c of cols) {
-        const off = Math.hypot(c.x - f.x, c.z - f.z);
-        expect(Math.abs(off - (under.road.width / 2 + 2.6)), `frame ${i} column`).toBeLessThanOrEqual(0.1);
+        // de través à linha: nada ao longo do heading, tudo ao longo da direita (cos h, −sin h)
+        const along = (c.x - f.x) * Math.sin(f.heading) + (c.z - f.z) * Math.cos(f.heading);
+        const lateral = (c.x - f.x) * Math.cos(f.heading) - (c.z - f.z) * Math.sin(f.heading);
+        expect(Math.abs(along), `frame ${i} column along`).toBeLessThanOrEqual(0.01);
+        expect(Math.abs(Math.abs(lateral) - (under.road.width / 2 + 2.6)), `frame ${i} column`).toBeLessThanOrEqual(0.1);
       }
+      expect(Math.sign(cols[0]!.x - f.x || cols[0]!.z - f.z)).not.toBe(Math.sign(cols[1]!.x - f.x || cols[1]!.z - f.z));
       for (const road of network.roads) {
         if (road === under.road) continue;
         expect(nearestOn([road], f.x, f.z).d, `frame ${i} near road ${road.id}`).toBeGreaterThanOrEqual(12);

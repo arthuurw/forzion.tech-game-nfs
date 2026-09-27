@@ -86,7 +86,7 @@ describe('parked cars in the real world', () => {
       interiors.zoneOf[Math.round((z - interiors.origin) / interiors.spacing) * interiors.size + Math.round((x - interiors.origin) / interiors.spacing)]!;
     const target = props.parking.find((p) => {
       for (let d = 2; d <= 27; d += 1) if (zoneAt(p.x - Math.sin(p.heading) * d, p.z - Math.cos(p.heading) * d) !== p.zoneId) return false;
-      return props.parking.every((o) => o === p || Math.hypot(o.x - p.x, o.z - p.z) > 2 || true);
+      return true;
     })!;
     expect(target).toBeDefined();
     const idx = props.parking.indexOf(target);

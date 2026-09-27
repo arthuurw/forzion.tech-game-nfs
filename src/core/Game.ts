@@ -1087,10 +1087,10 @@ export class Game {
 
   /**
    * Só DEV (block-life-extras C22): um quadro pelo composer com a câmera como está;
-   * procura ao longo do facho `i`, de 30 a 300 m da base a cada 10 m, o primeiro ponto
-   * projetado dentro da tela com 40 px de margem horizontal e 8 px vertical e devolve
-   * a luminância média nele (`beam`), 40 px ao lado (`sky`) e no mesmo ponto com os
-   * fachos escondidos (`without`), ou `null` se nenhum ponto cabe.
+   * procura ao longo do facho `i`, de 30 a 300 m da base a cada 10 m, entre os pontos
+   * projetados dentro da tela com 40 px de margem horizontal e 8 px vertical, o ponto
+   * em que os fachos mais clareiam, e devolve a luminância média nele (`beam`), 40 px
+   * ao lado (`sky`) e no mesmo ponto com os fachos escondidos (`without`), ou `null`.
    */
   probeSearchlight(i: number): { beam: number; sky: number; without: number; distance: number } | null {
     const it = this.city.interiors;

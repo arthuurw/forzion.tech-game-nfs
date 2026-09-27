@@ -45,7 +45,9 @@ export const COLUMN_HALF = 0.25;
 const CORNER_POINTS = CORNER_RADIUS / 2;
 /** controle da Bézier que aproxima um quarto de círculo: 0.5523 · raio */
 const BEZIER_K = 0.5523;
+/** mínimo de trechos por canto e passo máximo entre pontos do arco (m) */
 const CORNER_SEGMENTS = 16;
+const CORNER_STEP = 1.9;
 
 interface Leg {
   road: Road;
@@ -95,11 +97,25 @@ export function buildTrainLine(network: RoadNetwork): TrainLine | null {
     const r = Math.hypot(p3[0] - p0[0], p3[2] - p0[2]) / Math.SQRT2;
     const c1 = [p0[0] + ta[0] * BEZIER_K * r, p0[2] + ta[1] * BEZIER_K * r];
     const c2 = [p3[0] - tb[0] * BEZIER_K * r, p3[2] - tb[1] * BEZIER_K * r];
-    for (let s = 1; s < CORNER_SEGMENTS; s++) {
-      const t = s / CORNER_SEGMENTS;
+    const at = (t: number): [number, number] => {
       const u = 1 - t;
-      const x = u * u * u * p0[0] + 3 * u * u * t * c1[0]! + 3 * u * t * t * c2[0]! + t * t * t * p3[0];
-      const z = u * u * u * p0[2] + 3 * u * u * t * c1[1]! + 3 * u * t * t * c2[1]! + t * t * t * p3[2];
+      return [
+        u * u * u * p0[0] + 3 * u * u * t * c1[0]! + 3 * u * t * t * c2[0]! + t * t * t * p3[0],
+        u * u * u * p0[2] + 3 * u * u * t * c1[1]! + 3 * u * t * t * c2[1]! + t * t * t * p3[2],
+      ];
+    };
+    // passos de no máximo CORNER_STEP m ao longo do arco (o laço fecha a ≤ 2 m)
+    let len = 0;
+    let prev = at(0);
+    for (let s = 1; s <= 64; s++) {
+      const q = at(s / 64);
+      len += Math.hypot(q[0] - prev[0], q[1] - prev[1]);
+      prev = q;
+    }
+    const segments = Math.max(CORNER_SEGMENTS, Math.ceil(len / CORNER_STEP));
+    for (let s = 1; s < segments; s++) {
+      const t = s / segments;
+      const [x, z] = at(t);
       out.push([x, p0[1] + (p3[1] - p0[1]) * t + DECK_HEIGHT, z]);
     }
   }

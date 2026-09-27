@@ -280,7 +280,8 @@ export class InteriorScene {
         shader.fragmentShader = shader.fragmentShader
           // a cor da instância é a pintura, não um tingimento
           .replace('#include <color_fragment>', '')
-          .replace('#include <map_fragment>', `#include <map_fragment>\nvec3 carPaint = vColor.rgb;\n${CAR_PAINT_GLSL}`);
+          // a cor da instância chega linear; o trecho trabalha em sRGB
+          .replace('#include <map_fragment>', `#include <map_fragment>\nvec3 carPaint = sRGBTransferOETF( vec4( vColor.rgb, 1 ) ).rgb;\n${CAR_PAINT_GLSL}`);
       };
       material.customProgramCacheKey = () => 'parked-paint';
     } else {

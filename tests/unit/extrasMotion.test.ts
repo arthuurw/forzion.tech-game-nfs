@@ -143,7 +143,8 @@ describe('extras motion', () => {
       steps++;
       if (cat.state !== 'flee') break;
       const moved = Math.hypot(cat.x - before.x, cat.z - before.z);
-      expect(Math.abs(moved - 4 * DT), `step ${steps}`).toBeLessThanOrEqual(0.01);
+      // 4 m/s ± 0.01 m/s
+      expect(Math.abs(moved / DT - 4), `step ${steps}`).toBeLessThanOrEqual(0.01);
       const d = Math.hypot(cat.x - car.x, cat.z - car.z);
       expect(d, `step ${steps}`).toBeGreaterThan(prevD - 1e-9);
       prevD = d;
@@ -151,31 +152,66 @@ describe('extras motion', () => {
     expect(cat.state).toBe('walk');
     expect(Math.hypot(cat.x - car.x, cat.z - car.z)).toBeGreaterThanOrEqual(12 - 0.1);
 
-    // carro indo direto ao gato a 20 m/s: nunca a menos de 0.5 m
+    // carro indo direto ao gato a 20 m/s: nunca a menos de 0.5 m (gatos do seed 1337)
     for (const k of [0, 3, 7]) {
       const s = props.cats[Math.floor((k * props.cats.length) / 10)]!;
       const c = createCat(s, k);
       const dir = Math.PI / 4 + k;
       const chaser = { x: c.x - Math.sin(dir) * 40, z: c.z - Math.cos(dir) * 40 };
-      let gone = false;
       for (let step = 0; step < 60 * 6; step++) {
         chaser.x += Math.sin(dir) * 20 * DT;
         chaser.z += Math.cos(dir) * 20 * DT;
         stepCat(c, DT, chaser, interiors);
-        if (c.state === 'gone') {
-          gone = true;
-          continue;
-        }
+        if (c.state === 'gone') continue;
         expect(Math.hypot(c.x - chaser.x, c.z - chaser.z), `cat ${k} step ${step}`).toBeGreaterThanOrEqual(0.5);
       }
-      if (gone) {
-        // volta ao ponto de partida depois de 10 s com o carro longe
-        const far = { x: 1e5, z: 1e5 };
-        for (let step = 0; step < 60 * 11; step++) stepCat(c, DT, far, interiors);
-        expect(c.state).toBe('walk');
-        expect(Math.hypot(c.x - s.x, c.z - s.z)).toBeLessThanOrEqual(1);
-      }
     }
+
+    // zona pequena (chão plano com água na moldura, para a zona não encostar na borda do mapa):
+    // encurralado na borda, o empurrão sai da zona e o gato some
+    const size = 16;
+    const origin = -30;
+    const heights = new Float32Array(size * size);
+    for (let iz = 0; iz < size; iz++) {
+      for (let ix = 0; ix < size; ix++) if (ix < 2 || iz < 2 || ix >= size - 2 || iz >= size - 2) heights[iz * size + ix] = -10;
+    }
+    const small = findBlockInteriors({ size, spacing: 4, origin, heights }, { roads: [] }, []);
+    expect(small.zones.length).toBe(1);
+    expect(small.zones[0]!.cells).toBeLessThan(size * size);
+    // o carro persegue o gato um pouco mais rápido que a fuga (5 m/s contra 4): empurra-o até a borda
+    const pursue = (car: { x: number; z: number }, cat: { x: number; z: number }) => {
+      const d = Math.hypot(cat.x - car.x, cat.z - car.z) || 1;
+      car.x += ((cat.x - car.x) / d) * 5 * DT;
+      car.z += ((cat.z - car.z) / d) * 5 * DT;
+    };
+    const cornered = createCat({ zoneId: 0, x: 0, z: 0, yard: null }, 99);
+    const chaser = { x: -10, z: 0 };
+    let goneAt = -1;
+    for (let step = 0; step < 60 * 30 && goneAt < 0; step++) {
+      pursue(chaser, cornered);
+      stepCat(cornered, DT, chaser, small);
+      if (cornered.state === 'gone') goneAt = step;
+      else expect(Math.hypot(cornered.x - chaser.x, cornered.z - chaser.z), `cornered step ${step}`).toBeGreaterThanOrEqual(0.5);
+    }
+    expect(goneAt).toBeGreaterThan(0);
+    // some por 10 s; volta ao ponto de partida só com o carro a mais de 30 m
+    const near = { x: 10, z: 0 };
+    for (let step = 0; step < 60 * 11; step++) stepCat(cornered, DT, near, small);
+    expect(cornered.state).toBe('gone');
+    const far = { x: 1e5, z: 1e5 };
+    stepCat(cornered, DT, far, small);
+    expect(cornered.state).toBe('walk');
+    expect(Math.hypot(cornered.x, cornered.z)).toBeLessThanOrEqual(1e-9);
+    // e antes dos 10 s não volta, mesmo com o carro longe
+    const early = createCat({ zoneId: 0, x: 0, z: 0, yard: null }, 98);
+    const chaser2 = { x: -10, z: 0 };
+    for (let step = 0; step < 60 * 30 && early.state !== 'gone'; step++) {
+      pursue(chaser2, early);
+      stepCat(early, DT, chaser2, small);
+    }
+    expect(early.state).toBe('gone');
+    for (let step = 0; step < 60 * 9; step++) stepCat(early, DT, far, small);
+    expect(early.state).toBe('gone');
   });
 
   // C31

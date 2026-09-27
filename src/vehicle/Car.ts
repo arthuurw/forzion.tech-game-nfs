@@ -12,7 +12,7 @@ import {
   type DriveInput,
   type DrivetrainState,
 } from './drivetrain';
-import { CAR_PAINT_GLSL } from './carPaint';
+import { CAR_PAINT_GLSL, hexToRgb, rgbToHex } from './carPaint';
 import { cornerAssistForce } from './cornerAssist';
 import { yawAssistTorque } from './yawAssist';
 
@@ -89,13 +89,13 @@ export class Car {
 
   /** material da carroceria com a pintura deste carro (races AC 19); `null` no modelo glb do jogador */
   paintMaterial: THREE.MeshStandardMaterial | null = null;
-  /** pintura que o shader da carroceria lê (só o oponente com glb); o placeholder usa `paintMaterial.color` */
-  private paintUniform: { value: THREE.Color } | null = null;
+  /** pintura (sRGB) que o shader da carroceria lê (só o oponente com glb); o placeholder usa `paintMaterial.color` */
+  private paintUniform: { value: THREE.Vector3 } | null = null;
 
   /** cor da carroceria como o jogador vê: a pintura do shader, ou a cor do material no placeholder; `null` sem pintura */
   bodyColor(): string | null {
-    const c = this.paintUniform?.value ?? this.paintMaterial?.color;
-    return c ? `#${c.getHexString()}` : null;
+    if (this.paintUniform) return rgbToHex([this.paintUniform.value.x, this.paintUniform.value.y, this.paintUniform.value.z]);
+    return this.paintMaterial ? `#${this.paintMaterial.color.getHexString()}` : null;
   }
 
   private readonly wheelMeshes: THREE.Object3D[] = [];
@@ -554,7 +554,8 @@ export class Car {
     // a pintura troca o laranja da paleta no shader (block-life-extras door 3); a cor do material fica branca
     const material = (parts[0]!.material as THREE.MeshStandardMaterial).clone();
     material.color.set('#ffffff');
-    const paintUniform = { value: new THREE.Color(this.paint!) };
+    // o trecho GLSL trabalha em sRGB: a pintura vai como está no hex, sem a conversão para linear do `Color`
+    const paintUniform = { value: new THREE.Vector3(...hexToRgb(this.paint!)) };
     material.onBeforeCompile = (shader) => {
       shader.uniforms.uPaint = paintUniform;
       shader.fragmentShader = shader.fragmentShader
