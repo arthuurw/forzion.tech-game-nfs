@@ -33,7 +33,7 @@ Proof: `npx playwright test tests/e2e/visual.spec.ts -g "headlight still lights 
 
 ### S3 - "R" da ré no HUD · 1 file · 9 KB · ~2k
 
-**C7** - Segurando S por 5 s de simulação a partir do carro parado, com o carro já de ré (≤ -5 km/h): `#gear` mostra exatamente `R` e `__game.car.gear` = -1 (AC 6)
+**C7** - ✅ Segurando S por 5 s de simulação a partir do carro parado, com o carro já de ré (≤ -5 km/h): `#gear` mostra exatamente `R` e `__game.car.gear` = -1 (AC 6)
 Proof: `npx playwright test tests/e2e/drive.spec.ts -g "reverse drives backward up to 30 kmh"`
 
 ### S4 - sondas do miolo com uma só fonte · 3 files · 60 KB · ~15k

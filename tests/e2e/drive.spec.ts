@@ -40,9 +40,15 @@ test.describe('drive', () => {
     await page.keyboard.down('KeyS');
     await advanceSim(page, 5);
     const speed = await speedKmh(page);
+    // residuals C7: o HUD mostra "R" com o carro de ré
+    const gear = await page.evaluate(() => ({
+      label: document.querySelector('#gear')!.textContent,
+      value: (window as any).__game.car.gear as number,
+    }));
     await page.keyboard.up('KeyS');
     expect(speed).toBeLessThanOrEqual(-5);
     expect(speed).toBeGreaterThanOrEqual(-30);
+    expect(gear).toEqual({ label: 'R', value: -1 });
   });
 
   // extra: sinal da direção (A vira à esquerda = heading cresce)
