@@ -50,7 +50,7 @@ Proof: `npx playwright test tests/e2e/interiors.spec.ts -g "tree crowns sway and
 
 ### S5 - documento da block-fill · 2 files · 30 KB · ~1k
 
-**C11** - A linha `Cost:` de `.specs/features/block-fill/checks.md` e o `.specs/STATE.md` citam as mesmas três contagens (unitárias, física real, Playwright), recontadas no build a partir dos testes que os checks da block-fill citam (AC 9)
+**C11** - ✅ A linha `Cost:` de `.specs/features/block-fill/checks.md` e o `.specs/STATE.md` citam as mesmas três contagens (unitárias, física real, Playwright), recontadas no build a partir dos testes que os checks da block-fill citam (AC 9)
 Proof: `grep -n "Cost:" .specs/features/block-fill/checks.md` confrontado com `grep -c "^\s*\(it\|test\)(" ` sobre os arquivos que as linhas `Proof:` da block-fill citam; recontagem e comando escritos em `## Handoff`
 
 ## Coverage
@@ -101,3 +101,5 @@ Cost: 5 provas Playwright novas em 2 arquivos, 3 unitárias num arquivo novo, 1 
 - **Settled mid-build:** C8 nomeava `InteriorScene.ts` como lugar das constantes. A mesma conta já existia em `interiorMotion.fireflyMotion` (puro, ao lado de `BULB_AMPLITUDE`), então a fonte única ficou lá, e `InteriorScene.ts` exporta os trechos de GLSL montados a partir dela. O seletor `-g "C22|C25"` da C10 não casava com nenhum teste (os nomes não têm o número do check). Trocado pelos nomes reais, sem mudar a asserção.
 - **Settled mid-build (2026-09-27, usuário):** as bases do plano eram velhas. Medido no build a 640×360: espelho sem blur 0.0103, sem espelho 0.0054, com blur de 2.5 texels 0.0057, ganho de brilho 0.67 do original. Tijolo 0.00058 sem mudar nada, e os botões do plano pioram (mapa de rugosidade em 0 dá 0.00072, `normalScale` 0.18 dá 0.00063 e 0.1 dá 0.0019). O usuário escolheu: C1 e C2 relativos ao "sem espelho" (≤ 0.001 com blur, ≥ 0.003 sem blur), e o tijolo sem mudança de material, com C5 ≤ 0.0007 como guarda de regressão.
 - **Abandoned:** atenuar o `roughnessMap` do tijolo (`FACADE_ROUGHNESS_MAP_STRENGTH`): a 0.5 não mudou nada (0.00059), e a 0 piorou (0.00072).
+- **C11, recontagem:** `grep -o 'Proof: `[^`]*`' .specs/features/block-fill/checks.md | sort -u` dá 51 provas distintas: 27 com `tests/unit` (4 arquivos), 2 com `tests/physics` (1 arquivo) e 22 com `tests/e2e` (4 arquivos). A linha `Cost:` e o `.specs/STATE.md` citam 27/2/22.
+- **Boundary:** C1-C11 fechados na branch `residuals`
