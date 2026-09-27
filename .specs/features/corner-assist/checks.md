@@ -17,26 +17,26 @@ Plan: `.specs/features/corner-assist/plan.md`
 
 ### S1 - Curvas fechadas em velocidade · 5 files · 45 KB · ~11k
 
-**C1** - Giro em regime a 100 km/h ≥ 31.8°/s (0.5550 rad/s) (AC 1).
+**C1** - ✅ Giro em regime a 100 km/h ≥ 31.8°/s (0.5550 rad/s) (AC 1).
 Proof: `npx vitest run tests/physics/cornering.test.ts -t "radius at most 50 m at 100 kmh"`
 
-**C2** - Giro em regime a 140 km/h ≥ 22.3°/s (0.3892 rad/s) (AC 2).
+**C2** - ✅ Giro em regime a 140 km/h ≥ 22.3°/s (0.3892 rad/s) (AC 2).
 Proof: `npx vitest run tests/physics/cornering.test.ts -t "radius at most 100 m at 140 kmh"`
 
-**C3** - Giro em regime a 60 km/h ≥ 35°/s (0.6109 rad/s) (AC 3).
+**C3** - ✅ Giro em regime a 60 km/h ≥ 35°/s (0.6109 rad/s) (AC 3).
 Proof: `npx vitest run tests/physics/cornering.test.ts -t "still turns at least 35 degrees per second at 60 kmh"`
 
-**C4** - Para 60, 90, 120, 150 e 180 km/h, com `steer +1` por 3 s, a aceleração lateral em janela de 0.5 s fica ≤ 1.7 g em todo passo.
+**C4** - ✅ Para 60, 90, 120, 150 e 180 km/h, com `steer +1` por 3 s, a aceleração lateral em janela de 0.5 s fica ≤ 1.7 g em todo passo.
 
 Substitui yaw-assist C5. (AC 4)
 Proof: `npx vitest run tests/physics/cornering.test.ts -t "lateral acceleration never exceeds 1.7 g"`
 
-**C5** - A 100 km/h, depois de 180 passos com `steer +1`, `steer` volta a 0 (acelerador mantendo 100 km/h): a aceleração lateral em janela de 0.5 s fica abaixo de 0.15 g em algum passo dos 60 seguintes (1.0 s) (AC 5).
+**C5** - ✅ A 100 km/h, depois de 180 passos com `steer +1`, `steer` volta a 0 (acelerador mantendo 100 km/h): a aceleração lateral em janela de 0.5 s fica abaixo de 0.15 g em algum passo dos 60 seguintes (1.0 s) (AC 5).
 Proof: `npx vitest run tests/physics/cornering.test.ts -t "path straightens within 1 s after release"`
 
 ### S2 - A força não estraga o resto · 9 files · 60 KB · ~15k
 
-**C6** - `cornerAssistForce(spec, steerRad, v, wheelsInContact, handbrake)` com ficha de teste `massKg` 1000, `wheelbaseM` 2.6, `cornerAssistStartG` 0.9, `cornerAssistMaxG` 1.7, tolerância 1e-3 (AC 6):
+**C6** - ✅ `cornerAssistForce(spec, steerRad, v, wheelsInContact, handbrake)` com ficha de teste `massKg` 1000, `wheelbaseM` 2.6, `cornerAssistStartG` 0.9, `cornerAssistMaxG` 1.7, tolerância 1e-3 (AC 6):
 
 | `steerRad` | `v` (m/s) | rodas | freio de mão | esperado (N) |
 | --- | --- | --- | --- | --- |
@@ -52,34 +52,36 @@ Proof: `npx vitest run tests/physics/cornering.test.ts -t "path straightens with
 
 Proof: `npx vitest run tests/unit/cornerAssist.test.ts -t "corner assist force fills lateral acceleration above the start"`
 
-**C7** - O `Car` aplica a força e lê a ficha (door 1):
+**C7** - ✅ O `Car` aplica a força e lê a ficha (door 1):
 - `CarSpec` tem `cornerAssistStartG` e `cornerAssistMaxG`, finitos, com `cornerAssistMaxG` > `cornerAssistStartG` > 0 em `DEFAULT_CAR`.
-- No harness, a 100 km/h, o giro em regime com `{ ...DEFAULT_CAR, cornerAssistMaxG: DEFAULT_CAR.cornerAssistStartG }` é pelo menos 20 % menor que com `DEFAULT_CAR`.
+- No harness, 180 passos com `steer +1` a 100 km/h: com `{ ...DEFAULT_CAR, cornerAssistMaxG: DEFAULT_CAR.cornerAssistStartG }`, `car.cornerAssistN` é 0 em todo passo; com `DEFAULT_CAR`, é > 0 em pelo menos 60 passos. A força vem da ficha.
+
+(Prova trocada com o usuário em 2026-09-26: a versão aprovada comparava o giro com e sem a força, mas sem a força a ajuda de giro faz o carro rodar e girar mais, o que não diz nada sobre ler a ficha.)
 - A força é aplicada no centro de massa: com a força ligada, a rolagem média dos passos 90–180 a 100 km/h difere em no máximo 1.0° da rolagem com a força desligada.
 - `car.cornerAssistN` é > 0 depois de 60 passos com `steer +1` a 100 km/h, e 0 parado. No browser, `__game.car.cornerAssistN` é 0 parado no spawn e > 0 depois de `W` por 2 s e `W` + `A` por 0.5 s.
 
 Proof: `npx vitest run tests/physics/cornering.test.ts -t "car applies the corner assist from its spec at the center of mass"`
 Proof: `npx playwright test tests/e2e/drive.spec.ts -g "car debug exposes the corner assist force"`
 
-**C8** - `cornerAssist.ts` está na lista de módulos puros, sem `three` nem `@dimforge/rapier3d-compat` (door 1).
+**C8** - ✅ `cornerAssist.ts` está na lista de módulos puros, sem `three` nem `@dimforge/rapier3d-compat` (door 1).
 Proof: `npx vitest run tests/unit/purity.test.ts -t "pure modules do not import three or rapier"`
 
-**C9** - Continuam verdes, sem mudar asserções, as provas de "não capota" (AC 7): car-handling C2 e C3.
+**C9** - ✅ Continuam verdes, sem mudar asserções, as provas de "não capota" (AC 7): car-handling C2 e C3.
 Proof: `npx vitest run tests/physics/stability.test.ts -t "no rollover across the maneuver matrix|all four wheels back on the ground after release"`
 
-**C10** - Continuam verdes, sem mudar asserções, rolagem e arfagem da car-feel (AC 8): C1-C4.
+**C10** - ✅ Continuam verdes, sem mudar asserções, rolagem e arfagem da car-feel (AC 8): C1-C4.
 Proof: `npx vitest run tests/physics/feel.test.ts -t "body roll between 3.5 and 6 degrees|body roll swings back after the turn|nose dives 2 to 5 degrees under braking|nose lifts under full throttle"`
 
-**C11** - Continua verde, sem mudar asserções, o sideslip da car-feel C10 (10 casos, ≤ 12°) (AC 9).
+**C11** - ✅ Continua verde, sem mudar asserções, o sideslip da car-feel C10 (10 casos, ≤ 12°) (AC 9).
 Proof: `npx vitest run tests/physics/feel.test.ts -t "understeers without throttle or at speed"`
 
-**C12** - Continuam verdes, sem mudar asserções, freio de mão, power slide e frenagem com direção (AC 10): car-handling C11, C12, C13 e C36.
+**C12** - ✅ Continuam verdes, sem mudar asserções, freio de mão, power slide e frenagem com direção (AC 10): car-handling C11, C12, C13 e C36.
 Proof: `npx vitest run tests/physics/grip.test.ts -t "handbrake kicks the rear out|car recovers after the handbrake is released|steers while braking hard|throttle keeps pushing with the handbrake pulled"`
 
-**C13** - Continuam verdes, sem mudar asserções, as metas da yaw-assist que continuam valendo (AC 11): C1, C4 e C6.
+**C13** - ✅ Continuam verdes, sem mudar asserções, as metas da yaw-assist que continuam valendo (AC 11): C1, C4 e C6.
 Proof: `npx vitest run tests/physics/agility.test.ts -t "points into the turn within 0.25 s at 40 kmh|stops turning within 0.8 s after release|reaches at least 0.85 g at 60 kmh"`
 
-**C14** - Continuam verdes, sem mudar asserções, motor e freios (AC 12): car-handling C19-C23, e as provas do browser que dirigem o carro.
+**C14** - ✅ Continuam verdes, sem mudar asserções, motor e freios (AC 12): car-handling C19-C23, e as provas do browser que dirigem o carro.
 Proof: `npx vitest run tests/physics/powertrain.test.ts -t "zero to 100 kmh between 5.5 and 7.5 s|top speed limited by drag|coasting from 100 to 60 kmh|braking from 100 kmh stops in 34 to 45 m|climbs a 9 percent grade"`
 Proof: `npx playwright test tests/e2e/drive.spec.ts -g "A turns left|game builds the car from the default spec|car debug exposes the yaw assist torque"`
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "camera swings left while turning left|camera leans with the body"`

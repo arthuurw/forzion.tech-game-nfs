@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CAR } from '../../src/vehicle/carSpec';
 
-// os 26 campos literais da door 1 da car-handling, os 3 da door 1 da car-feel e os 3 da door 1 da yaw-assist (plan.md, Landing)
+// os 26 campos literais da door 1 da car-handling, os 3 da door 1 da car-feel, os 3 da door 1 da yaw-assist e os 2 da door 1 da corner-assist (plan.md, Landing)
 const FIELDS = [
   'massKg',
   'comHeightM',
@@ -35,6 +35,8 @@ const FIELDS = [
   'yawAssistGain',
   'yawAssistMaxNm',
   'yawAssistLateralG',
+  'cornerAssistStartG',
+  'cornerAssistMaxG',
 ];
 
 describe('car spec', () => {
@@ -72,7 +74,7 @@ describe('car spec', () => {
     expect(c.torqueCurve[0]![0]).toBeLessThanOrEqual(c.idleRpm);
     expect(c.torqueCurve[c.torqueCurve.length - 1]![0]).toBeGreaterThanOrEqual(c.redlineRpm);
 
-    expect(FIELDS.length).toBe(32);
+    expect(FIELDS.length).toBe(34);
     expect(Object.keys(c).sort()).toEqual([...FIELDS].sort());
     for (const field of FIELDS) {
       const value = (c as unknown as Record<string, unknown>)[field];

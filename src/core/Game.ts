@@ -577,6 +577,10 @@ export class Game {
         get yawAssistNm() {
           return game.car.yawAssistNm;
         },
+        /** força de curva no último passo (N, positiva = esquerda do carro; corner-assist) */
+        get cornerAssistN() {
+          return game.car.cornerAssistN;
+        },
         placeholder: game.car.placeholder,
         get collisionEvents() {
           return {

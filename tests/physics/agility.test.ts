@@ -72,15 +72,7 @@ describe('yaw assist - agility', () => {
     }
   });
 
-  // C5 (AC 5) - substitui car-feel C8; table-driven over the 5 speeds
-  it('lateral grip never exceeds 1.05 g', () => {
-    const speeds = [60, 90, 120, 150, 180];
-    for (const v of speeds) {
-      const { g } = hold(v, 180);
-      expect(g.length).toBe(180);
-      g.forEach((x, i) => expect(x, `${v} km/h step ${i + 1}`).toBeLessThanOrEqual(1.05));
-    }
-  });
+  // C5 foi substituído pela C4 da corner-assist (tests/physics/cornering.test.ts)
 
   // C6 (AC 6) - substitui car-feel C9
   it('reaches at least 0.85 g at 60 kmh', () => {

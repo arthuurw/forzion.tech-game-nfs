@@ -73,6 +73,19 @@ test.describe('drive', () => {
     expect(nm).toBeGreaterThan(0);
   });
 
+  // corner-assist C7: o campo DEV `__game.car.cornerAssistN` é a força de curva aplicada (positivo = esquerda)
+  test('car debug exposes the corner assist force', async ({ page }) => {
+    expect(await page.evaluate(() => (window as any).__game.car.cornerAssistN)).toBe(0);
+    await page.keyboard.down('KeyW');
+    await advanceSim(page, 2);
+    await page.keyboard.down('KeyA');
+    await advanceSim(page, 0.5);
+    const n = await page.evaluate(() => (window as any).__game.car.cornerAssistN);
+    await page.keyboard.up('KeyA');
+    await page.keyboard.up('KeyW');
+    expect(n).toBeGreaterThan(0);
+  });
+
   // C9 (AC 7); city-terrain C44: o prédio agora vem de `__game.world.lots`
   test('building blocks the chassis', async ({ page }) => {
     const s = await buildingScenario(page);
@@ -153,7 +166,7 @@ test.describe('drive', () => {
       const mod = await import('/src/vehicle/carSpec.ts' as string);
       return [(window as any).__game.car.spec, mod.DEFAULT_CAR];
     });
-    expect(Object.keys(expected).length).toBe(32);
+    expect(Object.keys(expected).length).toBe(34);
     expect(live).toEqual(expected);
   });
 

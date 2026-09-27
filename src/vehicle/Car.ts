@@ -11,6 +11,7 @@ import {
   type DriveInput,
   type DrivetrainState,
 } from './drivetrain';
+import { cornerAssistForce } from './cornerAssist';
 import { yawAssistTorque } from './yawAssist';
 
 /**
@@ -77,6 +78,8 @@ export class Car {
   lateralG = 0;
   /** torque da ajuda de giro aplicado no último passo (N·m, eixo Y do mundo; door 1 da yaw-assist) */
   yawAssistNm = 0;
+  /** força de curva aplicada no último passo (N, positiva = esquerda do carro; door 1 da corner-assist) */
+  cornerAssistN = 0;
 
   private readonly wheelMeshes: THREE.Object3D[] = [];
   private wheelSpin = 0;
@@ -178,6 +181,7 @@ export class Car {
     this.controller.updateVehicle(dt);
     this.restoreRollMoment();
     this.applyYawAssist(dt);
+    this.applyCornerAssist(input.handbrake, dt);
     this.applyResistance(dt);
     this.sampleLateralG();
     this.wheelSpin += (this.speedMs() * dt) / this.wheelRadius;
@@ -350,7 +354,7 @@ export class Car {
     this.body.applyTorqueImpulse({ x: tx, y: ty, z: tz }, true);
   }
 
-  /** A única ajuda arcade (AD-013): torque em Y do mundo que leva o giro ao alvo das rodas. */
+  /** Ajuda arcade de giro (AD-014): torque em Y do mundo que leva o giro ao alvo das rodas. */
   private applyYawAssist(dt: number): void {
     const yawInertia = this.body.effectiveAngularInertia().m22;
     this.yawAssistNm = yawAssistTorque(
@@ -362,6 +366,24 @@ export class Car {
       yawInertia,
     );
     if (this.yawAssistNm !== 0) this.body.applyTorqueImpulse({ x: 0, y: this.yawAssistNm * dt, z: 0 }, true);
+  }
+
+  /**
+   * Ajuda arcade de curva (AD-014): força horizontal no centro de massa, perpendicular à
+   * velocidade horizontal, do lado esquerdo do carro quando positiva. No centro de massa
+   * ela fecha a trajetória sem gerar momento de tombamento.
+   */
+  private applyCornerAssist(handbrake: boolean, dt: number): void {
+    const forwardSpeed = this.speedMs();
+    this.cornerAssistN = cornerAssistForce(this.spec, this.drive.steer, forwardSpeed, this.wheelsOnGround(), handbrake);
+    if (this.cornerAssistN === 0) return;
+    const v = this.body.linvel();
+    const speed = Math.hypot(v.x, v.z);
+    if (speed < 1e-6) return;
+    // esquerda da velocidade: +Y × v (de frente, +Z → +X, o lado esquerdo do carro); de ré, o outro lado
+    const side = Math.sign(forwardSpeed) / speed;
+    const k = this.cornerAssistN * dt * side;
+    this.body.applyImpulse({ x: v.z * k, y: 0, z: -v.x * k }, true);
   }
 
   private sampleLateralG(): void {
