@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { MINIMAP_SIZE_PX, MINIMAP_WINDOW_M, minimapSegments, worldToMinimap } from '../../src/hud/minimapMath';
+import {
+  MINIMAP_GATE_COLOR,
+  MINIMAP_MARKER_COLOR,
+  MINIMAP_SIZE_PX,
+  MINIMAP_WINDOW_M,
+  minimapRaceMarks,
+  minimapSegments,
+  worldToMinimap,
+} from '../../src/hud/minimapMath';
 
 describe('minimap math', () => {
   // C30 (AC 23)
@@ -34,5 +42,46 @@ describe('minimap math', () => {
     ]);
     // carro a mais de 400 m de qualquer estrada: nada
     expect(minimapSegments(network, { x: -1000, z: -1000 })).toEqual([]);
+  });
+
+  // races C9 (AC 7)
+  it('race marker icons inside the window only', () => {
+    const car = { x: 0, z: 0 };
+    const marks = minimapRaceMarks(car, {
+      markers: [
+        { x: 100, z: 0 },
+        { x: -160, z: 160 },
+        { x: 161, z: 0 },
+        { x: 0, z: -500 },
+      ],
+    });
+    expect(marks).toEqual([
+      { kind: 'marker', x: 130, y: 80, color: MINIMAP_MARKER_COLOR },
+      { kind: 'marker', x: 0, y: 160, color: MINIMAP_MARKER_COLOR },
+    ]);
+  });
+
+  // races C14 (AC 12)
+  it('next gate on the minimap', () => {
+    const car = { x: 10, z: 10 };
+    expect(minimapRaceMarks(car, { gate: { x: 30, z: 50 } })).toEqual([{ kind: 'gate', x: 90, y: 100, color: MINIMAP_GATE_COLOR }]);
+    expect(minimapRaceMarks(car, { gate: { x: 400, z: 50 } })).toEqual([]);
+    expect(minimapRaceMarks(car, { gate: null })).toEqual([]);
+  });
+
+  // races C24 (AC 22)
+  it('opponent dots in their paint', () => {
+    const car = { x: 0, z: 0 };
+    const marks = minimapRaceMarks(car, {
+      opponents: [
+        { x: 20, z: 0, color: '#2f8cff' },
+        { x: 0, z: 200, color: '#ffd23f' },
+        { x: -40, z: -40, color: '#3fe07a' },
+      ],
+    });
+    expect(marks).toEqual([
+      { kind: 'opponent', x: 90, y: 80, color: '#2f8cff' },
+      { kind: 'opponent', x: 60, y: 60, color: '#3fe07a' },
+    ]);
   });
 });

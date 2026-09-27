@@ -1,6 +1,6 @@
 import type { CarState } from '../vehicle/Car';
 import type { RoadNetwork } from '../world/roads/RoadGenerator';
-import { MINIMAP_SIZE_PX, minimapSegments } from './minimapMath';
+import { MINIMAP_SIZE_PX, minimapSegments, type MinimapMark } from './minimapMath';
 
 export const MINIMAP_ROAD_COLOR = '#4a5068';
 
@@ -17,7 +17,8 @@ export class Minimap {
     this.ctx = canvas.getContext('2d')!;
   }
 
-  update(state: CarState): void {
+  /** `marks`: marcas de corrida já projetadas (`minimapRaceMarks`), desenhadas sobre as estradas. */
+  update(state: CarState, marks: ReadonlyArray<MinimapMark> = []): void {
     const ctx = this.ctx;
     const size = MINIMAP_SIZE_PX;
     ctx.clearRect(0, 0, size, size);
@@ -33,6 +34,17 @@ export class Minimap {
       ctx.lineTo(x2!, y2!);
     }
     ctx.stroke();
+
+    // corrida (races AC 7, 12, 22): marcador = disco, portão = quadrado, oponente = ponto
+    for (const m of marks) {
+      ctx.fillStyle = m.color;
+      if (m.kind === 'gate') ctx.fillRect(m.x - 4, m.y - 4, 8, 8);
+      else {
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, m.kind === 'marker' ? 6 : 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
 
     // carro: triângulo apontando na direção do heading (+z do mundo = para baixo no mapa)
     ctx.save();

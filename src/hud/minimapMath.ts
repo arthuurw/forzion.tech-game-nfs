@@ -49,3 +49,39 @@ export function minimapSegments(
   }
   return out;
 }
+
+/** cor do ícone de largada e do próximo portão no minimapa (races AC 7, AC 12) */
+export const MINIMAP_MARKER_COLOR = '#35e0ff';
+export const MINIMAP_GATE_COLOR = '#ffe14a';
+
+export interface MinimapMark {
+  kind: 'marker' | 'gate' | 'opponent';
+  x: number;
+  y: number;
+  color: string;
+}
+
+/**
+ * Marcas de corrida no minimapa (races AC 7, 12, 22): marcadores de largada,
+ * o próximo portão e os oponentes na cor deles; só o que cai dentro da janela
+ * de 320 m, já em coordenadas de minimapa.
+ */
+export function minimapRaceMarks(
+  car: { x: number; z: number },
+  race: {
+    markers?: ReadonlyArray<{ x: number; z: number }>;
+    gate?: { x: number; z: number } | null;
+    opponents?: ReadonlyArray<{ x: number; z: number; color: string }>;
+  },
+): MinimapMark[] {
+  const half = MINIMAP_WINDOW_M / 2;
+  const out: MinimapMark[] = [];
+  const add = (kind: MinimapMark['kind'], x: number, z: number, color: string) => {
+    if (Math.abs(x - car.x) > half || Math.abs(z - car.z) > half) return;
+    out.push({ kind, ...worldToMinimap(x, z, car), color });
+  };
+  for (const m of race.markers ?? []) add('marker', m.x, m.z, MINIMAP_MARKER_COLOR);
+  if (race.gate) add('gate', race.gate.x, race.gate.z, MINIMAP_GATE_COLOR);
+  for (const o of race.opponents ?? []) add('opponent', o.x, o.z, o.color);
+  return out;
+}

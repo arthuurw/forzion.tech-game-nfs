@@ -17,6 +17,7 @@ import { AudioEngine } from '../audio/AudioEngine';
 import { ChaseCamera } from '../camera/ChaseCamera';
 import { Hud } from '../hud/Hud';
 import { Minimap } from '../hud/Minimap';
+import { RaceController } from '../race/RaceController';
 import { Car } from '../vehicle/Car';
 import { DEFAULT_CAR } from '../vehicle/carSpec';
 import { steerAxis } from './input';
@@ -109,6 +110,8 @@ export class Game {
   private readonly eventQueue: RAPIER.EventQueue;
   readonly hud: Hud;
   readonly minimap: Minimap;
+  /** corridas (races): marcadores, sessão, oponentes e HUD de corrida */
+  readonly race: RaceController;
   readonly audio = new AudioEngine();
   readonly input = new InputManager();
   readonly loop: GameLoop;
@@ -219,6 +222,7 @@ export class Game {
           this.city.water.mesh,
           ...this.city.chunks.outerObjects(),
           ...this.city.interiors.objects(),
+          ...this.race.objects(),
         ];
         const was = skip.map((o) => o.visible);
         skip.forEach((o) => (o.visible = false));
@@ -263,9 +267,15 @@ export class Game {
     const minimapCanvas = hudRoot.querySelector<HTMLCanvasElement>('#minimap');
     if (!minimapCanvas) throw new Error('HUD: #minimap não encontrado');
     this.minimap = new Minimap(minimapCanvas, network);
+    this.race = new RaceController(this.world, this.scene, assets, network, hudRoot);
 
     this.input.setFirstKeyHandler(() => this.audio.start());
-    this.input.onPress('KeyR', () => this.car.reset());
+    // na corrida, R volta ao último portão (races AC 27); no free roam desvira no lugar
+    this.input.onPress('KeyR', () => {
+      if (!this.race.resetPlayer(this.car)) this.car.reset();
+    });
+    this.input.onPress('Enter', () => this.race.enter(this.car));
+    this.input.onPress('Escape', () => this.race.escape());
     this.input.onPress('KeyM', () => this.audio.toggleMute());
 
     window.addEventListener('resize', this.handleResize);
@@ -282,18 +292,21 @@ export class Game {
     // sentido do movimento antes do passo: a batida zera a velocidade, então o lado do impacto vem daqui
     const movingDir = this.car.speedMs() >= 0 ? 1 : -1;
     this.car.fixedUpdate(
-      { throttle: s.throttle, brake: s.brake, steer: steerAxis(s), handbrake: s.handbrake },
+      this.race.playerInput({ throttle: s.throttle, brake: s.brake, steer: steerAxis(s), handbrake: s.handbrake }),
       dt,
     );
+    this.race.beforeStep(dt);
     this.world.step(this.eventQueue);
     this.simTime += dt;
+    this.race.afterStep(dt, this.car);
     // pedestres do miolo (block-fill): sem collider, só leem a posição do carro
     const carNow = this.car.body.translation();
     this.city.interiors.stepWalkers(dt, { x: carNow.x, z: carNow.z }, this.simTime);
 
     // caiu na água (door 9): volta em pé, parado, 1 m acima do ponto de estrada mais próximo
     const pos = this.car.body.translation();
-    if (needsWaterReset(pos.y)) {
+    // na corrida, a água leva ao último portão (races AC 28) e não conta como reset na água
+    if (needsWaterReset(pos.y) && !this.race.resetPlayer(this.car)) {
       const near = nearestRoadPoint(this.city.data.network, pos.x, pos.z);
       this.car.teleport(near.x, near.y + 1, near.z, near.heading);
       this.waterResets++;
@@ -307,7 +320,10 @@ export class Game {
 
     // colisões (door 6): força de contato do chassi -> impulso deste passo (o maior do passo)
     let strongest = 0;
+    const chassis = this.car.chassisCollider.handle;
     this.eventQueue.drainContactForceEvents((event) => {
+      // só as batidas do carro do jogador (os oponentes também geram eventos)
+      if (event.collider1() !== chassis && event.collider2() !== chassis) return;
       strongest = Math.max(strongest, event.totalForceMagnitude() * dt);
     });
     if (strongest > 0) {
@@ -342,7 +358,7 @@ export class Game {
     });
     (this.grade.uniforms.uBlur as { value: number }).value = blurFor(state.speedKmh);
     this.hud.update(state);
-    this.minimap.update(state);
+    this.minimap.update(state, this.race.render(state));
     this.audio.update(state.rpm, this.input.state.throttle);
 
     this.renderer.info.reset();
@@ -371,6 +387,75 @@ export class Game {
     return {
       get ready() {
         return game.ready;
+      },
+      /** só DEV (races): corridas, sessão, oponentes, portão e sondas das provas */
+      race: {
+        get state() {
+          return game.race.session.state;
+        },
+        get raceId() {
+          return game.race.race?.id ?? null;
+        },
+        get races() {
+          return game.race.races.map((r) => ({
+            id: r.id,
+            name: r.name,
+            kind: r.kind,
+            laps: r.laps,
+            marker: { ...r.marker },
+            gates: r.gates.map((g) => ({ ...g })),
+            grid: r.grid.map((g) => ({ ...g })),
+          }));
+        },
+        get markers() {
+          const visible = game.race.objects()[0]!.visible;
+          return game.race.races.map((r) => ({ ...r.marker, visible }));
+        },
+        get prompt() {
+          return game.race.prompt;
+        },
+        get time() {
+          return game.race.time;
+        },
+        get player() {
+          return { ...game.race.player, position: game.race.position() };
+        },
+        get opponents() {
+          return game.race.opponents.map((o) => {
+            const p = o.car.body.translation();
+            return {
+              index: o.index,
+              position: { x: p.x, y: p.y, z: p.z },
+              speedKmh: o.car.speedKmh(),
+              paint: o.car.paint,
+              bodyColor: o.car.paintMaterial ? `#${o.car.paintMaterial.color.getHexString()}` : null,
+              resets: o.resets,
+              progress: { ...o.progress },
+            };
+          });
+        },
+        get gate() {
+          const m = game.race.gateMesh;
+          return { visible: m.visible, x: m.position.x, y: m.position.y, z: m.position.z, height: m.scale.y };
+        },
+        get visibleGates() {
+          let n = 0;
+          game.scene.traverseVisible((o) => {
+            if (o.name === 'race-gate') n++;
+          });
+          return n;
+        },
+        get bodies() {
+          return game.world.bodies.len();
+        },
+        /** malhas de carro (`car`) na cena: o jogador e os oponentes */
+        get carsInScene() {
+          return game.scene.children.filter((o) => o.name === 'car').length;
+        },
+        crossNextGate: () => game.race.crossNextGate(game.car),
+        /** põe um oponente em (x, y, z), parado (para as provas do minimapa) */
+        placeOpponent: (i: number, x: number, y: number, z: number, heading: number) =>
+          game.race.opponents[i]?.car.teleport(x, y, z, heading),
       },
       get simTime() {
         return game.simTime;
