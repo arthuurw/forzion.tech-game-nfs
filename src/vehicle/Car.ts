@@ -1,5 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Assets } from '../core/Loader';
 import { DEFAULT_CAR, type CarSpec } from './carSpec';
 import { isSkidding } from './effectsMath';
@@ -89,6 +90,15 @@ export class Car {
   paintMaterial: THREE.MeshStandardMaterial | null = null;
 
   private readonly wheelMeshes: THREE.Object3D[] = [];
+  /**
+   * oponente com o modelo glb (races AC 32): as 4 rodas numa malha instanciada,
+   * com a posição de cada uma e o espelho do lado direito
+   */
+  private wheelInstances: { mesh: THREE.InstancedMesh; base: THREE.Vector3[]; mirror: number[] } | null = null;
+  private readonly wheelMatrix = new THREE.Matrix4();
+  private readonly wheelQuat = new THREE.Quaternion();
+  private readonly wheelEuler = new THREE.Euler();
+  private readonly wheelScale = new THREE.Vector3();
   /** geometrias e materiais criados só para este carro, liberados no `dispose` */
   private readonly owned: Array<{ dispose(): void }> = [];
   private wheelSpin = 0;
@@ -167,6 +177,7 @@ export class Car {
     });
 
     this.buildVisual(assets);
+    this.mesh.name = 'car';
     scene.add(this.mesh);
     this.sync();
   }
@@ -251,6 +262,15 @@ export class Car {
     this.wheelMeshes.forEach((wheel, i) => {
       wheel.rotation.set(this.wheelSpin, i < 2 ? steer : 0, 0, 'YXZ');
     });
+    const inst = this.wheelInstances;
+    if (inst) {
+      inst.base.forEach((p, i) => {
+        this.wheelQuat.setFromEuler(this.wheelEuler.set(this.wheelSpin, i < 2 ? steer : 0, 0, 'YXZ'));
+        this.wheelMatrix.compose(p, this.wheelQuat, this.wheelScale.set(inst.mirror[i]!, 1, 1));
+        inst.mesh.setMatrixAt(i, this.wheelMatrix);
+      });
+      inst.mesh.instanceMatrix.needsUpdate = true;
+    }
   }
 
   state(): CarState {
@@ -482,16 +502,8 @@ export class Car {
       // o jogador usa o modelo carregado; um oponente usa uma cópia com a carroceria tingida
       const model = this.paint ? assets.carModel.clone(true) : assets.carModel;
       if (this.paint) {
-        const paint = new THREE.Color(this.paint);
-        model.traverse((obj) => {
-          const mesh = obj as THREE.Mesh;
-          if (!mesh.isMesh || !/^(body|spoiler)/.test(obj.name)) return;
-          const mat = (mesh.material as THREE.MeshStandardMaterial).clone();
-          mat.color.copy(paint);
-          mesh.material = mat;
-          this.owned.push(mat);
-          if (obj.name.startsWith('body')) this.paintMaterial = mat;
-        });
+        this.buildOpponentModel(model);
+        return;
       }
       model.scale.setScalar(MODEL_SCALE);
       // o modelo do Kenney tem o chão em y=0; o chassi físico tem centro em y=0
@@ -505,6 +517,57 @@ export class Car {
       return;
     }
 
+    this.buildPlaceholder();
+  }
+
+  /**
+   * Oponente com o modelo glb (races AC 19 e AC 32): carroceria e aerofólio numa
+   * malha só, com a pintura, e as 4 rodas numa malha instanciada. 2 draw calls
+   * por passe em vez de 6.
+   */
+  private buildOpponentModel(model: THREE.Object3D): void {
+    // matrizes relativas à raiz do modelo (os nós podem estar aninhados)
+    model.position.set(0, 0, 0);
+    model.scale.set(1, 1, 1);
+    model.updateMatrixWorld(true);
+    const parts: THREE.Mesh[] = [];
+    const wheels: THREE.Mesh[] = [];
+    model.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      if (/^wheel/.test(obj.name)) wheels.push(mesh);
+      else parts.push(mesh);
+    });
+    const group = new THREE.Group();
+    group.scale.setScalar(MODEL_SCALE);
+    group.position.y = -(CHASSIS_HALF.y + WHEEL_REST * 0.4);
+
+    const material = (parts[0]!.material as THREE.MeshStandardMaterial).clone();
+    material.color.set(this.paint!);
+    this.paintMaterial = material;
+    const bodyGeo = mergeGeometries(
+      parts.map((m) => m.geometry.clone().applyMatrix4(m.matrixWorld)),
+    );
+    if (!bodyGeo) throw new Error('Car: carroceria do oponente não junta');
+    group.add(new THREE.Mesh(bodyGeo, material));
+
+    // ordem: frente-esq, frente-dir, tras-esq, tras-dir (como `wheelMeshes`)
+    const at = (w: THREE.Object3D) => new THREE.Vector3().setFromMatrixPosition(w.matrixWorld);
+    wheels.sort((a, b) => at(b).z - at(a).z || at(b).x - at(a).x);
+    const left = wheels.find((w) => at(w).x > 0) ?? wheels[0]!;
+    const wheelMesh = new THREE.InstancedMesh(left.geometry, left.material as THREE.Material, wheels.length);
+    wheelMesh.frustumCulled = false;
+    this.wheelInstances = {
+      mesh: wheelMesh,
+      base: wheels.map(at),
+      mirror: wheels.map((w) => (at(w).x > 0 ? 1 : -1)),
+    };
+    group.add(wheelMesh);
+    this.owned.push(material, bodyGeo, { dispose: () => wheelMesh.dispose() });
+    this.mesh.add(group);
+  }
+
+  private buildPlaceholder(): void {
     const bodyMat = new THREE.MeshStandardMaterial({ color: this.paint ?? PLAYER_PAINT, roughness: 0.35, metalness: 0.6 });
     this.paintMaterial = bodyMat;
     const cabinMat = new THREE.MeshStandardMaterial({ color: '#101018', roughness: 0.2, metalness: 0.8 });

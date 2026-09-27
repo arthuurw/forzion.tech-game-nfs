@@ -29,9 +29,9 @@ flowchart TD
     BOOT["core/Game (exists): boot"] --> GEN["race/raceRoutes (door 1): generateRaces(network) -> RaceDef[4]"]
     GEN --> FREE["core/Game (exists): free roam - marcadores de largada, prompt no hud/Hud (exists), ícones no hud/Minimap (exists)"]
     FREE -->|Enter no marcador| START["core/Game (exists): coloca o jogador no grid, cria 3 vehicle/Car (exists) com pintura própria"]
-    START --> STEP["passo fixo: AI (door 2) produz DriveInput -> Car.fixedUpdate; progresso lê gates, voltas e relógio (door 3)"]
-    STEP --> RENDER["render: hud/Hud (exists) painel de corrida, hud/Minimap (exists) oponentes e próximo portão, malha do portão"]
-    STEP -->|jogador cruza a chegada| RESULT["hud/Hud (exists): resultado"]
+    START --> STEP["passo fixo: race/Opponent (new, placement) pede DriveInput ao race/aiDriver (door 2) -> Car.fixedUpdate; race/raceProgress lê portões, voltas e relógio (door 3); race/raceSession decide o estado"]
+    STEP --> RENDER["render: race/RaceController (new, placement) atualiza hud/RaceHud (new, placement), hud/Minimap (exists) com oponentes e próximo portão, e a malha do portão"]
+    STEP -->|jogador cruza a chegada| RESULT["hud/RaceHud (new, placement): resultado"]
     STEP -->|Esc| END
     RESULT -->|Enter| END["core/Game (exists): remove os 3 Car do mundo, volta ao free roam"]
     END --> FREE
@@ -46,7 +46,8 @@ flowchart TD
 | domain | novo termo `Racer`: jogador ou oponente numa corrida, com próximo portão, volta, tempo e posição |
 | domain | tecla `R` significava "desvira o carro onde está" (`Game.ts:268`). Durante a corrida passa a significar "volta ao último portão cruzado". No free roam não muda. Hoje só o `Game` e `tests/e2e/drive.spec.ts` (free roam) dependem disso |
 | domain | reset na água (door 9 da city-terrain): durante a corrida manda o jogador para o último portão, não para a estrada mais próxima, que pode ser outra estrada e pular o traçado. No free roam não muda |
-| vehicle | `Car` ganha cor de carroceria no construtor (padrão `#ff4d1a`, igual à de hoje) e um jeito de sair do mundo (corpo, collider, controlador e malha). O comportamento físico não muda |
+| vehicle | `Car` ganha cor de carroceria no construtor (padrão `#ff4d1a`, igual à de hoje) e um jeito de sair do mundo (`dispose`: corpo, collider, controlador e malha). O comportamento físico não muda. A malha de todo carro se chama `car`. O oponente com o modelo glb junta carroceria e aerofólio numa malha tingida e desenha as 4 rodas numa `InstancedMesh` (C34: 2 draw calls por passe em vez de 6) |
+| efeitos | faíscas e tranco de câmera por batida passam a olhar só o chassi do jogador (`Game.ts`, fila de eventos de contato): os oponentes também geram eventos |
 | input | Enter e Escape viram teclas de jogo. `KEYMAP` (dirigir) não muda |
 | hud | `index.html` ganha prompt, contagem, painel de corrida e resultado. A linha de ajuda (`#help`) cita Enter e Esc |
 | checks existentes | continuam valendo: city-terrain C38 (draw calls ≤ 220, agora medido também com a corrida rodando), dirigibilidade (car-handling, car-feel, yaw-assist, corner-assist) sem mudança, porque o jogador usa o mesmo `Car` |

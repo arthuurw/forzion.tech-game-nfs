@@ -154,6 +154,99 @@ body {
   color: rgba(243, 241, 234, 0.55);
 }
 
+/* corridas (races): prompt, contagem, painel e resultado */
+#race-prompt {
+  position: absolute;
+  left: 50%;
+  bottom: 30%;
+  transform: translateX(-50%) skewX(-6deg);
+  padding: 8px 18px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--hud-text);
+  background: rgba(5, 6, 13, 0.8);
+  border: 1px solid var(--hud-cyan);
+  border-radius: 4px;
+}
+
+#race-countdown {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  transform: translate(-50%, -50%);
+  font-size: 96px;
+  font-weight: 900;
+  font-style: italic;
+  color: var(--hud-orange);
+  text-shadow: 0 0 24px rgba(255, 122, 26, 0.7);
+}
+
+#race-panel {
+  position: absolute;
+  right: 24px;
+  top: 16px;
+  padding: 8px 14px;
+  text-align: right;
+  font-weight: 700;
+  font-style: italic;
+  color: var(--hud-text);
+  background: rgba(5, 6, 13, 0.7);
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  border-radius: 4px;
+  transform: skewX(-6deg);
+}
+
+#race-pos {
+  font-size: 26px;
+  color: var(--hud-cyan);
+}
+
+#race-lap,
+#race-time {
+  font-size: 16px;
+}
+
+#race-results {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 280px;
+  padding: 14px 20px;
+  color: var(--hud-text);
+  background: rgba(5, 6, 13, 0.9);
+  border: 1px solid var(--hud-orange);
+  border-radius: 6px;
+}
+
+#race-results .race-title {
+  margin-bottom: 8px;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--hud-orange);
+}
+
+#race-results .race-row {
+  display: grid;
+  grid-template-columns: 2em 1fr auto;
+  gap: 8px;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+#race-results .race-row.player {
+  color: var(--hud-cyan);
+}
+
+#race-results .race-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: rgba(243, 241, 234, 0.55);
+}
+
 @media (max-width: 700px) {
   #speedo {
     width: 180px;

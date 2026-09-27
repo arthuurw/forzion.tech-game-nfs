@@ -18,7 +18,7 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
    - 1.7 `block-fill` - miolo das quadras: mapa em zonas, grama nova, luz rebatida, quintais, árvores ao vento, vagalumes, obras com guindaste, pedestres (concluída, verificada round 2)
    - 1.7.1 `residuals` - reflexo da rua sem cintilar, guarda do tijolo, "R" da ré provado no browser, sondas do miolo com uma fonte só, custo da block-fill recontado
    - 1.8 `block-life-extras` - vapor de dutos, holofotes para o céu, estacionamentos, gatos, trem de superfície
-2. corridas - checkpoints, cronômetro, sprint/circuito, IA oponente por waypoints
+2. corridas - checkpoints, cronômetro, sprint/circuito, IA oponente por waypoints (`races`: construída, aguardando Verifier)
 3. garagem + tuning visual - pintura, rodas, vinil, body kit, underglow
 4. tuning de performance - motor, turbo, pneus alterando parâmetros do Rapier
 5. carreira - progressão, dinheiro, desbloqueios, save em `localStorage`
@@ -42,15 +42,17 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 | AD-012 | Miolo das quadras: `findBlockInteriors` (puro, `src/world/interiors/BlockInteriors.ts`) marca o chão livre na grade de 4 m do heightmap (fora de estrada `w/2 + 2 m`, de lote + 1 m e de água), agrupa em zonas por vizinhança de 4 (mínimo 400 m²), classifica `downtown` / `outer` e guarda a distância ao prédio; todo conteúdo do miolo (render, física, pedestres, features futuras) lê esse mapa | um único critério de "chão livre" evita objeto em cima de estrada ou dentro de prédio; mesma grade da AD-010 | active | 2026-09-26 |
 | AD-013 | Física: `@dimforge/rapier3d-compat` com `DynamicRayCastVehicleController` (como a AD-002); o feeling vem de parâmetros da `CarSpec` mais uma única ajuda arcade: o torque de giro de `src/vehicle/yawAssist.ts`, que leva o giro a um alvo pelo ângulo das rodas, limitado a `yawAssistLateralG` e `yawAssistMaxNm`. Nenhuma outra ajuda arcade | o giro do carro era limitado pela aderência e pela inércia; mais aderência capotava o carro; escolha do usuário ("Assistência de giro arcade") | superseded by AD-014 | 2026-09-26 |
 | AD-014 | Física: `@dimforge/rapier3d-compat` com `DynamicRayCastVehicleController`; o feeling vem de parâmetros da `CarSpec` mais duas ajudas arcade, e nenhuma outra: o torque de giro (`src/vehicle/yawAssist.ts`) e a força de curva pelo centro de massa (`src/vehicle/cornerAssist.ts`), que completa a aceleração lateral acima de `cornerAssistStartG` até `cornerAssistMaxG` e desliga com freio de mão | em alta o raio era limitado pela aderência, e mais aderência tombava o carro; força pelo centro de massa não gera momento de tombamento; escolha do usuário ("Força de curva arcade") | active | 2026-09-26 |
+| AD-015 | Oponentes das corridas: cada um é um `Car` com `DEFAULT_CAR`, dirigido só pelo `DriveInput` que `src/race/aiDriver.ts` (puro) devolve a cada passo, como o teclado do jogador; nenhuma força, torque ou teleporte fora do `Car`, exceto o reset de travado para o último portão. Estende a AD-014 aos oponentes | sem trapaça e com as mesmas batidas do jogador; carro cinemático atravessaria o jogador; catch-up recusado pelo usuário (2026-09-27) | active | 2026-09-27 |
+| AD-016 | Corridas: `RaceDef` gerado por regra sobre a `RoadNetwork` (`src/race/raceRoutes.ts`, `generateRaces`), nunca por id de estrada ou coordenada escrita à mão; ids em texto fixos (`circuito-centro`, `circuito-anel`, `sprint-cruzada`, `sprint-morro`); relógio = soma dos passos fixos de 1/60 s desde o GO (AD-006), mostrado `m:ss.cc` | a carreira (sub-projeto 5) vai guardar resultado por id e tempo; o relógio de passos não depende de FPS nem de aba em segundo plano | active | 2026-09-27 |
 
 ## Handoff
 
-**Feature**: `residuals` concluída (Verifier PASS rodada 1, 2026-09-27) juntada em `main`; `races` com `plan.md` aprovado, sem `checks.md`
-**Where**: `main`; 151/151 unitários e 101/101 e2e verdes em 2026-09-27 (5 e2e falharam só quando rodaram junto com a injeção de falhas do Verifier e passaram sozinhos)
-**In progress**: nada
-**Next step**: `races`: escrever `.specs/features/races/checks.md` a partir do plano aprovado e construir
+**Feature**: `races` construída na branch `races` (34 checks com prova, todos verdes); `residuals` concluída (Verifier PASS rodada 1) e juntada em `main`
+**Where**: branch `races`; 178/178 unitários e 118/118 e2e verdes em 2026-09-27
+**In progress**: Verifier da `races` sobre `main..races`
+**Next step**: com PASS, juntar `races` em `main` local; `git push` só com ok do usuário
 **Blockers**: none
-**Branch**: `main`
+**Branch**: `races`
 
 Concluídas: free-roam-city (PASS rodada 4), engine-sound (PASS rodada 3), visual-upgrade (PASS rodada 4), city-terrain (PASS rodada 3), car-handling (PASS rodada 4, autorizada pelo usuário depois de escalar), facade-glint (PASS rodada 1), car-feel (PASS rodada 2; traseira só no acelerador fora de escopo por decisão do usuário), yaw-assist (PASS rodada 2), corner-assist (PASS rodada 3), block-fill (PASS rodada 2).
 Decisões do usuário no build (2026-09-26): C1 da facade-glint isola o especular; metal com `metalness` 0.05 e `normalScale` 0.2, tijolo com `normalScale` 0.25 e piso de rugosidade 0.6; C4 da car-handling com sinal corrigido e C29 com velocidade horizontal; freio de mão com acelerador mantém o motor (power slide); freio-motor na ré; C7 da corner-assist trocou a prova; doors 1 e 2 da block-fill alargadas pelo builder e confirmadas.

@@ -28,7 +28,15 @@
         </div>
       </div>
       <canvas id="minimap" width="160" height="160"></canvas>
-      <div id="help">W/S acelera/freia · A/D vira · ESPAÇO freio de mão · R reset · M mudo</div>
+      <div id="help">W/S acelera/freia · A/D vira · ESPAÇO freio de mão · R reset · M mudo · ENTER corrida · ESC sai</div>
+      <div id="race-prompt" style="display: none"></div>
+      <div id="race-countdown" style="display: none"></div>
+      <div id="race-panel" style="display: none">
+        <div id="race-pos"></div>
+        <div id="race-lap"></div>
+        <div id="race-time"></div>
+      </div>
+      <div id="race-results" style="display: none"></div>
     </div>
 
     <script type="module" src="/src/main.ts"></script>
