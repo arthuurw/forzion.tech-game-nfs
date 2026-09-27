@@ -1017,7 +1017,6 @@ export class Game {
     };
   }
 
-  /** Luminância média do quarto central da tela no último `composer.render` (lida com `readPixels`). */
   /** Só DEV: `false` zera o blur do espelho até chamar a função devolvida; `undefined` não mexe. */
   setMirrorBlur(on: boolean | undefined): () => void {
     const r = this.city.reflector;
@@ -1030,6 +1029,7 @@ export class Game {
     };
   }
 
+  /** Luminância média do quarto central da tela no último `composer.render` (lida com `readPixels`). */
   private centralLuminance(): number {
     const gl = this.renderer.getContext();
     const w = gl.drawingBufferWidth;
