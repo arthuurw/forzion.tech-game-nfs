@@ -120,6 +120,12 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: block-fill r1 C8/C25 (checks)
 - last seen: 2026-09-27T01:23:21Z
 
+### L-019 - Re-measure a baseline at HEAD before writing a threshold on it; a value copied from an older verification report can already be stale.
+- signal: `spec_precision_gap` · recurrence: 1 feature(s) · scope: `checks` · harmful: 0
+- features: residuals
+- evidence: checks.md Handoff - C1/C2/C5 renegotiated (checks)
+- last seen: 2026-09-27T15:25:24Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.

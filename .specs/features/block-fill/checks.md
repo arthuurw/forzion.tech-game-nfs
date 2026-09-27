@@ -236,7 +236,7 @@ Evidence (forma prevista; o Verifier reconta sobre o diff):
 - **`WorldPhysics.ts`** → instrumentation que monta colliders a partir de `InteriorProps`; provado com Rapier real em C23, C30 e no browser em C24, C35.
 - **`ChunkManager.ts`, `CityScene.ts`, `Game.ts`** → instrumentation; cobertos pelas provas Playwright (C9-C12, C14, C16, C17, C19, C22, C24, C25, C27-C29, C31, C34-C37).
 
-Cost: 25 provas unitárias em 4 arquivos, 2 de física real em 1 arquivo e 20 Playwright num arquivo novo.
+Cost: 27 provas unitárias em 4 arquivos, 2 de física real em 1 arquivo e 22 Playwright em 4 arquivos (recontado na residuals em 2026-09-27: `Proof:` distintos deste arquivo por pasta de teste).
 
 ## Swept
 

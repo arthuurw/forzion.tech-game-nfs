@@ -16,6 +16,7 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
    - 1.6.1 `yaw-assist` - ajuda de giro arcade: carro aponta rápido e vira mais, aderência ~1.0 g (concluída)
    - 1.6.2 `corner-assist` - força de curva arcade pelo centro de massa: curvas fechadas em alta sem capotar (concluída, verificada round 3)
    - 1.7 `block-fill` - miolo das quadras: mapa em zonas, grama nova, luz rebatida, quintais, árvores ao vento, vagalumes, obras com guindaste, pedestres (concluída, verificada round 2)
+   - 1.7.1 `residuals` - reflexo da rua sem cintilar, guarda do tijolo, "R" da ré provado no browser, sondas do miolo com uma fonte só, custo da block-fill recontado
    - 1.8 `block-life-extras` - vapor de dutos, holofotes para o céu, estacionamentos, gatos, trem de superfície
 2. corridas - checkpoints, cronômetro, sprint/circuito, IA oponente por waypoints
 3. garagem + tuning visual - pintura, rodas, vinil, body kit, underglow
@@ -44,14 +45,14 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 
 ## Handoff
 
-**Feature**: nenhuma em andamento - todas as features do sub-projeto 1 concluídas e juntadas em `main`
-**Where**: `main`; 148/148 unitários (vitest, com `tests/physics`) e 18/18 e2e da block-fill verdes em 2026-09-26; repositório público `arthuurw/forzion.tech-game-nfs`, com `README.md` para quem chega
+**Feature**: `residuals` concluída (Verifier PASS rodada 1, 2026-09-27) na branch `residuals`, ainda não juntada em `main`; `races` com `plan.md` aprovado, sem `checks.md`
+**Where**: branch `residuals`; 151/151 unitários e 101/101 e2e verdes em 2026-09-27 (5 e2e falharam só quando rodaram junto com a injeção de falhas do Verifier e passaram sozinhos)
 **In progress**: nada
-**Next step**: usuário testa curvas (corner-assist) e o miolo das quadras (block-fill); então sub-projeto 2 (corridas) em `.specs/features/races/`, lendo o `RoadNetwork` e o `CarSpec`, ou 1.8 `block-life-extras`
+**Next step**: juntar `residuals` em `main`; depois `races`: escrever `.specs/features/races/checks.md` a partir do plano aprovado e construir
 **Blockers**: none
-**Branch**: `main`
+**Branch**: `residuals`
 
 Concluídas: free-roam-city (PASS rodada 4), engine-sound (PASS rodada 3), visual-upgrade (PASS rodada 4), city-terrain (PASS rodada 3), car-handling (PASS rodada 4, autorizada pelo usuário depois de escalar), facade-glint (PASS rodada 1), car-feel (PASS rodada 2; traseira só no acelerador fora de escopo por decisão do usuário), yaw-assist (PASS rodada 2), corner-assist (PASS rodada 3), block-fill (PASS rodada 2).
 Decisões do usuário no build (2026-09-26): C1 da facade-glint isola o especular; metal com `metalness` 0.05 e `normalScale` 0.2, tijolo com `normalScale` 0.25 e piso de rugosidade 0.6; C4 da car-handling com sinal corrigido e C29 com velocidade horizontal; freio de mão com acelerador mantém o motor (power slide); freio-motor na ré; C7 da corner-assist trocou a prova; doors 1 e 2 da block-fill alargadas pelo builder e confirmadas.
-Resíduos conhecidos: o reflexo da rua (door 3 da visual-upgrade) ainda cintila um pouco com a câmera andando; tijolo passa o C1 da facade-glint com margem curta (0.00074 de 0.0010); o "R" da ré no HUD não tem prova no browser; margens estreitas da corner-assist (C1 +3.3 %, C4 0.067 g); as sondas DEV `treeVertices`/`fireflyPositions` espelham o GLSL em JS, então mudar só o shader não é pego; o "Cost" do `checks.md` da block-fill está desatualizado (25/2/20, real 27/2/22).
+Resíduos conhecidos: margens estreitas da corner-assist (C1 +3.3 %, C4 0.067 g), fora da residuals por mexer na sensação do carro (sub-projeto 4); a sonda `treeVertices` ainda repete em JS a estrutura da conta do shader da copa (os números vêm de uma fonte só desde a residuals). Resolvidos pela residuals (2026-09-27): reflexo da rua, tijolo (mede 0.00058, guarda em 0.0007), "R" da ré, constantes do vagalume, e o "Cost" da block-fill, agora 27/2/22.
 Hashes de commit citados nos relatórios anteriores a 2026-09-26 foram reescritos quando o histórico trocou o e-mail do autor pelo noreply do GitHub; valem como rótulo, não resolvem no repositório.

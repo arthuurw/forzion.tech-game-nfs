@@ -8,6 +8,7 @@ import {
   BULB_AMPLITUDE,
   CROWN_AMPLITUDE,
   FIREFLIES_HIGH,
+  FIREFLY_DRIFT,
   FIREFLIES_LOW,
   POOL_FLOW,
   WALKER_CAP_HIGH,
@@ -24,6 +25,7 @@ import {
   walkerBob,
   type Walker,
   crownSwayParams,
+  fireflyDrift,
   fireflyMotion,
   zoneLight,
 } from './interiorMotion';
@@ -519,11 +521,9 @@ export class InteriorScene {
     const t = this.swayTime.value;
     const out: Array<{ x: number; y: number; z: number }> = [];
     for (let k = 0; k < this.fireflyCount; k++) {
-      out.push({
-        x: pos.getX(k) + Math.sin(2 * Math.PI * 0.05 * t + prm.getX(k)),
-        y: pos.getY(k) + 0.4 * Math.sin(2 * Math.PI * 0.06 * t + prm.getZ(k)),
-        z: pos.getZ(k) + Math.sin(2 * Math.PI * 0.045 * t + prm.getY(k)),
-      });
+      // aParams = (faseX, faseZ, faseY, pulso)
+      const d = fireflyDrift(t, prm.getX(k), prm.getZ(k), prm.getY(k));
+      out.push({ x: pos.getX(k) + d.dx, y: pos.getY(k) + d.dy, z: pos.getZ(k) + d.dz });
     }
     return out;
   }
@@ -652,6 +652,19 @@ totalEmissiveRadiance *= vGlow;`,
   material.customProgramCacheKey = () => key;
 }
 
+/** Balanço da lâmpada no vertex shader (a conta de `bulbOffset`); amplitude de `BULB_AMPLITUDE`. */
+export const BULB_SWAY_GLSL = `float swayS = ${BULB_AMPLITUDE.toFixed(3)} * sin(6.28318530718 * aSway.x * uTime + aSway.y);
+transformed.xz += aSway.zw * swayS;`;
+
+/** Balanço da copa: frequência, fase e amplitude chegam todas por `aSway`, geradas em TS. */
+export const CROWN_SWAY_GLSL = `transformed.xz += aSway.zw * aCrown * sin(6.28318530718 * aSway.x * uTime + aSway.y);`;
+
+/** Deriva do vagalume no vertex shader: amplitudes e frequências de `FIREFLY_DRIFT`. */
+export const FIREFLY_DRIFT_GLSL = `vec3 p = position + vec3(
+          ${FIREFLY_DRIFT.x.amp.toFixed(3)} * sin(6.28318530718 * ${FIREFLY_DRIFT.x.freq.toFixed(3)} * t + aParams.x),
+          ${FIREFLY_DRIFT.y.amp.toFixed(3)} * sin(6.28318530718 * ${FIREFLY_DRIFT.y.freq.toFixed(3)} * t + aParams.z),
+          ${FIREFLY_DRIFT.z.amp.toFixed(3)} * sin(6.28318530718 * ${FIREFLY_DRIFT.z.freq.toFixed(3)} * t + aParams.y));`;
+
 /**
  * Balanço horizontal no vertex shader: `aSway` = (freq, fase, dirX, dirZ) por
  * instância, deslocamento `A · sin(2π f t + fase)` ao longo de (dirX, dirZ),
@@ -670,8 +683,7 @@ uniform float uTime;`,
       .replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>
-float swayS = ${BULB_AMPLITUDE.toFixed(3)} * sin(6.28318530718 * aSway.x * uTime + aSway.y);
-transformed.xz += aSway.zw * swayS;`,
+${BULB_SWAY_GLSL}`,
       );
   };
   material.customProgramCacheKey = () => key;
@@ -725,7 +737,7 @@ uniform float uTime;`,
       .replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>
-transformed.xz += aSway.zw * aCrown * sin(6.28318530718 * aSway.x * uTime + aSway.y);`,
+${CROWN_SWAY_GLSL}`,
       );
   };
   material.customProgramCacheKey = () => 'tree-crown';
@@ -742,10 +754,7 @@ function fireflyMaterial(time: { value: number }): THREE.ShaderMaterial {
       varying float vFog;
       void main() {
         float t = uTime;
-        vec3 p = position + vec3(
-          1.0 * sin(6.28318530718 * 0.05 * t + aParams.x),
-          0.4 * sin(6.28318530718 * 0.06 * t + aParams.z),
-          1.0 * sin(6.28318530718 * 0.045 * t + aParams.y));
+        ${FIREFLY_DRIFT_GLSL}
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         gl_Position = projectionMatrix * mv;
         gl_PointSize = clamp(40.0 / max(1.0, -mv.z), 1.5, 8.0);
