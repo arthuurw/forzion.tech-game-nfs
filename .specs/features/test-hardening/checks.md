@@ -18,10 +18,10 @@ Proof: `npx vitest run tests/unit --reporter=json --outputFile=test-results/unit
 
 **C3** - ✅ `npm run test:quick` sai com 0, e a lista de testes que ele roda não tem `each opponent finishes every race in time` (AC 3, door 2)
 Proof: `npm run test:quick`
-Proof: `npx vitest list --tags-filter="!slow"` sem nenhuma linha com `each opponent finishes every race in time` (`node tests/tooling/list-has.mjs --tags-filter="!slow" --absent "each opponent finishes every race in time"`)
+Proof: `node tests/tooling/list-has.mjs --script test:quick --absent "each opponent finishes every race in time"` (a lista sai do script `test:quick` do `package.json`; rodada 4: antes repetia o flag e sobrevivia a uma edição do script)
 
 **C4** - ✅ A lista do `npm test` é exatamente a do `test:quick` mais a dos testes com a tag `slow`, sem sobra, falta ou repetição, e `each opponent finishes every race in time` está entre os `slow` (AC 4; rodada 3: a rodada 2 escrevia um total à mão, 212, que ficou velho no mesmo commit; a afirmação agora é a partição, que não envelhece)
-Proof: `node tests/tooling/suite-split.mjs` (imprime `npm test: N · test:quick: N−k · slow: k`)
+Proof: `node tests/tooling/suite-split.mjs` (imprime `npm test: N · test:quick: N−k · slow: k`; rodada 4: as listas do `npm test` e do `test:quick` saem dos scripts do `package.json` por `tests/tooling/npmScript.mjs`)
 
 ### S2 - e2e no checkout certo e com suíte curta · 12 files · 180 KB · ~45k
 
