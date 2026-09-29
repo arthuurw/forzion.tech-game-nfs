@@ -88,7 +88,8 @@ describe('race opponents in the real world', () => {
   }, 300_000);
 
   // C22
-  it('each opponent finishes every race in time', () => {
+  // tag `slow`: fora do `npm run test:quick` (test-hardening door 2a); o `npm test` roda
+  it('each opponent finishes every race in time', { tags: ['slow'] }, () => {
     const world = makeWorld();
     for (const race of races) {
       const times: number[] = [];

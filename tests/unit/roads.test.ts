@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { generateTerrain, type Heightmap } from '../../src/world/terrain/TerrainGenerator';
 import { carveRoads } from '../../src/world/terrain/carveRoads';
 import { ROAD_SPECS, generateRoads, type Road } from '../../src/world/roads/RoadGenerator';
@@ -25,8 +25,13 @@ const headingOf = (r: Road, i: number) => {
 
 describe('road network', () => {
   // C12 (AC 10, door 3)
+  // a segunda geração fica no hook: o teste só compara (test-hardening AC 2)
+  let again: ReturnType<typeof generateRoads>;
+  beforeAll(() => {
+    again = generateRoads(1337, hm);
+  });
+
   it('road network is deterministic', () => {
-    const again = generateRoads(1337, hm);
     expect(again.roads.length).toBe(net.roads.length);
     net.roads.forEach((r, k) => {
       const o = again.roads[k]!;

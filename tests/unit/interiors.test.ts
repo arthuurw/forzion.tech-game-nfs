@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { findBlockInteriors } from '../../src/world/interiors/BlockInteriors';
 import { placeInteriorProps } from '../../src/world/interiors/InteriorProps';
 import { generateLots, type Lot } from '../../src/world/lots/LotGenerator';
@@ -348,8 +348,15 @@ describe('block interiors', () => {
   });
 
   // C5 (AC 5, doors 1 e 2)
-  it('interiors and props are deterministic', { timeout: 60_000 }, () => {
-    const again = world(1337);
+  // as duas gerações extras (mesmo seed e outro seed) ficam no hook: o teste só compara (test-hardening AC 2)
+  let again: ReturnType<typeof world>;
+  let other1338: ReturnType<typeof world>;
+  beforeAll(() => {
+    again = world(1337);
+    other1338 = world(1338);
+  }, 60_000);
+
+  it('interiors and props are deterministic', () => {
     const a = w1337.interiors;
     const b = again.interiors;
     expect(b.zoneOf.length).toBe(a.zoneOf.length);
@@ -358,7 +365,7 @@ describe('block interiors', () => {
     expect(b.zones).toEqual(a.zones);
     expect(placeInteriorProps(1337, b, again.lots, again.carved)).toEqual(placeInteriorProps(1337, a, w1337.lots, w1337.carved));
 
-    const other = world(1338).interiors;
+    const other = other1338.interiors;
     let differ = 0;
     for (let k = 0; k < a.zoneOf.length; k++) if (other.zoneOf[k] !== a.zoneOf[k]) differ++;
     expect(differ).toBeGreaterThanOrEqual(1000);

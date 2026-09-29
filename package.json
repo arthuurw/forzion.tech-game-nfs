@@ -12,6 +12,7 @@
   },
   "scripts": {
     "test": "vitest run",
+    "test:quick": "vitest run --tags-filter=!slow",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",

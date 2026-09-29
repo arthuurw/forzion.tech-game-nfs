@@ -9,18 +9,18 @@ Plan: `.specs/features/test-hardening/plan.md`
 
 ### S1 - suíte unitária estável sob carga · 6 files · 60 KB · ~15k
 
-**C1** - Todo teste de `tests/unit` e de `tests/physics` sem timeout próprio roda com `task.timeout` = 30000 ms (AC 1)
+**C1** - ✅ Todo teste de `tests/unit` e de `tests/physics` sem timeout próprio roda com `task.timeout` = 30000 ms (AC 1)
 Proof: `npx vitest run tests/unit/testConfig.test.ts -t "unit tests run with a 30 s timeout"`
 Proof: `npx vitest run tests/physics/testConfig.test.ts -t "physics tests run with a 30 s timeout"`
 
-**C2** - Com a máquina ociosa, nenhum teste de `tests/unit` leva mais que 3000 ms no relatório JSON do vitest (AC 2)
+**C2** - ✅ Com a máquina ociosa, nenhum teste de `tests/unit` leva mais que 3000 ms no relatório JSON do vitest (AC 2)
 Proof: `npx vitest run tests/unit --reporter=json --outputFile=test-results/unit-durations.json && node tests/tooling/max-duration.mjs test-results/unit-durations.json 3000`
 
-**C3** - `npm run test:quick` sai com 0, e a lista de testes que ele roda não tem `each opponent finishes every race in time` (AC 3, door 2)
+**C3** - ✅ `npm run test:quick` sai com 0, e a lista de testes que ele roda não tem `each opponent finishes every race in time` (AC 3, door 2)
 Proof: `npm run test:quick`
 Proof: `npx vitest list --tags-filter="!slow"` sem nenhuma linha com `each opponent finishes every race in time` (`node tests/tooling/list-has.mjs --tags-filter="!slow" --absent "each opponent finishes every race in time"`)
 
-**C4** - `npm test` continua listando `each opponent finishes every race in time`, com o total de testes de antes, menos os que a C25 remove, mais os que esta feature cria (AC 4)
+**C4** - ✅ `npm test` continua listando `each opponent finishes every race in time`, com o total de testes de antes, menos os que a C25 remove, mais os que esta feature cria (AC 4)
 Proof: `node tests/tooling/list-has.mjs --present "each opponent finishes every race in time"`
 
 ### S2 - e2e no checkout certo e com suíte curta · 12 files · 180 KB · ~45k
@@ -64,7 +64,7 @@ Proof: `npx vitest run tests/unit/inputManager.test.ts -t "keyup clears and pres
 Proof: `npx vitest run tests/unit/aiDriver.test.ts -t "stuck detector thresholds and target"`
 
 **C17** - No teste de física do oponente travado, o reset acontece a ≥ 3.9 s e ≤ 4.1 s do instante em que parou (AC 13)
-Proof: `npx vitest run tests/physics/raceAi.test.ts -t "stuck opponent resets to its last gate"`
+Proof: `npx vitest run tests/physics/raceAi.test.ts -t "stuck opponent is reset to its last gate"`
 
 **C18** - `yawAssistTorque(SPEC, 0.3, 10, 0, 2, INERTIA)` = 5000 ± 1e-6, como linha da tabela (AC 14)
 Proof: `npx vitest run tests/unit/yawAssist.test.ts -t "yaw assist torque follows the target yaw rate"`
