@@ -139,7 +139,7 @@ test.describe('drive', () => {
   });
 
   // car-handling C33 (Surface, AC 6)
-  test('car debug exposes handling state', async ({ page }) => {
+  test('car debug exposes handling state', { tag: '@smoke' }, async ({ page }) => {
     const info = await page.evaluate(() => {
       const car = (window as any).__game.car;
       return {
@@ -177,7 +177,7 @@ test.describe('drive', () => {
   });
 
   // C11 (AC 9)
-  test('reset puts car upright', async ({ page }) => {
+  test('reset puts car upright', { tag: '@smoke' }, async ({ page }) => {
     await page.evaluate(() => (window as any).__game.car.setRotation({ x: 0, y: 0, z: 1, w: 0 }));
     await advanceSim(page, 0.2);
     const before = await position(page);

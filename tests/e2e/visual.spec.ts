@@ -452,7 +452,7 @@ test.describe('visual - S5 pós', () => {
   });
 
   // C31 (door 5)
-  test('low quality profile end to end', async ({ page }) => {
+  test('low quality profile end to end', { tag: '@smoke' }, async ({ page }) => {
     await open(page, '?quality=low');
     const s = await page.evaluate(() => ({
       ready: (window as any).__game.ready,
@@ -510,7 +510,7 @@ test.describe('facade-glint', () => {
   });
 
   // C5: antialiasing de especular ligado por padrão, logo depois de ready e antes de qualquer sonda
-  test('specular antialiasing on by default', async ({ page }) => {
+  test('specular antialiasing on by default', { tag: '@smoke' }, async ({ page }) => {
     await open(page);
     expect(await page.evaluate(() => (window as any).__game.materials.facadeSpecularAA)).toBe(true);
   });

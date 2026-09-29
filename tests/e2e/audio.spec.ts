@@ -13,7 +13,7 @@ test.describe('audio', () => {
   });
 
   // free-roam-city C35 (AC 27)
-  test('first keypress starts audio', async ({ page }) => {
+  test('first keypress starts audio', { tag: '@smoke' }, async ({ page }) => {
     expect(await page.evaluate(() => (window as any).__game.audio.state)).toBe('idle');
     await page.keyboard.press('KeyW');
     await page.waitForFunction(() => (window as any).__game.audio.state === 'running');
@@ -56,7 +56,7 @@ test.describe('audio', () => {
   });
 
   // engine-sound C4 (supersede free-roam-city C46) - grafo descrito pelas propriedades reais dos nós
-  test('synthesized audio graph', async ({ page }) => {
+  test('synthesized audio graph', { tag: '@smoke' }, async ({ page }) => {
     await startAudio(page);
     const graph = await page.evaluate(() => (window as any).__game.audio.graph);
     // fontes: oscilador de explosões (onda custom a 33.33 Hz = 1000 rpm / 30), sub uma oitava abaixo, ruído marrom em loop

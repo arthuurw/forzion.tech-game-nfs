@@ -88,7 +88,7 @@ test.describe('races', () => {
   });
 
   // C10 (AC 8)
-  test('prompt appears at the marker', async ({ page }) => {
+  test('prompt appears at the marker', { tag: '@smoke' }, async ({ page }) => {
     await place(page, await nearMarker(page, 'circuito-centro', 5));
     expect(await shown(page, '#race-prompt')).toBe(true);
     expect(await page.textContent('#race-prompt')).toBe('ENTER · Circuito Centro');
@@ -381,7 +381,7 @@ test.describe('block-life-extras - pintura e provas da races', () => {
   });
 
   // C4 (AC 4)
-  test('opponent material is white and body color is the paint', async ({ page }) => {
+  test('opponent material is white and body color is the paint', { tag: '@smoke' }, async ({ page }) => {
     await startRace(page, 'circuito-centro', false);
     const ops = (await race(page)).opponents as Array<{ index: number; paint: string; bodyColor: string; materialColor: string }>;
     expect(ops).toHaveLength(3);

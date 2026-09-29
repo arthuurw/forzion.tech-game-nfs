@@ -30,7 +30,7 @@ test.describe('hud', () => {
   });
 
   // C32 (AC 25)
-  test('webgl2 missing shows error overlay', async ({ page }) => {
+  test('webgl2 missing shows error overlay', { tag: '@smoke' }, async ({ page }) => {
     await page.addInitScript(() => {
       const original = HTMLCanvasElement.prototype.getContext;
       HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, type: string, ...rest: unknown[]) {
@@ -96,7 +96,7 @@ test.describe('hud - rodada 2', () => {
   });
 
   // C42 (AC 23) - o canvas real do minimapa tem as estradas e o carro desenhados (city-terrain C41)
-  test('minimap draws roads and car', async ({ page }) => {
+  test('minimap draws roads and car', { tag: '@smoke' }, async ({ page }) => {
     await gotoGame(page);
     await page.waitForTimeout(200);
     const result = await page.evaluate(() => {

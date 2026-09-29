@@ -1,6 +1,6 @@
 // test-hardening C3/C4: confere se um teste aparece (ou não) na lista do vitest.
 // uso: node tests/tooling/list-has.mjs [--tags-filter=<expr>] (--present|--absent) "<nome do teste>"
-import { execFileSync } from 'node:child_process';
+import { execSync } from 'node:child_process';
 
 const args = process.argv.slice(2);
 const filter = args.find((a) => a.startsWith('--tags-filter='));
@@ -11,9 +11,8 @@ if (modeIdx < 0 || !args[modeIdx + 1]) {
 }
 const mode = args[modeIdx];
 const name = args[modeIdx + 1];
-const cli = ['vitest', 'list', '--json'];
-if (filter) cli.push(filter);
-const out = execFileSync('npx', cli, { encoding: 'utf8', shell: true, maxBuffer: 64 * 1024 * 1024 });
+const cmd = `npx vitest list --json${filter ? ` "${filter}"` : ''}`;
+const out = execSync(cmd, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 const list = JSON.parse(out.slice(out.indexOf('[')));
 const found = list.some((t) => t.name.endsWith(name));
 console.log(`${list.length} testes listados; "${name}" ${found ? 'presente' : 'ausente'}`);

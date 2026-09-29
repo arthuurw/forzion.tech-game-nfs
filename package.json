@@ -17,6 +17,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test:e2e": "playwright test",
+    "test:e2e:smoke": "playwright test --grep @smoke",
     "fetch:textures": "node scripts/fetch-textures.mjs"
   },
   "dependencies": {

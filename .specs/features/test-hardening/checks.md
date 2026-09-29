@@ -25,19 +25,19 @@ Proof: `node tests/tooling/list-has.mjs --present "each opponent finishes every 
 
 ### S2 - e2e no checkout certo e com suíte curta · 12 files · 180 KB · ~45k
 
-**C5** - Com um servidor já respondendo na porta e sem `E2E_REUSE`, `playwright test` sai com código ≠ 0, a saída contém `is already used` e nenhum teste roda (AC 5, door 2)
+**C5** - ✅ Com um servidor já respondendo na porta e sem `E2E_REUSE`, `playwright test` sai com código ≠ 0, a saída contém `is already used` e nenhum teste roda (AC 5, door 2)
 Proof: `node tests/tooling/e2e-reuse.mjs` (caso `without E2E_REUSE`)
 
-**C6** - Com `E2E_REUSE=1` e o servidor da porta de pé, o mesmo teste roda e sai com 0 (AC 6)
+**C6** - ✅ Com `E2E_REUSE=1` e o servidor da porta de pé, o mesmo teste roda e sai com 0 (AC 6)
 Proof: `node tests/tooling/e2e-reuse.mjs` (caso `with E2E_REUSE=1`)
 
-**C7** - Cada um dos 9 arquivos `tests/e2e/*.spec.ts` tem pelo menos 1 teste com `tag: '@smoke'`, e `test:e2e:smoke` é `playwright test --grep @smoke` (AC 7, door 2)
+**C7** - ✅ Cada um dos 9 arquivos `tests/e2e/*.spec.ts` tem pelo menos 1 teste com `tag: '@smoke'`, e `test:e2e:smoke` é `playwright test --grep @smoke` (AC 7, door 2)
 Proof: `npx vitest run tests/unit/testHygiene.test.ts -t "every e2e spec file has a smoke test"`
 
-**C8** - `npm run test:e2e:smoke` sai com 0 em até 10 min, com a máquina ociosa (AC 7)
+**C8** - ✅ `npm run test:e2e:smoke` sai com 0 em até 10 min, com a máquina ociosa (AC 7)
 Proof: `npm run test:e2e:smoke`, cronometrado, com duração e resultado anotados em `## Handoff`
 
-**C9** - `npx playwright test --list` lista ≥ 132 testes (AC 8)
+**C9** - ✅ `npx playwright test --list` lista ≥ 132 testes (AC 8)
 Proof: `npx playwright test --list`, linha `Total: N tests in 9 files`, N ≥ 132
 
 ### S3 - provas que pegam as regressões citadas · 14 files · 250 KB · ~60k
@@ -175,3 +175,5 @@ Cost: 5 arquivos de teste novos (`testConfig` ×2, `inputManager`, `chunkManager
 
 - S1 = 15k (vite.config 0.3 KB, testes de física e unitários regenerando o mundo, ~55 KB). S2 soma 45k (playwright.config, 9 specs com tag, ~180 KB lidos de passagem) e chega a 60k. S3 soma 60k (race.spec 20 KB, InputManager, aiDriver, yawAssist, ChunkManager, purity, effectsMath, hud/extras/render spec) e chega a 120k. S4 soma 10k (130k), S5 1k, S6 8k: total ~139k, abaixo do budget de 150k. Um builder só
 - Mechanism: one builder (cabe no budget, sem pergunta)
+- **C8, medida:** `npm run test:e2e:smoke` em 2026-09-29: 18 passed (3.6m), exit 0, 2 testes `@smoke` por arquivo de spec
+- **C9, medida:** `npx playwright test --list` → `Total: 132 tests in 9 files`

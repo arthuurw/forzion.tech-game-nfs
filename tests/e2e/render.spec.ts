@@ -55,7 +55,7 @@ test.describe('render', () => {
   });
 
   // C22 (AC 17)
-  test('neon emissive intensity at least 2', async ({ page }) => {
+  test('neon emissive intensity at least 2', { tag: '@smoke' }, async ({ page }) => {
     const m = await page.evaluate(() => (window as any).__game.materials);
     expect(m.windowEmissiveIntensity).toBeGreaterThanOrEqual(2);
     // visual-upgrade C29: com o flicker ativo os 4 letreiros continuam >= 2.0
@@ -73,7 +73,7 @@ test.describe('render', () => {
   });
 
   // C24 (AC 19)
-  test('bloom pass and ACES tone mapping', async ({ page }) => {
+  test('bloom pass and ACES tone mapping', { tag: '@smoke' }, async ({ page }) => {
     const info = await page.evaluate(() => {
       const g = (window as any).__game;
       return { passes: g.composer.passes, bloomEnabled: g.composer.bloomEnabled, aces: g.toneMappingIsACES };
