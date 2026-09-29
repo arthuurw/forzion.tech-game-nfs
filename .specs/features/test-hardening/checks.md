@@ -20,8 +20,8 @@ Proof: `npx vitest run tests/unit --reporter=json --outputFile=test-results/unit
 Proof: `npm run test:quick`
 Proof: `npx vitest list --tags-filter="!slow"` sem nenhuma linha com `each opponent finishes every race in time` (`node tests/tooling/list-has.mjs --tags-filter="!slow" --absent "each opponent finishes every race in time"`)
 
-**C4** - ✅ `npm test` continua listando `each opponent finishes every race in time`, com 212 testes: os 202 de antes, menos os 6 do gerador antigo que a C26 remove, mais os 16 que esta feature cria (AC 4; corrigido na rodada 2: dizia C25 e não dava o número)
-Proof: `node tests/tooling/list-has.mjs --present "each opponent finishes every race in time"` (a saída dá o total listado, 212)
+**C4** - ✅ A lista do `npm test` é exatamente a do `test:quick` mais a dos testes com a tag `slow`, sem sobra, falta ou repetição, e `each opponent finishes every race in time` está entre os `slow` (AC 4; rodada 3: a rodada 2 escrevia um total à mão, 212, que ficou velho no mesmo commit; a afirmação agora é a partição, que não envelhece)
+Proof: `node tests/tooling/suite-split.mjs` (imprime `npm test: N · test:quick: N−k · slow: k`)
 
 ### S2 - e2e no checkout certo e com suíte curta · 12 files · 180 KB · ~45k
 
