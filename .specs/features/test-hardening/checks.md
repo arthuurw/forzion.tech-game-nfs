@@ -51,36 +51,36 @@ Proof: `npx playwright test tests/e2e/race.spec.ts -g "hud shows time lap and po
 **C12** - Depois da `sprint-cruzada` por `crossNextGate` sem oponente chegado: linha 1 do resultado = `VOCÊ`, linhas 2-4 com tempo `--:--.--` (AC 11)
 Proof: `npx playwright test tests/e2e/race.spec.ts -g "finishing a sprint shows the results"`
 
-**C13** - `InputManager` num alvo falso: `keydown` com `repeat: true` não muda o estado nem chama o handler de `onPress` (AC 12)
+**C13** - ✅ `InputManager` num alvo falso: `keydown` com `repeat: true` não muda o estado nem chama o handler de `onPress` (AC 12)
 Proof: `npx vitest run tests/unit/inputManager.test.ts -t "repeat keydown changes nothing"`
 
-**C14** - `onFirstKey` roda 1 vez em 3 `keydown` de teclas distintas (AC 12)
+**C14** - ✅ `onFirstKey` roda 1 vez em 3 `keydown` de teclas distintas (AC 12)
 Proof: `npx vitest run tests/unit/inputManager.test.ts -t "first key handler runs once"`
 
-**C15** - `keyup` de W depois do `keydown` de W deixa `throttle` = false, e o handler de `onPress('KeyR')` roda 1 vez por pressão, 2 vezes em 2 pressões (AC 12)
+**C15** - ✅ `keyup` de W depois do `keydown` de W deixa `throttle` = false, e o handler de `onPress('KeyR')` roda 1 vez por pressão, 2 vezes em 2 pressões (AC 12)
 Proof: `npx vitest run tests/unit/inputManager.test.ts -t "keyup clears and press handler runs per press"`
 
-**C16** - `checkStuck` com 4.9 m de progresso: `false` em t = 3.99 s, `true` em t = 4.0 s (AC 13)
+**C16** - ✅ `checkStuck` com 4.9 m de progresso: `false` em t = 3.99 s, `true` em t = 4.0 s (AC 13)
 Proof: `npx vitest run tests/unit/aiDriver.test.ts -t "stuck detector thresholds and target"`
 
-**C17** - No teste de física do oponente travado, o reset acontece a ≥ 3.9 s e ≤ 4.1 s do instante em que parou (AC 13)
+**C17** - ✅ No teste de física do oponente travado, o reset acontece a ≥ 3.9 s e ≤ 4.1 s do instante em que parou (AC 13)
 Proof: `npx vitest run tests/physics/raceAi.test.ts -t "stuck opponent is reset to its last gate"`
 
-**C18** - `yawAssistTorque(SPEC, 0.3, 10, 0, 2, INERTIA)` = 5000 ± 1e-6, como linha da tabela (AC 14)
+**C18** - ✅ `yawAssistTorque(SPEC, 0.3, 10, 0, 2, INERTIA)` = 5000 ± 1e-6, como linha da tabela (AC 14)
 Proof: `npx vitest run tests/unit/yawAssist.test.ts -t "yaw assist torque follows the target yaw rate"`
 
 **C19** - `ChunkManager` com 2 chunks faltando e 2 `update` antes de `endFrame()`: `maxBuildsInOneFrame` = 2; com 1 `update` por `endFrame()`: 1 (AC 15)
 Proof: `npx vitest run tests/unit/chunkManager.test.ts -t "max builds counts builds between frames"`
 Proof: `npx playwright test tests/e2e/world.spec.ts -g "streams chunks around the car"`
 
-**C20** - A trava de pureza acha `three` importado indiretamente: um módulo de fixture que importa um arquivo local que importa `three` é marcado; um que só faz `import type` de um arquivo que importa `three` não é (AC 16)
+**C20** - ✅ A trava de pureza acha `three` importado indiretamente: um módulo de fixture que importa um arquivo local que importa `three` é marcado; um que só faz `import type` de um arquivo que importa `three` não é (AC 16)
 Proof: `npx vitest run tests/unit/purity.test.ts -t "transitive imports are followed"`
 Proof: `npx vitest run tests/unit/purity.test.ts -t "pure modules do not import three or rapier"`
 
-**C21** - `effect constants` prova comportamento: 1 passo derrapando soma exatamente 4 partículas de fumaça; uma partícula está viva a 0.79 s e morta a 0.81 s; impulso 3001 solta 40 faíscas e 2999 nenhuma. Nenhum `expect(CONST).toBe(literal)` sobra no teste (AC 17)
+**C21** - ✅ `effect constants` prova comportamento: 1 passo derrapando soma exatamente 4 partículas de fumaça; uma partícula está viva a 0.79 s e morta a 0.81 s; impulso 3001 solta 40 faíscas e 2999 nenhuma. Nenhum `expect(CONST).toBe(literal)` sobra no teste (AC 17)
 Proof: `npx vitest run tests/unit/effectsMath.test.ts -t "effect constants"`
 
-**C22** - `cornerAssist.test.ts` não tem mais as asserções de aritmética com literais das linhas 19-20, e `drivetrain.test.ts` não tem a variável `t` que só era conferida `> 0` (AC 17)
+**C22** - ✅ `cornerAssist.test.ts` não tem mais as asserções de aritmética com literais das linhas 19-20, e `drivetrain.test.ts` não tem a variável `t` que só era conferida `> 0` (AC 17)
 Proof: `npx vitest run tests/unit/testHygiene.test.ts -t "no literal-only assertions left"`
 
 **C23** - `tests/e2e` tem 0 chamadas a `waitForTimeout` e 0 `screenshot` com `path` fixo em `test-results/` (AC 18, AC 20)
@@ -99,7 +99,7 @@ Proof: `npx playwright test tests/e2e/race.spec.ts -g "placing an opponent does 
 Proof: `npx vitest run tests/unit/testHygiene.test.ts -t "old city generator is gone"`
 Proof: `npx vitest run tests/unit/cityGenerator.test.ts -t "mulberry32 is deterministic"`
 
-**C27** - `npx tsc --noEmit -p . --noUnusedLocals --noUnusedParameters` sai com 0 e 0 erros (AC 23)
+**C27** - ✅ `npx tsc --noEmit -p . --noUnusedLocals --noUnusedParameters` sai com 0 e 0 erros (AC 23)
 Proof: `npx tsc --noEmit -p . --noUnusedLocals --noUnusedParameters`
 
 ### S5 - CI no repositório · 1 file · 1 KB · ~1k

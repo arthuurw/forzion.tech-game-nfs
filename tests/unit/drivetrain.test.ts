@@ -321,12 +321,10 @@ describe('drivetrain - engine and gearbox', () => {
     expect(back.state.rpm).toBeGreaterThan(spec.idleRpm);
     expect(back.cmd.engineForce).toBeGreaterThan(0);
     expect(back.cmd.brakeFront + back.cmd.brakeRear).toBe(0);
-    const t = (back.state.rpm - spec.idleRpm) / (spec.redlineRpm - spec.idleRpm);
     // mesma lei do freio-motor para frente: proporcional ao giro acima da marcha lenta
     const fwd = stepDrivetrain(spec, settled({ gear: 1 }), idle, speedFor(1, back.state.rpm), DT).cmd.engineForce;
     const ratio = spec.reverseRatio / spec.gearRatios[0]!;
     expect(back.cmd.engineForce).toBeCloseTo(-fwd * ratio, 6);
-    expect(t).toBeGreaterThan(0);
     // ré engatada rolando para frente (descida): o freio-motor segura contra o movimento, mesma magnitude
     const ahead = stepDrivetrain(spec, settled({ gear: -1 }), idle, 20 / 3.6, DT);
     expect(ahead.state.gear).toBe(-1);

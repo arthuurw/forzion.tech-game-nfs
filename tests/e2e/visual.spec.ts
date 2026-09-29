@@ -9,8 +9,6 @@ async function open(page: Page, query = ''): Promise<void> {
   await page.waitForFunction(() => (window as any).__game?.ready === true, null, { timeout: 30_000 });
 }
 
-const g = (page: Page) => page.evaluate(() => (window as any).__game);
-
 test.describe('visual - S2 materiais', () => {
   // C1 (AC 1, door 1)
   test('texture sets are served and loaded', async ({ page }) => {

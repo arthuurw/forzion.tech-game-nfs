@@ -14,14 +14,12 @@ const INERTIA = 2000;
 const TOL = 1e-6;
 
 describe('yaw assist', () => {
-  // C7 (AC 7, door 1) - table-driven over the 10 rows
+  // C7 (AC 7, door 1) - table-driven over the 10 rows (the tenth, two wheels, came with test-hardening C18)
   it('yaw assist torque follows the target yaw rate', () => {
     const freeTarget = Math.min((10 * Math.tan(0.1)) / 2.6, (1.1 * 9.81) / 10);
     const reverseTarget = (-5 * Math.tan(0.1)) / 2.6;
     // os valores arredondados da tabela da C7
     expect(freeTarget).toBeCloseTo(0.3859, 4);
-    expect((1.1 * 9.81) / 10).toBeCloseTo(1.0791, 4);
-    expect(4 * 2000 * ((1.1 * 9.81) / 10)).toBeCloseTo(8632.8, 1);
     expect(reverseTarget).toBeCloseTo(-0.19295, 5);
 
     const rows: Array<[string, number, number, number, number, number]> = [
@@ -36,6 +34,8 @@ describe('yaw assist', () => {
       ['lateral g cap below max torque', 0.3, 10, 0.5, 4, 4 * 2000 * ((1.1 * 9.81) / 10 - 0.5)],
       // exatamente 2 m/s já tem ajuda
       ['exactly 2 m/s', 0.3, 2, 0, 4, 4 * 2000 * ((2 * Math.tan(0.3)) / 2.6)],
+      // test-hardening C18 (AC 14): com 2 rodas no chão o torque é o mesmo do caso limitado, sem escala por roda
+      ['two wheels on the ground', 0.3, 10, 0, 2, 5000],
     ];
     expect(rows[0]![5]).toBeCloseTo(3087.2, 1);
     expect(rows[4]![5]).toBeCloseTo(-1543.6, 1);
@@ -46,8 +46,5 @@ describe('yaw assist', () => {
       expect(Math.abs(t - expected), `${name}: got ${t}, expected ${expected}`).toBeLessThanOrEqual(TOL);
     }
 
-    const twoWheels = yawAssistTorque(SPEC, 0.3, 10, 0, 2, INERTIA);
-    expect(twoWheels).not.toBe(0);
-    expect(Number.isFinite(twoWheels)).toBe(true);
   });
 });

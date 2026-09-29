@@ -9,7 +9,7 @@ export class Minimap {
   private readonly ctx: CanvasRenderingContext2D;
 
   constructor(
-    private readonly canvas: HTMLCanvasElement,
+    canvas: HTMLCanvasElement,
     private readonly network: RoadNetwork,
   ) {
     canvas.width = MINIMAP_SIZE_PX;

@@ -54,6 +54,16 @@ describe('ai driver', () => {
     };
     expect(run(4.9)).toBe(true);
     expect(run(5.1)).toBe(false);
+    // test-hardening C16 (AC 13): os dois lados da janela de 4 s, com o mesmo progresso de 4.9 m
+    const at = (t: number) => {
+      const ai = createAiState();
+      ai.progress = 100;
+      restartStuck(ai, 0);
+      ai.progress = 104.9;
+      return checkStuck(ai, t, 0);
+    };
+    expect(at(3.99)).toBe(false);
+    expect(at(4.0)).toBe(true);
     // na água dispara na hora, sem esperar a janela
     const wet = createAiState();
     expect(checkStuck(wet, 0.5, -1.51)).toBe(true);

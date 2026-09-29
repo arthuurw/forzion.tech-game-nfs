@@ -31,8 +31,10 @@ const SIDEWALK_HEIGHT = 0.12;
  */
 export class ChunkManager {
   readonly loaded = new Map<number, THREE.Group>();
+  /** maior número de builds entre dois `endFrame` (door 7: no máximo 1 por quadro) */
   maxBuildsInOneFrame = 0;
   builds = 0;
+  private buildsAtFrameStart = 0;
   /**
    * Últimos chunks descartados: quantas geometrias cada um tinha e quantas já
    * emitiram o evento `dispose` do three (door 7; lido por C37).
@@ -76,13 +78,18 @@ export class ChunkManager {
       });
       this.loaded.delete(id);
     }
-    this.maxBuildsInOneFrame = Math.max(this.maxBuildsInOneFrame, plan.build.length);
     for (const id of plan.build) {
       const group = this.build(id);
       this.scene.add(group);
       this.loaded.set(id, group);
       this.builds++;
     }
+  }
+
+  /** Fecha o quadro: guarda quantos builds aconteceram desde o `endFrame` anterior. */
+  endFrame(): void {
+    this.maxBuildsInOneFrame = Math.max(this.maxBuildsInOneFrame, this.builds - this.buildsAtFrameStart);
+    this.buildsAtFrameStart = this.builds;
   }
 
   /**
