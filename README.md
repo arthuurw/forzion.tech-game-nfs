@@ -3,8 +3,8 @@
 Jogo de corrida de rua noturno que roda direto no navegador, inspirado em Need for Speed
 Underground 2. A cidade inteira é gerada por código a partir de uma semente, e o carro tem física
 de verdade: suspensão, câmbio de 6 marchas, aderência dos pneus e duas ajudas arcade para fazer
-curva em alta sem capotar. É um experimento em andamento de quem está aprendendo 3D: por enquanto
-dá para dirigir livre pela cidade; as corridas ainda não existem.
+curva em alta sem capotar. É um experimento em andamento de quem está aprendendo 3D: dá para
+dirigir livre pela cidade e disputar quatro corridas contra oponentes com IA.
 
 ![Centro da cidade à noite, carro acelerando entre prédios com neon](docs/screenshots/01-centro-acelerando.jpg)
 
@@ -30,7 +30,9 @@ Na primeira tecla o som liga (o navegador só libera áudio depois de uma intera
 | `S` | frear; parado, dá ré |
 | `A` / `D` | virar |
 | `Espaço` | freio de mão |
-| `R` | reposicionar o carro |
+| `R` | reposicionar o carro; na corrida, volta ao último portão |
+| `Enter` | entrar na corrida, parado perto do marcador |
+| `Esc` | sair da corrida |
 | `M` | mudo |
 
 Em máquina mais fraca, abra com `?quality=low` (`http://localhost:5173/?quality=low`): desliga a
@@ -41,8 +43,10 @@ Outros comandos:
 ```bash
 npm run build      # checa os tipos e gera o build de produção em dist/
 npm run preview    # serve o build de produção
-npm test           # testes unitários e de física (vitest)
-npm run test:e2e   # testes no navegador (Playwright + Chromium)
+npm test                # testes unitários e de física (vitest)
+npm run test:quick      # os mesmos, sem os testes lentos (segundos, para iterar)
+npm run test:e2e        # testes no navegador (Playwright + Chromium, ~1 h)
+npm run test:e2e:smoke  # 2 testes de navegador por arquivo (minutos, para iterar)
 ```
 
 ## O que já existe
@@ -52,7 +56,12 @@ npm run test:e2e   # testes no navegador (Playwright + Chromium)
   lotes ao longo delas. A mesma semente (`1337`) gera sempre o mesmo mapa. As malhas carregam por
   chunks de 512 m conforme o carro anda.
 - **Miolo das quadras:** o espaço entre os prédios tem quintais, piscinas, árvores balançando ao
-  vento, vagalumes, obras com guindaste de luz piscando e pedestres andando.
+  vento, vagalumes, obras com guindaste de luz piscando, pedestres andando, gatos, vapor saindo de
+  dutos, holofotes varrendo o céu e estacionamentos.
+- **Trem elevado:** um trem dá a volta no centro sobre um viaduto que acompanha as avenidas.
+- **Corridas:** dois circuitos e dois sprints de ponto a ponto, com portões, cronômetro, posição e
+  três oponentes que dirigem pelo mesmo controle do jogador. O traçado de cada corrida sai das
+  ruas geradas, não de coordenadas escritas à mão.
 - **Carro com física real:** um veículo por raycast do Rapier, com suspensão por roda, câmbio
   automático de 6 marchas, freio-motor, freio de mão com derrapagem e rolagem da carroceria nas
   curvas. Duas ajudas arcade deixam o carro ágil: um torque que faz ele apontar rápido para a curva
@@ -60,7 +69,7 @@ npm run test:e2e   # testes no navegador (Playwright + Chromium)
 - **Visual noturno:** materiais PBR, neon, bloom, oclusão de ambiente, reflexo molhado da rua,
   chuva, fumaça, faíscas, marcas de pneu e uma câmera que inclina junto com o carro.
 - **Som sintetizado:** o ronco do motor é gerado na hora com Web Audio, sem arquivos de áudio.
-- **HUD:** velocímetro, marcha, conta-giros e minimapa.
+- **HUD:** velocímetro, marcha, conta-giros e minimapa; na corrida, tempo, volta e posição.
 
 ## Tecnologias
 
@@ -83,8 +92,10 @@ src/
 │   ├── terrain/    heightfield e ruído
 │   ├── roads/      rede de ruas, malhas e pontes
 │   ├── lots/       lotes e prédios
-│   └── interiors/  miolo das quadras: quintais, árvores, obras, pedestres
+│   ├── interiors/  miolo das quadras: quintais, árvores, obras, pedestres, gatos, vapor
+│   └── rail/       trem elevado: traçado e cena
 ├── vehicle/   carro, ficha técnica (carSpec), câmbio e motor, ajudas arcade, efeitos
+├── race/      corridas: traçados, portões, cronômetro, oponentes com IA
 ├── camera/    câmera de perseguição
 ├── hud/       velocímetro e minimapa
 ├── audio/     motor sintetizado
@@ -92,7 +103,8 @@ src/
 tests/
 ├── unit/      lógica pura
 ├── physics/   dirigibilidade medida com o Rapier real, sem navegador
-└── e2e/       integração no navegador
+├── e2e/       integração no navegador
+└── tooling/   scripts que provam as regras da própria suíte
 ```
 
 A lógica pura (sem importar `three` nem o Rapier) fica em arquivos separados e é testada com
@@ -114,14 +126,17 @@ Cada funcionalidade passa por quatro etapas, registradas em [`.specs/`](.specs/)
 4. **Verificação** (`verification.md`): um agente que não escreveu o código confere cada check e
    injeta defeitos de propósito para provar que os testes pegam.
 
+Uma mudança pequena, sem decisão difícil de desfazer, pode pular o plano: fica só com o
+`checks.md`, que abre com uma seção `## Intent` (foi o caso da `engine-sound` e da `facade-glint`).
+
 O código foi escrito em parceria com IA (Claude Code). Decisões de arquitetura e o roadmap ficam em
 [`.specs/STATE.md`](.specs/STATE.md).
 
 ## Roadmap
 
-1. ~~Cidade livre~~: carro, cidade procedural, HUD, som, terreno, dirigibilidade, miolo das quadras
-   (concluído). Próximo extra: vapor de dutos, holofotes, estacionamentos, gatos e trem.
-2. Corridas: checkpoints, cronômetro, sprint e circuito, oponentes com IA.
+1. ~~Cidade livre~~: carro, cidade procedural, HUD, som, terreno, dirigibilidade, miolo das quadras,
+   vapor de dutos, holofotes, estacionamentos, gatos e trem (concluído).
+2. ~~Corridas~~: checkpoints, cronômetro, sprint e circuito, oponentes com IA (concluído).
 3. Garagem e tuning visual: pintura, rodas, vinil, body kit, neon embaixo do carro.
 4. Tuning de performance: motor, turbo e pneus mudando a física.
 5. Carreira: progressão, dinheiro, desbloqueios, save local.

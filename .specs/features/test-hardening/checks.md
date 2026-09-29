@@ -42,13 +42,13 @@ Proof: `npx playwright test --list`, linha `Total: N tests in 9 files`, N ≥ 13
 
 ### S3 - provas que pegam as regressões citadas · 14 files · 250 KB · ~60k
 
-**C10** - Na `sprint-cruzada` em `racing`, com o carro do jogador posto 15 m antes de `gates[0]` no heading do portão e W segurado, `race.player.lastGate` vira 0 em ≤ 5 s de simulação, sem chamar `crossNextGate` (AC 9)
+**C10** - ✅ Na `sprint-cruzada` em `racing`, com o carro do jogador posto 15 m antes de `gates[0]` no heading do portão e W segurado, `race.player.lastGate` vira 0 em ≤ 5 s de simulação, sem chamar `crossNextGate` (AC 9)
 Proof: `npx playwright test tests/e2e/race.spec.ts -g "player crosses a gate by driving"`
 
-**C11** - Parado no grid 1.5 s depois do GO no `circuito-centro`: `race.player.position` = 4 e `#race-pos` = `POS 4/4` (AC 10)
+**C11** - ✅ Parado no grid 1.5 s depois do GO no `circuito-centro`: `race.player.position` = 4 e `#race-pos` = `POS 4/4` (AC 10)
 Proof: `npx playwright test tests/e2e/race.spec.ts -g "hud shows time lap and position"`
 
-**C12** - Depois da `sprint-cruzada` por `crossNextGate` sem oponente chegado: linha 1 do resultado = `VOCÊ`, linhas 2-4 com tempo `--:--.--` (AC 11)
+**C12** - ✅ Depois da `sprint-cruzada` por `crossNextGate` sem oponente chegado: linha 1 do resultado = `VOCÊ`, linhas 2-4 com tempo `--:--.--` (AC 11)
 Proof: `npx playwright test tests/e2e/race.spec.ts -g "finishing a sprint shows the results"`
 
 **C13** - ✅ `InputManager` num alvo falso: `keydown` com `repeat: true` não muda o estado nem chama o handler de `onPress` (AC 12)
@@ -69,9 +69,9 @@ Proof: `npx vitest run tests/physics/raceAi.test.ts -t "stuck opponent is reset 
 **C18** - ✅ `yawAssistTorque(SPEC, 0.3, 10, 0, 2, INERTIA)` = 5000 ± 1e-6, como linha da tabela (AC 14)
 Proof: `npx vitest run tests/unit/yawAssist.test.ts -t "yaw assist torque follows the target yaw rate"`
 
-**C19** - `ChunkManager` com 2 chunks faltando e 2 `update` antes de `endFrame()`: `maxBuildsInOneFrame` = 2; com 1 `update` por `endFrame()`: 1 (AC 15)
+**C19** - ✅ `ChunkManager` com 2 chunks faltando e 2 `update` antes de `endFrame()`: `maxBuildsInOneFrame` = 2; com 1 `update` por `endFrame()`: 1 (AC 15)
 Proof: `npx vitest run tests/unit/chunkManager.test.ts -t "max builds counts builds between frames"`
-Proof: `npx playwright test tests/e2e/world.spec.ts -g "streams chunks around the car"`
+Proof: `npx playwright test tests/e2e/world.spec.ts -g "chunks stream around the car"`
 
 **C20** - ✅ A trava de pureza acha `three` importado indiretamente: um módulo de fixture que importa um arquivo local que importa `three` é marcado; um que só faz `import type` de um arquivo que importa `three` não é (AC 16)
 Proof: `npx vitest run tests/unit/purity.test.ts -t "transitive imports are followed"`
@@ -83,19 +83,19 @@ Proof: `npx vitest run tests/unit/effectsMath.test.ts -t "effect constants"`
 **C22** - ✅ `cornerAssist.test.ts` não tem mais as asserções de aritmética com literais das linhas 19-20, e `drivetrain.test.ts` não tem a variável `t` que só era conferida `> 0` (AC 17)
 Proof: `npx vitest run tests/unit/testHygiene.test.ts -t "no literal-only assertions left"`
 
-**C23** - `tests/e2e` tem 0 chamadas a `waitForTimeout` e 0 `screenshot` com `path` fixo em `test-results/` (AC 18, AC 20)
+**C23** - ✅ `tests/e2e` tem 0 chamadas a `waitForTimeout` e 0 `screenshot` com `path` fixo em `test-results/` (AC 18, AC 20)
 Proof: `npx vitest run tests/unit/testHygiene.test.ts -t "e2e has no fixed clock waits nor fixed screenshot paths"`
 
-**C24** - Com a contagem presa em `countdown` (hook DEV que congela a sessão), o teste da contagem falha com a mensagem `countdown não terminou em 4 s`; sem o hook, passa (AC 19)
+**C24** - ✅ Com a contagem presa em `countdown` (hook DEV que congela a sessão), o teste da contagem falha com a mensagem `countdown não terminou em 4 s`; sem o hook, passa (AC 19)
 Proof: `npx playwright test tests/e2e/race.spec.ts -g "countdown holds every car"`
 Proof: `npx playwright test tests/e2e/race.spec.ts -g "countdown deadline message"`
 
-**C25** - Depois de `race.placeOpponent(i, …)` a 2 m depois de um portão que ele ainda não cruzou, 0.2 s de simulação não mudam o `lastGate` dele, e a posição anterior guardada (`race.opponents[i].prev`) é a posta, ±0.01 m (AC 21)
+**C25** - ✅ Depois de `race.placeOpponent(i, …)` a 2 m depois de um portão que ele ainda não cruzou, 0.2 s de simulação não mudam o `lastGate` dele, e a posição anterior guardada (`race.opponents[i].prev`) é a posta, ±0.01 m (AC 21)
 Proof: `npx playwright test tests/e2e/race.spec.ts -g "placing an opponent does not cross gates"`
 
 ### S4 - sem código morto verde · 5 files · 40 KB · ~10k
 
-**C26** - `src/` não tem `generateCity`, `streetsFor`, `lampsFor`, `laneMarksFor` nem `CITY_EXTENT`; `mulberry32`, `NEON_PALETTE`, `FACADE_TYPES` e `DEFAULT_SEED` continuam exportados de `src/world/CityGenerator.ts`, e o cabeçalho não fala mais em grade 8×8 nem em ±202 m (AC 22)
+**C26** - ✅ `src/` não tem `generateCity`, `streetsFor`, `lampsFor`, `laneMarksFor` nem `CITY_EXTENT`; `mulberry32`, `NEON_PALETTE`, `FACADE_TYPES` e `DEFAULT_SEED` continuam exportados de `src/world/CityGenerator.ts`, e o cabeçalho não fala mais em grade 8×8 nem em ±202 m (AC 22)
 Proof: `npx vitest run tests/unit/testHygiene.test.ts -t "old city generator is gone"`
 Proof: `npx vitest run tests/unit/cityGenerator.test.ts -t "mulberry32 is deterministic"`
 
@@ -104,19 +104,19 @@ Proof: `npx tsc --noEmit -p . --noUnusedLocals --noUnusedParameters`
 
 ### S5 - CI no repositório · 1 file · 1 KB · ~1k
 
-**C28** - `.github/workflows/ci.yml` dispara em `push` e `pull_request`, roda num job `ubuntu-latest` com Node 24 e tem, nesta ordem, os passos `npm ci`, `npm run build` e `npm test` (AC 24, door 1)
+**C28** - ✅ `.github/workflows/ci.yml` dispara em `push` e `pull_request`, roda num job `ubuntu-latest` com Node 24 e tem, nesta ordem, os passos `npm ci`, `npm run build` e `npm test` (AC 24, door 1)
 Proof: `npx vitest run tests/unit/testHygiene.test.ts -t "ci workflow runs build and unit tests"`
 Proof (go-live, depois do push autorizado): `gh run list --workflow ci --limit 1` com `completed success`
 
 ### S6 - documento que bate com o código · 4 files · 40 KB · ~8k
 
-**C29** - O README não contém `as corridas ainda não existem`; o item 2 do roadmap está marcado como concluído; "O que já existe" cita corridas e trem; a tabela de teclas tem `Enter` e `Esc`, e a linha do `R` cita o último portão (AC 25, AC 26)
+**C29** - ✅ O README não contém `as corridas ainda não existem`; o item 2 do roadmap está marcado como concluído; "O que já existe" cita corridas e trem; a tabela de teclas tem `Enter` e `Esc`, e a linha do `R` cita o último portão (AC 25, AC 26)
 Proof: `npx vitest run tests/unit/docs.test.ts -t "readme describes what exists"`
 
-**C30** - AGENTS.md, a árvore do README e a AD nova citam `race` e `world/rail`; a AD-004 está `superseded by AD-018`; a AD-018 é `active` e fica depois da AD-017 (AC 27, door 3)
+**C30** - ✅ AGENTS.md, a árvore do README e a AD nova citam `race` e `world/rail`; a AD-004 está `superseded by AD-018`; a AD-018 é `active` e fica depois da AD-017 (AC 27, door 3)
 Proof: `npx vitest run tests/unit/docs.test.ts -t "layout is the same in agents readme and state"`
 
-**C31** - No STATE.md: a linha da residuals tem `(concluída, verificada rodada 1)`; as linhas das ADs estão em ordem numérica crescente; "Resíduos conhecidos" não tem o bloco `races: pintura dos oponentes sai escura`. A doc de `Car.teleport` cita grid, reset de corrida (AD-015) e água. O README diz que uma mudança pequena sem door pode ter só `checks.md` com `## Intent` (AC 28, AC 29, AC 30)
+**C31** - ✅ No STATE.md: a linha da residuals tem `(concluída, verificada rodada 1)`; as linhas das ADs estão em ordem numérica crescente; "Resíduos conhecidos" não tem o bloco `races: pintura dos oponentes sai escura`. A doc de `Car.teleport` cita grid, reset de corrida (AD-015) e água. O README diz que uma mudança pequena sem door pode ter só `checks.md` com `## Intent` (AC 28, AC 29, AC 30)
 Proof: `npx vitest run tests/unit/docs.test.ts -t "state and docs are current"`
 
 ## Coverage
@@ -177,3 +177,10 @@ Cost: 5 arquivos de teste novos (`testConfig` ×2, `inputManager`, `chunkManager
 - Mechanism: one builder (cabe no budget, sem pergunta)
 - **C8, medida:** `npm run test:e2e:smoke` em 2026-09-29: 18 passed (3.6m), exit 0, 2 testes `@smoke` por arquivo de spec
 - **C9, medida:** `npx playwright test --list` → `Total: 132 tests in 9 files`
+- **Settled mid-build:** o plano dizia 10 arquivos de spec no AC 7; são 9 (`helpers.ts` não é spec). O plano foi corrigido e C7 já dizia 9
+- **Settled mid-build:** door 2a no plano. O vitest 5.0.2 tem tags nativas (`tags: ['slow']` e `--tags-filter=!slow`), que substituem a variável `SLOW`; no Windows o `cmd` do `npm run` não aceita `SLOW=0 comando`
+- **Settled mid-build:** os testes de determinismo precisam gerar o mundo duas vezes. A segunda geração foi para o `beforeAll` do arquivo (interiors, raceRoutes, roads), e o teste só compara. O teste dos carros estacionados juntava um `expect` por par carro×objeto e levava 3.0 s; virou uma lista de violações com um `expect(bad).toEqual([])`, com a mesma exigência
+- **Settled mid-build:** C21 prova os números pelo `Effects` real em node, com um canvas falso por `vi.stubGlobal('document', …)` só para a textura da partícula. A linha nova da yaw-assist (C18) foi para o fim da tabela, porque o teste lê `rows[7]` e `rows[8]` por índice
+- **Settled mid-build:** a regra do C22 é genérica (todo `expect(` só de literais em `tests/unit` e `tests/physics`) e pegou também 2 linhas de `yawAssist.test.ts` com o mesmo defeito, removidas
+- **Settled mid-build:** C24 usa um campo DEV `RaceController.holdCountdown` (hook `__game.race.holdCountdown`) para segurar a contagem; C25 expõe `Opponent.prev` e o método `Opponent.placeAt`, que o hook `placeOpponent` passou a usar
+- **Abandoned:** o primeiro log das e2e foi para `test-results/`, que o Playwright apaga ao iniciar; os logs de execução ficam fora do repositório

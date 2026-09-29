@@ -331,7 +331,10 @@ export class Car {
     this.sync();
   }
 
-  /** Só para testes e debug: coloca o carro em qualquer lugar, parado. */
+  /**
+   * Coloca o carro em qualquer lugar, parado. Caminho de jogo: grid da corrida e reset para o
+   * último portão (a única exceção de teleporte da AD-015), spawn e volta da água; também testes.
+   */
   teleport(x: number, y: number, z: number, heading: number): void {
     this.body.setTranslation({ x, y, z }, true);
     this.body.setRotation({ x: 0, y: Math.sin(heading / 2), z: 0, w: Math.cos(heading / 2) }, true);
