@@ -174,6 +174,12 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: test-hardening r1 gap 4 and r2 C4 - .specs/features/test-hardening/checks.md:23 (count 212 stale, 213 at HEAD) (checks)
 - last seen: 2026-09-29T20:35:41Z
 
+### L-028 - A claim about what an npm script runs owes a proof that runs or reads that script; a proof that retypes the script's flags survives any edit to the script.
+- signal: `surviving_mutant` · recurrence: 1 feature(s) · scope: `test-tooling` · harmful: 0
+- features: test-hardening
+- evidence: test-hardening r3 R3-F2 - package.json:15 test:quick -> vitest run survived tests/tooling/suite-split.mjs:14-16 and list-has.mjs:14 (C3, C4) (test-tooling)
+- last seen: 2026-09-29T20:45:22Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.

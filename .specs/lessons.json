@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 28,
+  "next_id": 29,
   "lessons": [
     {
       "id": "L-001",
@@ -493,6 +493,24 @@
       ],
       "created": "2026-09-29T20:35:41Z",
       "last_seen": "2026-09-29T20:35:41Z"
+    },
+    {
+      "id": "L-028",
+      "key": "surviving_mutant::a claim about what an npm script runs owes a proof that runs or reads that script a proof that retypes the script s flags survives any edit to the script",
+      "text": "A claim about what an npm script runs owes a proof that runs or reads that script; a proof that retypes the script's flags survives any edit to the script.",
+      "signal": "surviving_mutant",
+      "scope": "test-tooling",
+      "status": "candidate",
+      "features": [
+        "test-hardening"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "test-hardening r3 R3-F2 - package.json:15 test:quick -> vitest run survived tests/tooling/suite-split.mjs:14-16 and list-has.mjs:14 (C3, C4) (test-tooling)"
+      ],
+      "created": "2026-09-29T20:45:22Z",
+      "last_seen": "2026-09-29T20:45:22Z"
     }
   ]
 }
