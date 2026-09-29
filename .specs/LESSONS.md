@@ -150,6 +150,30 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: checks.md C17 C21 C31 (tests/e2e)
 - last seen: 2026-09-27T21:49:54Z
 
+### L-024 - Size a decision's coverage row from the branches in the code, and reconcile it with any branch list the checks' own evidence names; a shorter row hides a branch.
+- signal: `ac_gap` · recurrence: 1 feature(s) · scope: `tests` · harmful: 0
+- features: test-hardening
+- evidence: test-hardening r1 gap 1 - src/core/InputManager.ts:34 (Space branch unproven) (tests)
+- last seen: 2026-09-29T20:35:41Z
+
+### L-025 - A claim naming several literals owes one assertion per literal; asserting one half of a compound phrase leaves the other half free to drift.
+- signal: `ac_gap` · recurrence: 1 feature(s) · scope: `docs` · harmful: 0
+- features: test-hardening
+- evidence: test-hardening r1 gap 2 - tests/unit/docs.test.ts:58 (AD-018 world/rail half unasserted) (docs)
+- last seen: 2026-09-29T20:35:41Z
+
+### L-026 - A negative sub-claim (nothing of kind X remains) owes its own scan assertion; a hand check at verify time proves only that one commit.
+- signal: `ac_gap` · recurrence: 1 feature(s) · scope: `tests` · harmful: 0
+- features: test-hardening
+- evidence: test-hardening r1 gap 3 - tests/unit/testHygiene.test.ts:16 (C21 no-expect(CONST) sub-claim unasserted) (tests)
+- last seen: 2026-09-29T20:35:41Z
+
+### L-027 - A check that states a total count owes a proof that asserts that number; a count kept only in the check text goes stale at the next added test.
+- signal: `spec_precision_gap` · recurrence: 1 feature(s) · scope: `checks` · harmful: 0
+- features: test-hardening
+- evidence: test-hardening r1 gap 4 and r2 C4 - .specs/features/test-hardening/checks.md:23 (count 212 stale, 213 at HEAD) (checks)
+- last seen: 2026-09-29T20:35:41Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.
