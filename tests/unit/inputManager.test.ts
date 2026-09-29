@@ -35,6 +35,17 @@ describe('InputManager', () => {
     expect(first).toBe(1);
   });
 
+  // C32: Espaço é o freio de mão; o navegador não pode rolar a página com ele
+  it('space keydown prevents the default action and other keys do not', () => {
+    const { target } = setup();
+    const space = key('keydown', 'Space');
+    const w = key('keydown', 'KeyW');
+    target.dispatchEvent(space);
+    target.dispatchEvent(w);
+    expect(space.defaultPrevented).toBe(true);
+    expect(w.defaultPrevented).toBe(false);
+  });
+
   // C15
   it('keyup clears and press handler runs per press', () => {
     const { target, input } = setup();

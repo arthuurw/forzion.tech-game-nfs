@@ -54,7 +54,7 @@ describe('effects math', () => {
   });
 
   // visual-upgrade C38 - os números dos efeitos (AC 13, 14, 15), provados pelo `Effects` real
-  // (test-hardening C21: comportamento no lugar de `expect(CONST).toBe(literal)`)
+  // (test-hardening C21: comportamento no lugar de comparar a constante com o próprio número)
   it('effect constants', () => {
     // `Effects` desenha a textura da partícula num canvas; em node basta um canvas falso
     const ctx = { createRadialGradient: () => ({ addColorStop() {} }), fillRect() {}, fillStyle: '' };

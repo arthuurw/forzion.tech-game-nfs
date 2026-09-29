@@ -56,6 +56,7 @@ describe('docs', () => {
     expect(i18).toBeGreaterThan(i17);
     expect(rows[i18]![1]).toContain('| active |');
     expect(rows[i18]![1]).toContain('`src/{core,world,vehicle,camera,hud,audio,post,race}/`');
+    expect(rows[i18]![1]).toContain('`world/{terrain,roads,lots,interiors,rail}/`');
   });
 
   // C31 (AC 28, AC 29, AC 30)

@@ -40,6 +40,8 @@ describe('test hygiene', () => {
         });
     }
     expect(hits).toEqual([]);
+    // C21: o teste dos efeitos não volta a comparar constante exportada com literal
+    expect(read('tests/unit/effectsMath.test.ts')).not.toMatch(/expect\(\s*[A-Z][A-Z0-9_]+\s*\)\.(toBe|toBeCloseTo|toEqual)\(/);
     // drivetrain: a razão `t` só era conferida > 0, o que o rpm acima da marcha lenta já prova
     expect(read('tests/unit/drivetrain.test.ts')).not.toContain('const t = (back.state.rpm - spec.idleRpm)');
   });

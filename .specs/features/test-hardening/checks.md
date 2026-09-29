@@ -3,7 +3,7 @@
 Profile: standard
 Plan: `.specs/features/test-hardening/plan.md`
 
-31 checks in 6 slices · 3 one-way doors · 1 open, of which 0 block (1 blocks go-live)
+32 checks in 6 slices · 3 one-way doors · 1 open, of which 0 block (1 blocks go-live)
 
 ## Checks
 
@@ -20,8 +20,8 @@ Proof: `npx vitest run tests/unit --reporter=json --outputFile=test-results/unit
 Proof: `npm run test:quick`
 Proof: `npx vitest list --tags-filter="!slow"` sem nenhuma linha com `each opponent finishes every race in time` (`node tests/tooling/list-has.mjs --tags-filter="!slow" --absent "each opponent finishes every race in time"`)
 
-**C4** - ✅ `npm test` continua listando `each opponent finishes every race in time`, com o total de testes de antes, menos os que a C25 remove, mais os que esta feature cria (AC 4)
-Proof: `node tests/tooling/list-has.mjs --present "each opponent finishes every race in time"`
+**C4** - ✅ `npm test` continua listando `each opponent finishes every race in time`, com 212 testes: os 202 de antes, menos os 6 do gerador antigo que a C26 remove, mais os 16 que esta feature cria (AC 4; corrigido na rodada 2: dizia C25 e não dava o número)
+Proof: `node tests/tooling/list-has.mjs --present "each opponent finishes every race in time"` (a saída dá o total listado, 212)
 
 ### S2 - e2e no checkout certo e com suíte curta · 12 files · 180 KB · ~45k
 
@@ -60,6 +60,9 @@ Proof: `npx vitest run tests/unit/inputManager.test.ts -t "first key handler run
 **C15** - ✅ `keyup` de W depois do `keydown` de W deixa `throttle` = false, e o handler de `onPress('KeyR')` roda 1 vez por pressão, 2 vezes em 2 pressões (AC 12)
 Proof: `npx vitest run tests/unit/inputManager.test.ts -t "keyup clears and press handler runs per press"`
 
+**C32** - ✅ `keydown` de `Space` sai com `defaultPrevented` = true, e `keydown` de `KeyW` com false (AC 12; acrescentado na rodada 2: o ramo `Space` estava na evidência do Test policy e fora do Coverage)
+Proof: `npx vitest run tests/unit/inputManager.test.ts -t "space keydown prevents the default action and other keys do not"`
+
 **C16** - ✅ `checkStuck` com 4.9 m de progresso: `false` em t = 3.99 s, `true` em t = 4.0 s (AC 13)
 Proof: `npx vitest run tests/unit/aiDriver.test.ts -t "stuck detector thresholds and target"`
 
@@ -79,6 +82,7 @@ Proof: `npx vitest run tests/unit/purity.test.ts -t "pure modules do not import 
 
 **C21** - ✅ `effect constants` prova comportamento: 1 passo derrapando soma exatamente 4 partículas de fumaça; uma partícula está viva a 0.79 s e morta a 0.81 s; impulso 3001 solta 40 faíscas e 2999 nenhuma. Nenhum `expect(CONST).toBe(literal)` sobra no teste (AC 17)
 Proof: `npx vitest run tests/unit/effectsMath.test.ts -t "effect constants"`
+Proof: `npx vitest run tests/unit/testHygiene.test.ts -t "no literal-only assertions left"` (rodada 2: nenhum `expect(CONSTANTE).toBe(...)` em `effectsMath.test.ts`)
 
 **C22** - ✅ `cornerAssist.test.ts` não tem mais as asserções de aritmética com literais das linhas 19-20, e `drivetrain.test.ts` não tem a variável `t` que só era conferida `> 0` (AC 17)
 Proof: `npx vitest run tests/unit/testHygiene.test.ts -t "no literal-only assertions left"`
@@ -128,7 +132,7 @@ Proof: `npx vitest run tests/unit/docs.test.ts -t "state and docs are current"`
 | modos do servidor do e2e (2) | porta ocupada sem `E2E_REUSE` C5 · com `E2E_REUSE=1` C6 | - |
 | arquivos de spec com `@smoke` (9) | C7, table-driven sobre os 9 (`audio`, `drive`, `extras`, `hud`, `interiors`, `race`, `render`, `visual`, `world`) | - |
 | exit codes dos comandos novos (2) | 0 C3, C6, C8 · ≠ 0 C5 | - |
-| comportamentos do `InputManager` (4) | repeat C13 · primeira tecla C14 · keyup C15 · press por pressão C15 | - |
+| comportamentos do `InputManager` (5) | repeat C13 · primeira tecla C14 · keyup C15 · press por pressão C15 · `Space` sem ação padrão C32 | - |
 | lados do limiar de travado (2) | 3.99 s C16 · 4.0 s C16, C17 | - |
 | asserções só-de-constante a trocar (3 arquivos) | `effectsMath.test.ts` C21 · `cornerAssist.test.ts` C22 · `drivetrain.test.ts` C22 | - |
 | esperas fixas a trocar (6) | `hud.spec.ts:45` C23 · `hud.spec.ts:93` C23 · `hud.spec.ts:101` C23 · `hud.spec.ts:128` C23 · `extras.spec.ts:36` C23 · `render.spec.ts:7` C23 | - |
@@ -137,6 +141,7 @@ Proof: `npx vitest run tests/unit/docs.test.ts -t "state and docs are current"`
 | sobras do `tsc` (2) | `Minimap.canvas` C27 · `visual.spec.ts` `g` C27 | - |
 | door 1 (CI), eventos e passos (5) | `push` C28 · `pull_request` C28 · `npm ci` C28 · `npm run build` C28 · `npm test` C28 | - |
 | documentos (3) | README C29, C30, C31 · AGENTS.md C30 · STATE.md C30, C31 | - |
+| metades do layout da AD-018 (2) | `src/{…,race}/` C30 · `world/{…,rail}/` C30 | - |
 
 - Claims naming a command's exit code: C3, C5, C6, C8, C27 - cada um roda o comando de verdade
 - C28 prova o arquivo; a execução no GitHub fica para o go-live (open question 1 do plan)
