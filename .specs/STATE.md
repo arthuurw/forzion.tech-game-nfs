@@ -18,7 +18,7 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
    - 1.7 `block-fill` - miolo das quadras: mapa em zonas, grama nova, luz rebatida, quintais, árvores ao vento, vagalumes, obras com guindaste, pedestres (concluída, verificada round 2)
    - 1.7.1 `residuals` - reflexo da rua sem cintilar, guarda do tijolo, "R" da ré provado no browser, sondas do miolo com uma fonte só, custo da block-fill recontado (concluída, verificada rodada 1)
    - 1.8 `block-life-extras` - vapor de dutos, holofotes para o céu, estacionamentos, gatos, trem elevado; mais a pintura viva dos oponentes e as provas que faltaram na races (concluída, verificada rodada 3)
-   - 1.9 correções da validação de 2026-09-29 (`.specs/audits/2026-09-29-validation.md`), nesta ordem: `test-hardening` (suítes confiáveis, provas que faltam, CI, documento), `play-fixes` (bugs que o jogador vê), `smooth-world` (interpolação, junção do anel, chão caminhável, streaming em fatias), `pre-garage` (orçamento de draw calls, carro trocável e pintura, sondas fora do Game, dispose, bundle) - planos escritos, aguardando revisão
+   - 1.9 correções da validação de 2026-09-29 (`.specs/audits/2026-09-29-validation.md`), nesta ordem: `test-hardening` (suítes confiáveis, provas que faltam, CI, documento), `play-fixes` (bugs que o jogador vê), `smooth-world` (interpolação, junção do anel, chão caminhável, streaming em fatias), `pre-garage` (orçamento de draw calls, carro trocável e pintura, sondas fora do Game, dispose, bundle). `test-hardening` concluída (verificada rodada 4); as outras três com plano escrito. Antes delas entra `night-city` (visual da cidade à noite), e depois delas `car-look`, `speed-feel` e `hud-look`, decisão do usuário em 2026-09-29
 2. corridas - checkpoints, cronômetro, sprint/circuito, IA oponente por waypoints (`races`: concluída, verificada rodada 1)
 3. garagem + tuning visual - pintura, rodas, vinil, body kit, underglow
 4. tuning de performance - motor, turbo, pneus alterando parâmetros do Rapier
@@ -50,10 +50,10 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 
 ## Handoff
 
-**Feature**: `block-life-extras` concluída (Verifier PASS rodada 3, 2026-09-27, 39 checks; rodadas 1 e 2 pegaram fechamento do laço, estado `gone` do gato, limiar de 30 m e cor da pintura em linear) juntada em `main` e publicada
-**Where**: `main`; 202/202 unitários e 132/132 e2e verdes em 2026-09-27; draw calls no grid do centro em corrida: 219 de 220
-**In progress**: planos das 4 features de correção (1.9), escritos em 2026-09-29, aguardando revisão do usuário
-**Next step**: revisar os planos; depois checks e build da `test-hardening`. O sub-projeto 3 (garagem) espera a `pre-garage`
+**Feature**: `test-hardening` concluída (Verifier PASS rodada 4, 2026-09-29, 32 checks; rodadas 1-3 pegaram o ramo `Space` do input, a metade `world/rail` da AD-018, a regra de constante no teste de efeitos, um total de testes escrito à mão e provas que repetiam flags em vez de ler os scripts npm) juntada em `main`, sem push
+**Where**: `main`; `npm test` 213 (quick 212 + 1 slow), e2e 135 testes; `npm run test:quick` ~16 s e `npm run test:e2e:smoke` ~4 min para iterar
+**In progress**: brainstorming da `night-city`: reflexo da rua em faixas verticais escolhido pelo usuário
+**Next step**: terminar o desenho da `night-city` (postes, céu, fachadas) e escrever o plan pelo tlc-spec-lean; depois `play-fixes`
 **Blockers**: none
 **Branch**: `main`
 
