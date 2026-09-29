@@ -51,6 +51,7 @@ const PURE_MODULES = [
   // night-city C28 (door 2) e S2
   'src/world/lampLight.ts',
   'src/world/mirrorMath.ts',
+  'src/world/skyMath.ts',
 ];
 
 // cobre `import x from 'three'`, `import 'three'`, `import('three')` e `require('three')`
@@ -86,7 +87,7 @@ function forbiddenReach(file: string, seen = new Set<string>()): string | null {
 
 describe('pure modules', () => {
   it('pure modules do not import three or rapier', () => {
-    expect(PURE_MODULES.length).toBe(38);
+    expect(PURE_MODULES.length).toBe(39);
     for (const rel of PURE_MODULES) {
       const file = resolve(process.cwd(), rel);
       const source = readFileSync(file, 'utf8');

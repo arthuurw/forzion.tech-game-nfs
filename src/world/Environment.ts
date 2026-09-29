@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { NEON_PALETTE } from './CityGenerator';
+import { SKYLINE_STEPS, SKYLINE_TABLE, SKY_GLOW, SKY_HORIZON, SKY_RADIUS_M, SKY_SILHOUETTE, SKY_ZENITH } from './skyMath';
 
 /**
  * Céu noturno + mapa de ambiente. O env map é o que faz o asfalto "molhado"
@@ -45,8 +46,9 @@ export function createNightEnvironment(renderer: THREE.WebGLRenderer, scene: THR
   texture.dispose();
 
   scene.environment = envMap;
-  scene.background = new THREE.Color('#05060d');
-  scene.fog = new THREE.FogExp2('#05060d', 0.0035);
+  // night-city door 3: a névoa tem a cor do horizonte da cúpula; o fundo é o zênite
+  scene.background = new THREE.Color(SKY_ZENITH);
+  scene.fog = new THREE.FogExp2(SKY_HORIZON, 0.0035);
   return envMap;
 }
 
@@ -57,4 +59,56 @@ export function addNightLights(scene: THREE.Scene): void {
   const moon = new THREE.DirectionalLight('#8aa0ff', 0.35);
   moon.position.set(-60, 120, 40);
   scene.add(moon);
+}
+
+const glslColor = (hex: string) => {
+  const c = new THREE.Color(hex);
+  return `vec3( ${c.r.toFixed(5)}, ${c.g.toFixed(5)}, ${c.b.toFixed(5)} )`;
+};
+
+/**
+ * Cúpula do céu (night-city door 3): esfera de 500 m por dentro, que o `Game` põe na câmera a
+ * cada quadro. Degradê do zênite para o horizonte, brilho laranja fraco da cidade na faixa do
+ * horizonte e a silhueta de prédios distantes (`skylineHeight`). Sem tempo: nada se mexe.
+ */
+export function createSky(): THREE.Mesh {
+  const material = new THREE.ShaderMaterial({
+    name: 'night-sky',
+    side: THREE.BackSide,
+    depthWrite: false,
+    fog: false,
+    uniforms: {
+      uHorizon: { value: new THREE.Color(SKY_HORIZON) },
+      uSkyline: { value: [...SKYLINE_TABLE] },
+    },
+    vertexShader: /* glsl */ `
+      varying vec3 vDir;
+      void main() {
+        vDir = position;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: /* glsl */ `
+      #include <common>
+      uniform vec3 uHorizon;
+      uniform float uSkyline[${SKYLINE_STEPS}];
+      varying vec3 vDir;
+      void main() {
+        vec3 d = normalize(vDir);
+        float e = d.y;
+        // azimute como atan2(x, z) de skyMath.ts, em voltas [0, 1)
+        float turn = fract((atan(d.x, d.z) + PI) / (2.0 * PI));
+        int idx = int(min(float(${SKYLINE_STEPS - 1}), floor(turn * ${SKYLINE_STEPS.toFixed(1)})));
+        vec3 sky = mix(uHorizon, ${glslColor(SKY_ZENITH)}, smoothstep(0.0, 0.2, e));
+        sky += ${glslColor(SKY_GLOW)} * exp(-max(e, 0.0) * 14.0);
+        if (e < uSkyline[idx]) sky = mix(${glslColor(SKY_SILHOUETTE)}, uHorizon, clamp(-e * 20.0, 0.0, 1.0));
+        gl_FragColor = vec4(sky, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+  });
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(SKY_RADIUS_M, 48, 24), material);
+  mesh.name = 'sky';
+  mesh.renderOrder = -1;
+  mesh.frustumCulled = false;
+  return mesh;
 }

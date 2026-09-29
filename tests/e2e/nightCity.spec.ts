@@ -105,3 +105,41 @@ test.describe('night-city - asfalto molhado', () => {
     expect(far.h / far.srcH).toBeGreaterThan(near.h / near.srcH);
   });
 });
+
+test.describe('night-city - céu', () => {
+  // C14 (AC 11)
+  test('horizon glows above the skyline', async ({ page }) => {
+    await open(page);
+    await advanceSim(page, 1);
+    const p = await page.evaluate(() => (window as any).__game.render.skyProfile() as { top: number; band: number });
+    expect(p.band).toBeGreaterThanOrEqual(1.5 * p.top);
+  });
+
+  // C15 (AC 12, door 3)
+  test('fog takes the horizon color', async ({ page }) => {
+    await open(page);
+    const s = await page.evaluate(() => (window as any).__game.world.sky);
+    expect(s.fog).toBe('#2a1a3e');
+    expect(s.horizon).toBe(s.fog);
+    expect(s.background).toBe('#03040c');
+  });
+
+  // C17 (AC 14, door 3)
+  test('sky dome follows the camera outside the mirror', async ({ page }) => {
+    await open(page);
+    await advanceSim(page, 0.5);
+    const s = await page.evaluate(() => (window as any).__game.world.sky);
+    expect(s.inScene).toBe(true);
+    for (const k of ['x', 'y', 'z'] as const) expect(Math.abs(s.position[k] - s.camera[k]), k).toBeLessThanOrEqual(0.001);
+    const skipped = await page.evaluate(() => (window as any).__game.render.reflectorSkipped as string[]);
+    expect(skipped).toContain('sky');
+  });
+
+  // C18 (AC 15)
+  test('sky is still', async ({ page }) => {
+    await open(page);
+    expect(await page.evaluate(() => (window as any).__game.render.skyStill() as number)).toBe(-1);
+    await advanceSim(page, 1);
+    expect(await page.evaluate(() => (window as any).__game.render.skyStill() as number)).toBe(0);
+  });
+});

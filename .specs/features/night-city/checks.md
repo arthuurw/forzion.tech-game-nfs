@@ -52,19 +52,19 @@ Proof: `npx playwright test tests/e2e/visual.spec.ts -g "street reflection stays
 
 ### S3 - céu com horizonte · 4 files · 70 KB · ~18k
 
-**C14** - `render.skyProfile()` no spawn, câmera parada: o maior brilho médio de linha nos 25 % de baixo da faixa de céu (colunas do meio 10 %) ≥ 1.5 × a média das 10 % de linhas de cima (AC 11)
+**C14** - ✅ `render.skyProfile()` no spawn, câmera parada, só com a cúpula visível (os prédios do spawn tapam o centro do céu): o maior brilho médio de linha nos 25 % de baixo da faixa de céu (colunas do meio 10 %) ≥ 1.5 × a média das 10 % de linhas de cima (AC 11)
 Proof: `npx playwright test tests/e2e/nightCity.spec.ts -g "horizon glows above the skyline"`
 
-**C15** - `scene.fog.color` e o uniform de horizonte da cúpula são o mesmo `SKY_HORIZON` (`#2a1a3e`); `scene.background` é `SKY_ZENITH` (`#03040c`) (AC 12, door 3)
+**C15** - ✅ `scene.fog.color` e o uniform de horizonte da cúpula são o mesmo `SKY_HORIZON` (`#2a1a3e`); `scene.background` é `SKY_ZENITH` (`#03040c`) (AC 12, door 3)
 Proof: `npx playwright test tests/e2e/nightCity.spec.ts -g "fog takes the horizon color"`
 
-**C16** - `skylineHeight(az)`: em 3600 amostras de uma volta, todos os valores em [0.02, 0.08], pelo menos 60 valores distintos (degraus), `skylineHeight(az) === skylineHeight(az + 2π)` e mesma saída em duas chamadas (AC 13)
+**C16** - ✅ `skylineHeight(az)`: em 3600 amostras de uma volta, todos os valores em [0.02, 0.08], pelo menos 60 valores distintos (degraus), `skylineHeight(az) === skylineHeight(az + 2π)` e mesma saída em duas chamadas (AC 13)
 Proof: `npx vitest run tests/unit/nightCityShaders.test.ts -t "skyline is a stepped silhouette"`
 
-**C17** - Depois de um quadro, a cúpula (`name = 'sky'`) tem a posição da câmera ± 0.001 m, e `render.reflectorSkipped` inclui `sky` (AC 14, door 3)
+**C17** - ✅ Depois de um quadro, a cúpula (`name = 'sky'`) tem a posição da câmera ± 0.001 m, e `render.reflectorSkipped` inclui `sky` (AC 14, door 3)
 Proof: `npx playwright test tests/e2e/nightCity.spec.ts -g "sky dome follows the camera outside the mirror"`
 
-**C18** - Com a câmera parada olhando 35° para cima (só céu), dois quadros com 1 s de simulação entre eles têm 0 pixels diferentes (AC 15)
+**C18** - ✅ Com a câmera parada olhando 35° para cima (só céu), dois quadros com 1 s de simulação entre eles têm 0 pixels diferentes (AC 15)
 Proof: `npx playwright test tests/e2e/nightCity.spec.ts -g "sky is still"`
 
 ### S4 - letreiros e janelas · 4 files · 70 KB · ~18k
@@ -158,3 +158,5 @@ Cost: 1 arquivo unitário novo (`lampLight.test.ts`), 1 de shaders (`nightCitySh
 - S1 = 28k (roadMesh 6 KB, CityScene 25 KB, lampLight novo, ChunkManager 16 KB, Game 60 KB lidos em parte, world.spec 16 KB). S2 soma 30k (shader do espelho, sondas no Game, visual.spec 23 KB) e chega a 58k. S3 soma 18k (Environment, Game) e chega a 76k. S4 18k chega a 94k. S5 15k chega a ~109k, abaixo do budget de 150k. Um builder só
 - Mechanism: one builder (cabe no budget, sem pergunta)
 - **Settled at checks:** o AC 18 pedia as proporções 70/20/10 contadas sobre as janelas acesas do seed 1337. O sorteio de janela é um hash `sin` que roda na GPU e não reproduz bit a bit em JavaScript, então contar janela na tela mediria o hash da GPU, não a regra. C22 prova a regra (`windowTint` sobre 10 000 valores uniformes) e que o shader usa os mesmos limites e cores com um hash separado do de janela acesa. Decisão delegada pelo usuário
+- **Settled mid-build:** C14 mede só a cúpula. No spawn, as colunas do meio do quadro caem num prédio distante tingido pela névoa (luminância ~0.2 no topo), e a medida comparava prédio com prédio. A sonda esconde o resto da cena durante o quadro; a afirmação sobre o degradê do céu é a mesma
+- **Settled mid-build:** door 3a no plan: cúpula de 500 m, porque a câmera tem `far` de 600 m

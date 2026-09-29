@@ -35,7 +35,7 @@ import { SEARCHLIGHT_TILT } from '../world/interiors/interiorMotion';
 import { buildTrainLine, type TrainLine } from '../world/rail/trainLine';
 import { TrainScene } from '../world/rail/TrainScene';
 import { WORLD_HALF, nearestRoadPoint, needsWaterReset } from '../world/worldMath';
-import { addNightLights, createNightEnvironment } from '../world/Environment';
+import { addNightLights, createNightEnvironment, createSky } from '../world/Environment';
 import { GameLoop } from './GameLoop';
 import { InputManager } from './InputManager';
 import type { Assets } from './Loader';
@@ -104,6 +104,8 @@ export class Game {
   readonly chase: ChaseCamera;
   readonly composer: EffectComposer;
   readonly bloom: UnrealBloomPass;
+  /** céu da night-city (door 3): segue a câmera, fora do espelho da rua */
+  readonly sky = createSky();
   readonly gtao: GTAOPass | null;
   readonly grade: ShaderPass;
   readonly gtaoClipBox = new THREE.Box3();
@@ -151,6 +153,7 @@ export class Game {
 
     createNightEnvironment(this.renderer, this.scene);
     addNightLights(this.scene);
+    this.scene.add(this.sky);
 
     // mundo da city-terrain: tudo gerado por seed no boot (doors 1-6)
     const seed = DEFAULT_SEED;
@@ -366,6 +369,7 @@ export class Game {
     this.minimap.update(state, this.race.render(state));
     this.audio.update(state.rpm, this.input.state.throttle);
 
+    this.sky.position.copy(this.chase.camera.position);
     this.renderer.info.reset();
     this.composer.render();
     this.drawCalls = this.renderer.info.render.calls;
@@ -707,6 +711,91 @@ export class Game {
         get calls() {
           return game.drawCalls;
         },
+        /**
+         * só DEV/testes (night-city C14): um quadro pelo composer só com a cúpula do céu visível
+         * (os prédios do spawn tapam o centro do céu; o que se mede aqui é o degradê). Nas
+         * colunas do meio (10 %), `top` é a luminância média das 10 % de linhas de cima da imagem e
+         * `band` a maior média de linha nos 25 % de baixo da faixa de céu (do horizonte para cima).
+         */
+        skyProfile: () => {
+          const hidden: THREE.Object3D[] = game.scene.children.filter((o) => o !== game.sky);
+          const was = hidden.map((o) => o.visible);
+          hidden.forEach((o) => (o.visible = false));
+          game.composer.render(0);
+          const gl = game.renderer.getContext();
+          const w = gl.drawingBufferWidth;
+          const h = gl.drawingBufferHeight;
+          const px = new Uint8Array(w * h * 4);
+          gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+          hidden.forEach((o, i) => (o.visible = was[i]!));
+          const cam = game.chase.camera;
+          const dir = new THREE.Vector3();
+          cam.getWorldDirection(dir);
+          dir.y = 0;
+          dir.normalize();
+          const far = cam.position.clone().addScaledVector(dir, 400);
+          const gy = Math.max(0, Math.min(h - 1, game.toPixel(far.x, cam.position.y, far.z).py));
+          const x0 = Math.floor(w * 0.45);
+          const x1 = Math.ceil(w * 0.55);
+          const row = (y: number) => {
+            let sum = 0;
+            for (let x = x0; x < x1; x++) {
+              const k = 4 * (y * w + x);
+              sum += (0.2126 * px[k]! + 0.7152 * px[k + 1]! + 0.0722 * px[k + 2]!) / 255;
+            }
+            return sum / (x1 - x0);
+          };
+          let top = 0;
+          const topRows = Math.max(1, Math.round(h * 0.1));
+          for (let y = h - topRows; y < h; y++) top += row(y);
+          top /= topRows;
+          let band = 0;
+          const bandEnd = gy + Math.max(1, Math.round((h - gy) * 0.25));
+          for (let y = gy; y < Math.min(h, bandEnd); y++) band = Math.max(band, row(y));
+          return { top, band, horizonRow: gy };
+        },
+        /**
+         * só DEV/testes (night-city C18): câmera 300 m acima da atual, olhando 35° para cima (só
+         * céu). Guarda o quadro e devolve quantos pixels mudaram desde a chamada anterior (−1 na
+         * primeira). A pose é a da primeira chamada.
+         */
+        skyStill: (() => {
+          let prev: Uint8Array | null = null;
+          let pose: { x: number; y: number; z: number; yaw: number } | null = null;
+          return (): number => {
+            const cam = game.chase.camera;
+            if (!pose) {
+              const dir = new THREE.Vector3();
+              cam.getWorldDirection(dir);
+              pose = { x: cam.position.x, y: cam.position.y + 300, z: cam.position.z, yaw: Math.atan2(dir.x, dir.z) };
+            }
+            const p0 = cam.position.clone();
+            const q0 = cam.quaternion.clone();
+            const sky0 = game.sky.position.clone();
+            cam.position.set(pose.x, pose.y, pose.z);
+            cam.rotation.set(0, 0, 0, 'YXZ');
+            cam.rotation.y = pose.yaw + Math.PI;
+            cam.rotation.x = (35 * Math.PI) / 180;
+            cam.updateMatrixWorld();
+            game.sky.position.copy(cam.position);
+            game.composer.render(0);
+            const gl = game.renderer.getContext();
+            const n = gl.drawingBufferWidth * gl.drawingBufferHeight * 4;
+            const px = new Uint8Array(n);
+            gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, px);
+            cam.position.copy(p0);
+            cam.quaternion.copy(q0);
+            cam.updateMatrixWorld();
+            game.sky.position.copy(sky0);
+            let diff = -1;
+            if (prev) {
+              diff = 0;
+              for (let k = 0; k < n; k += 4) if (px[k] !== prev[k] || px[k + 1] !== prev[k + 1] || px[k + 2] !== prev[k + 2]) diff++;
+            }
+            prev = px;
+            return diff;
+          };
+        })(),
         /**
          * só DEV/testes (night-city C9-C11): uma esfera brilhante de 0.25 m a `d` m à frente da
          * câmera, 1.5 m acima do asfalto do centro, com o carro do jogador escondido (o reflexo perto
@@ -1098,6 +1187,21 @@ export class Game {
         const hex = '#' + [c.getX(i), c.getY(i), c.getZ(i)].map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
         return { x: lamp.x, y: lamp.y, z: lamp.z, heading: lamp.heading, side: lamp.side, kind: data.network.roads[lamp.roadId]!.kind, color: hex, head: lampHeadPosition(lamp) };
       },
+      /** night-city C15, C17: névoa, fundo, uniform de horizonte e posição da cúpula */
+      get sky() {
+        const fog = game.scene.fog as THREE.FogExp2;
+        const u = (game.sky.material as THREE.ShaderMaterial).uniforms;
+        const p = game.sky.position;
+        const c = game.chase.camera.position;
+        return {
+          fog: `#${fog.color.getHexString()}`,
+          background: `#${(game.scene.background as THREE.Color).getHexString()}`,
+          horizon: `#${(u.uHorizon!.value as THREE.Color).getHexString()}`,
+          inScene: game.sky.parent === game.scene,
+          position: { x: p.x, y: p.y, z: p.z },
+          camera: { x: c.x, y: c.y, z: c.z },
+        };
+      },
       /** night-city C29: o mapa de luz dos postes em cada material de chão */
       get lampLight() {
         const t = game.city.lampLight;
@@ -1152,6 +1256,7 @@ export class Game {
   /** O que o espelho da rua não reflete: partículas, cones, água, chunks de fora, miolo, corrida e trem. */
   private reflectorSkipList(): THREE.Object3D[] {
     return [
+      this.sky,
       this.rain.points,
       ...this.effects.objects,
       ...this.headlightCones,
