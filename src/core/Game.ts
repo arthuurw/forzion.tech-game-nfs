@@ -25,7 +25,7 @@ import { DEFAULT_SEED } from '../world/CityGenerator';
 import { CityScene, type WorldData } from '../world/CityScene';
 import { generateLots } from '../world/lots/LotGenerator';
 import { generateRoads, type Road } from '../world/roads/RoadGenerator';
-import { generateLamps } from '../world/roads/roadMesh';
+import { generateLamps, lampHeadPosition } from '../world/roads/roadMesh';
 import { carveRoads } from '../world/terrain/carveRoads';
 import { generateTerrain, heightAt, riverCenterX } from '../world/terrain/TerrainGenerator';
 import { WorldPhysics } from '../world/WorldPhysics';
@@ -708,6 +708,100 @@ export class Game {
           return game.drawCalls;
         },
         /**
+         * só DEV/testes (night-city C9-C11): uma esfera brilhante de 0.25 m a `d` m à frente da
+         * câmera, 1.5 m acima do asfalto do centro, com o carro do jogador escondido (o reflexo perto
+         * cairia atrás dele) e sem bloom (o halo da esfera escorreria para baixo do ponto do chão). Renderiza com e sem ela e devolve a caixa dos
+         * pixels que mudaram mais de 25 % do pico (e > 0.01) abaixo do ponto do chão sob a esfera (`w`, `h`:
+         * o reflexo) e a altura da própria esfera projetada na tela (`srcH`), em pixels.
+         * `mirrorBlur: false` mede com o espelho de uma amostra.
+         */
+        mirrorStreak: (d: number, opts: { mirrorBlur?: boolean } = {}) => {
+          const restoreBlur = game.setMirrorBlur(opts.mirrorBlur);
+          const cam = game.chase.camera;
+          const dir = new THREE.Vector3();
+          cam.getWorldDirection(dir);
+          dir.y = 0;
+          dir.normalize();
+          const at = cam.position.clone().addScaledVector(dir, d);
+          const ball = new THREE.Mesh(
+            new THREE.SphereGeometry(0.25, 16, 8),
+            new THREE.MeshStandardMaterial({ color: '#000000', emissive: '#ffffff', emissiveIntensity: 3 }),
+          );
+          ball.position.set(at.x, 1.5, at.z);
+          const hidden: THREE.Object3D[] = [game.rain.points, ...game.effects.objects, game.car.mesh];
+          const was = hidden.map((o) => o.visible);
+          hidden.forEach((o) => (o.visible = false));
+          const gl = game.renderer.getContext();
+          const w = gl.drawingBufferWidth;
+          const h = gl.drawingBufferHeight;
+          const grab = (): Float32Array => {
+            game.composer.render(0);
+            const px = new Uint8Array(w * h * 4);
+            gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+            const l = new Float32Array(w * h);
+            for (let k = 0; k < w * h; k++) l[k] = (0.2126 * px[4 * k]! + 0.7152 * px[4 * k + 1]! + 0.0722 * px[4 * k + 2]!) / 255;
+            return l;
+          };
+          const bloomWas = game.bloom.enabled;
+          game.bloom.enabled = false;
+          const without = grab();
+          game.scene.add(ball);
+          const withBall = grab();
+          game.scene.remove(ball);
+          game.bloom.enabled = bloomWas;
+          ball.geometry.dispose();
+          (ball.material as THREE.Material).dispose();
+          hidden.forEach((o, i) => (o.visible = was[i]!));
+          restoreBlur();
+          const gy = game.toPixel(at.x, 0, at.z).py;
+          const box = { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity };
+          // limiar relativo ao pico do reflexo: mede a forma da mancha, não o quanto ela brilha
+          let peak = 0;
+          for (let y = 0; y < Math.min(h, gy - 1); y++) {
+            for (let x = 0; x < w; x++) peak = Math.max(peak, withBall[y * w + x]! - without[y * w + x]!);
+          }
+          const cut = Math.max(0.01, 0.25 * peak);
+          for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+              const k = y * w + x;
+              if (withBall[k]! - without[k]! <= cut) continue;
+              if (y >= gy - 1) continue;
+              box.x0 = Math.min(box.x0, x);
+              box.x1 = Math.max(box.x1, x);
+              box.y0 = Math.min(box.y0, y);
+              box.y1 = Math.max(box.y1, y);
+            }
+          }
+          const found = box.x1 >= box.x0;
+          return {
+            w: found ? box.x1 - box.x0 + 1 : 0,
+            h: found ? box.y1 - box.y0 + 1 : 0,
+            srcH: game.toPixel(at.x, 1.75, at.z).py - game.toPixel(at.x, 1.25, at.z).py + 1,
+          };
+        },
+        /**
+         * só DEV/testes (night-city C6): um quadro pelo composer, sem chuva nem partículas, e a
+         * luminância média 3 × 3 em volta de cada ponto do mundo projetado na tela (null se atrás).
+         */
+        lumAt: (points: Array<{ x: number; y: number; z: number }>): Array<number | null> => {
+          const hidden: THREE.Object3D[] = [game.rain.points, ...game.effects.objects];
+          const was = hidden.map((o) => o.visible);
+          hidden.forEach((o) => (o.visible = false));
+          game.composer.render(0);
+          const gl = game.renderer.getContext();
+          const px = new Uint8Array(9 * 4);
+          const out = points.map((p) => {
+            const s = game.toPixel(p.x, p.y, p.z);
+            if (!s.front) return null;
+            gl.readPixels(s.px - 1, s.py - 1, 3, 3, gl.RGBA, gl.UNSIGNED_BYTE, px);
+            let sum = 0;
+            for (let k = 0; k < 9; k++) sum += (0.2126 * px[4 * k]! + 0.7152 * px[4 * k + 1]! + 0.0722 * px[4 * k + 2]!) / 255;
+            return sum / 9;
+          });
+          hidden.forEach((o, i) => (o.visible = was[i]!));
+          return out;
+        },
+        /**
          * só DEV/testes: cintilação com a câmera andando. Renderiza `frames` quadros
          * avançando a câmera `step` m para a frente por quadro (chuva e partículas
          * escondidas, cena parada) e devolve a fração de pixels cuja luminância tem
@@ -992,7 +1086,35 @@ export class Game {
       lots: data.lots.map((l) => ({ ...l })),
       lampCount: data.lamps.length,
       get lamps() {
-        return game.city.lampMeshes.map((m) => ({ count: m.count, instanced: m.isInstancedMesh === true }));
+        return game.city.lampMeshes.map((m) => {
+          const b = m.geometry.boundingBox!;
+          return { count: m.count, instanced: m.isInstancedMesh === true, width: b.max.x - b.min.x, depth: b.max.z - b.min.z };
+        });
+      },
+      /** night-city C8: cor da luz do poste `i` (atributo por instância), com os dados dele */
+      lampAt: (i: number) => {
+        const lamp = data.lamps[i]!;
+        const c = game.city.lampMeshes[0]!.geometry.getAttribute('aLampColor') as THREE.InstancedBufferAttribute;
+        const hex = '#' + [c.getX(i), c.getY(i), c.getZ(i)].map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
+        return { x: lamp.x, y: lamp.y, z: lamp.z, heading: lamp.heading, side: lamp.side, kind: data.network.roads[lamp.roadId]!.kind, color: hex, head: lampHeadPosition(lamp) };
+      },
+      /** night-city C29: o mapa de luz dos postes em cada material de chão */
+      get lampLight() {
+        const t = game.city.lampLight;
+        const read = (m: THREE.Material) => (m.userData.lampLight?.uLampLight.value as THREE.Texture | undefined)?.uuid ?? null;
+        return {
+          uuid: t.uuid,
+          width: t.image.width,
+          height: t.image.height,
+          linear: t.magFilter === THREE.LinearFilter && t.minFilter === THREE.LinearFilter,
+          mipmaps: t.generateMipmaps,
+          materials: {
+            roadDowntown: read(game.city.roadMaterial),
+            roadOuter: read(game.city.roadOuterMaterial),
+            sidewalk: read(game.city.sidewalkMaterial),
+            terrain: read(game.city.terrainMaterial),
+          },
+        };
       },
       get chunks() {
         return {

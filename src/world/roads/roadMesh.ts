@@ -9,6 +9,7 @@
  * dois sentidos. O atributo `width` por vértice deixa o shader desenhar as
  * faixas em metros (u·4 atravessando, v·4 ao longo).
  */
+import { DOWNTOWN_HALF } from '../worldMath';
 import { ROAD_STEP, type Road, type RoadNetwork } from './RoadGenerator';
 
 export const ROAD_LIFT = 0.05;
@@ -17,6 +18,14 @@ export const LAMP_SPACING = 40;
 export const LAMP_SIDE_OFFSET = 1.5;
 /** um poste a até width/2 + 1 m do eixo de outra estrada fica no meio da pista: pulado */
 export const LAMP_CLEARANCE = 1;
+/** altura da haste do poste (m) */
+export const LAMP_POST_HEIGHT = 6;
+/** braço horizontal do poste, da haste até a luminária sobre a rua (night-city AC 1) */
+export const LAMP_ARM_M = 1.6;
+/** luz de LED: centro, avenidas e anel (night-city door 1) */
+export const LAMP_LED = '#dce6ff';
+/** luz de sódio: bairros e morros fora do centro (night-city door 1) */
+export const LAMP_SODIUM = '#ff9d4a';
 
 /** Heading no ponto i por diferença central (nas pontas de estrada aberta, a diferença de um lado). */
 export function pointHeading(road: Road, i: number): number {
@@ -86,6 +95,27 @@ export interface Lamp {
   stretch: number;
   /** distância ao longo do trecho (m) */
   along: number;
+  /** heading da estrada no ponto do poste (rad, 0 = +Z, AD-007) */
+  heading: number;
+}
+
+/**
+ * Ponta do braço, onde fica a lente (night-city AC 1): 6 m acima da base e 1.6 m na
+ * direção do eixo da estrada. O poste do lado `side` fica a `(cos h, −sin h)·side` do eixo,
+ * então o braço aponta para `−side·(cos h, −sin h)`.
+ */
+export function lampHeadPosition(lamp: Lamp): { x: number; y: number; z: number } {
+  return {
+    x: lamp.x - lamp.side * Math.cos(lamp.heading) * LAMP_ARM_M,
+    y: lamp.y + LAMP_POST_HEIGHT,
+    z: lamp.z + lamp.side * Math.sin(lamp.heading) * LAMP_ARM_M,
+  };
+}
+
+/** Cor da luz do poste por bairro (night-city door 1): LED no centro, nas avenidas e no anel; sódio no resto. */
+export function lampColor(lamp: Pick<Lamp, 'x' | 'z'>, road: Pick<Road, 'kind'>): string {
+  const downtown = Math.abs(lamp.x) <= DOWNTOWN_HALF && Math.abs(lamp.z) <= DOWNTOWN_HALF;
+  return downtown || road.kind === 'avenue' || road.kind === 'highway' ? LAMP_LED : LAMP_SODIUM;
 }
 
 /** Trechos contínuos fora de ponte, como listas de índices de ponto na ordem da estrada. */
@@ -156,6 +186,7 @@ export function generateLamps(network: RoadNetwork): { lamps: Lamp[]; skipped: L
             side,
             stretch,
             along,
+            heading: h,
           };
           (nearOtherRoad(network, road, lamp.x, lamp.z) ? skipped : lamps).push(lamp);
         }

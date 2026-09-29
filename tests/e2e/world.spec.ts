@@ -210,15 +210,14 @@ test.describe('city-terrain - mundo', () => {
     for (const s of r.spacing) expect(Math.abs(s - 6)).toBeLessThanOrEqual(0.25);
   });
 
-  // C25 (AC 19)
-  test('lamp posts are two instanced meshes', { tag: '@smoke' }, async ({ page }) => {
+  // C25 (AC 19), substituído por night-city C7 (AC 1, AC 5): haste, braço e luminária numa malha só
+  test('lamp posts are one instanced mesh', { tag: '@smoke' }, async ({ page }) => {
     await gotoGame(page);
     const l = await page.evaluate(() => ({ meshes: (window as any).__game.world.lamps, count: (window as any).__game.world.lampCount }));
-    expect(l.meshes.length).toBe(2);
-    for (const m of l.meshes) {
-      expect(m.instanced).toBe(true);
-      expect(m.count).toBe(l.count);
-    }
+    expect(l.meshes.length).toBe(1);
+    expect(l.meshes[0].instanced).toBe(true);
+    expect(l.meshes[0].count).toBe(l.count);
+    expect(l.meshes[0].width).toBeGreaterThanOrEqual(1.6);
     expect(l.count).toBeGreaterThan(0);
   });
 

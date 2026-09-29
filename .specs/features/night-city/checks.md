@@ -9,45 +9,45 @@ Plan: `.specs/features/night-city/plan.md`
 
 ### S1 - poste que ilumina o chão · 6 files · 110 KB · ~28k
 
-**C1** - `lampHeadPosition(lamp)` fica a 6 m de altura sobre a base e 1.6 m ± 0.05 mais perto da linha central da estrada do poste que a base, em todos os postes do seed 1337 (AC 1)
+**C1** - ✅ `lampHeadPosition(lamp)` fica a 6 m de altura sobre a base e 1.6 m ± 0.05 mais perto da linha central da estrada do poste que a base, em todos os postes do seed 1337 (AC 1)
 Proof: `npx vitest run tests/unit/lampLight.test.ts -t "lamp head hangs over the road"`
 
-**C2** - `generateLamps` guarda em cada poste o `heading` da estrada no ponto dele (rad, 0 = +Z), igual ao `atan2` do segmento, ± 1e-6 (AC 1)
+**C2** - ✅ `generateLamps` guarda em cada poste o `heading` da estrada no ponto dele (rad, 0 = +Z), igual ao `atan2` do segmento, ± 1e-6 (AC 1)
 Proof: `npx vitest run tests/unit/roads.test.ts -t "lamp posts every 40 m on both sides"`
 
-**C3** - `lampColor`: `#dce6ff` para poste com |x| e |z| ≤ 500 em qualquer estrada, e para poste de `avenue` ou `highway` fora do centro; `#ff9d4a` para `hill` e `street` fora do centro. Uma linha por caso na tabela (5 linhas) (AC 2, door 1)
+**C3** - ✅ `lampColor`: `#dce6ff` para poste com |x| e |z| ≤ 500 em qualquer estrada, e para poste de `avenue` ou `highway` fora do centro; `#ff9d4a` para `hill` e `street` fora do centro. Uma linha por caso na tabela (5 linhas) (AC 2, door 1)
 Proof: `npx vitest run tests/unit/lampLight.test.ts -t "lamp color by district"`
 
-**C4** - Na grade de `buildLampLight` do seed 1337: a célula sob cada lente tem intensidade ≥ 0.9 × a cor do poste; toda célula a ≥ 9 m de qualquer lente é 0; e, ao longo de uma linha que sai de uma lente isolada, a intensidade nunca sobe (AC 3, door 2)
+**C4** - ✅ Na grade de `buildLampLight` do seed 1337: a célula sob cada lente tem intensidade ≥ 0.9 × a cor do poste; toda célula a ≥ 9 m de qualquer lente é 0; e, ao longo de uma linha que sai de uma lente isolada, a intensidade nunca sobe (AC 3, door 2)
 Proof: `npx vitest run tests/unit/lampLight.test.ts -t "lamp light grid falls off from each head"`
 
-**C5** - A grade tem 1536 × 1536 células RGBA de 2 m, com a célula (0, 0) centrada em (−1535, −1535) (AC 3, door 2)
+**C5** - ✅ A grade tem 1536 × 1536 células RGBA de 2 m, com a célula (0, 0) centrada em (−1535, −1535) (AC 3, door 2)
 Proof: `npx vitest run tests/unit/lampLight.test.ts -t "lamp light grid covers the world"`
 
-**C6** - Com `?quality=low` (sem espelho), carro parado numa avenida do centro: a luminância do asfalto sob a lente de um poste à frente ≥ 1.3 × a do asfalto 20 m adiante ao longo da estrada, na mesma imagem (`render.lumAt`) (AC 4)
+**C6** - ✅ Com `?quality=low` (sem espelho), carro parado numa avenida do centro: a luminância do asfalto sob a lente de um poste à frente ≥ 1.3 × a do asfalto 20 m adiante ao longo da estrada, na mesma imagem (`render.lumAt`) (AC 4)
 Proof: `npx playwright test tests/e2e/nightCity.spec.ts -g "street light pools on the asphalt"`
 
-**C7** - `__game.world.lamps` tem exatamente 1 `InstancedMesh`, com `count` = número de postes, e a caixa da geometria mede ≥ 1.6 m na horizontal (o braço) (AC 5, AC 1; substitui city-terrain C25)
+**C7** - ✅ `__game.world.lamps` tem exatamente 1 `InstancedMesh`, com `count` = número de postes, e a caixa da geometria mede ≥ 1.6 m na horizontal (o braço) (AC 5, AC 1; substitui city-terrain C25)
 Proof: `npx playwright test tests/e2e/world.spec.ts -g "lamp posts are one instanced mesh"`
 
-**C8** - A cor por instância da malha de postes é `#dce6ff` num poste do centro e `#ff9d4a` num poste de `hill`, lida no browser (AC 2)
+**C8** - ✅ A cor por instância da malha de postes é `#dce6ff` num poste do centro e `#ff9d4a` num poste de `hill`, lida no browser (AC 2)
 Proof: `npx playwright test tests/e2e/nightCity.spec.ts -g "lamp colors in the browser"`
 
 ### S2 - asfalto molhado sem confete · 4 files · 120 KB · ~30k
 
-**C9** - `render.mirrorStreak(20)`: a mancha que o espelho soma abaixo do ponto do chão tem altura ≥ 3 × a largura, em pixels (AC 6)
+**C9** - ✅ `render.mirrorStreak(20)`: a mancha que o espelho soma abaixo do ponto do chão tem altura ≥ 3 × a largura, em pixels (AC 6)
 Proof: `npx playwright test tests/e2e/nightCity.spec.ts -g "reflections are vertical streaks"`
 
-**C10** - `render.mirrorStreak(20, { mirrorBlur: false })`: altura ≤ 1.5 × a largura (AC 7)
+**C10** - ✅ `render.mirrorStreak(20, { mirrorBlur: false })`: altura ≤ 1.5 × a largura (AC 7)
 Proof: `npx playwright test tests/e2e/nightCity.spec.ts -g "probe sees a sharp reflection without streaks"`
 
-**C11** - `mirrorStreak(60).h / mirrorStreak(60).srcH` > `mirrorStreak(20).h / mirrorStreak(20).srcH` (AC 8)
+**C11** - ✅ `mirrorStreak(60).h / mirrorStreak(60).srcH` > `mirrorStreak(20).h / mirrorStreak(20).srcH` (AC 8)
 Proof: `npx playwright test tests/e2e/nightCity.spec.ts -g "streaks grow with distance"`
 
-**C12** - O fragment shader do espelho não contém `blendOverlay(`; o tom `MIRROR_TINT` tem os 3 canais em (0, 1]; `mirrorFresnel(cos)` fica em [0, 1] para cos em {0, 0.25, 0.5, 0.75, 1} e não sobe com cos. O texto do shader interpola `MIRROR_TINT` e as constantes da faixa (AC 9)
+**C12** - ✅ O fragment shader do espelho não contém `blendOverlay(`; o tom `MIRROR_TINT` tem os 3 canais em (0, 1]; `mirrorFresnel(cos)` fica em [0, 1] para cos em {0, 0.25, 0.5, 0.75, 1} e não sobe com cos. O texto do shader interpola `MIRROR_TINT` e as constantes da faixa (AC 9)
 Proof: `npx vitest run tests/unit/nightCityShaders.test.ts -t "mirror never adds light"`
 
-**C13** - As provas da residuals seguem com os limites de hoje: cintilação ≤ 0.001 acima do sem espelho e = 0 parada; ≥ 0.003 com `mirrorBlur: false`; alvo 320 × 180 com texel = 1/tamanho; ganho ≥ 0.6 × o nítido (AC 10)
+**C13** - ✅ As provas da residuals seguem com os limites de hoje: cintilação ≤ 0.001 acima do sem espelho e = 0 parada; ≥ 0.003 com `mirrorBlur: false`; alvo 320 × 180 com texel = 1/tamanho; ganho ≥ 0.6 × o nítido (AC 10)
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "street reflection stays stable while the camera moves|probe detects reflection shimmer without blur|reflection blur keeps the half-resolution target|blurred reflection keeps most of its brightness"`
 
 ### S3 - céu com horizonte · 4 files · 70 KB · ~18k
@@ -99,10 +99,10 @@ Proof: `npx vitest run tests/unit/nightCityShaders.test.ts -t "nothing new reads
 **C27** - Com `?quality=low`: 1 malha de postes, cúpula `sky` na cena, o material do asfalto com o uniform `uLampLight`, letreiros com profundidade 0.12 e nenhum espelho (AC 23)
 Proof: `npx playwright test tests/e2e/nightCity.spec.ts -g "low quality keeps the night city"`
 
-**C28** - `src/world/lampLight.ts` é puro (sem `three` nem Rapier, direto ou por import relativo) e está na lista da trava de pureza (door 2)
+**C28** - ✅ `src/world/lampLight.ts` é puro (sem `three` nem Rapier, direto ou por import relativo) e está na lista da trava de pureza (door 2)
 Proof: `npx vitest run tests/unit/purity.test.ts -t "pure modules do not import three or rapier"`
 
-**C29** - O asfalto do centro, o de fora, a calçada e o terreno leem o mesmo `uLampLight` (a mesma `DataTexture`), e a textura tem 1536 × 1536, filtro linear e sem mipmap (door 2)
+**C29** - ✅ O asfalto do centro, o de fora, a calçada e o terreno leem o mesmo `uLampLight` (a mesma `DataTexture`), e a textura tem 1536 × 1536, filtro linear e sem mipmap (door 2)
 Proof: `npx playwright test tests/e2e/nightCity.spec.ts -g "ground materials share the lamp light map"`
 
 ## Coverage

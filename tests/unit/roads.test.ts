@@ -394,6 +394,24 @@ describe('road network', () => {
       }
       expect(Math.abs(best - (road.width / 2 + 1.5))).toBeLessThan(0.25);
       expect(inBridge(road, bi), `lamp on bridge of road ${road.id}`).toBe(false);
+      // night-city C2: o heading guardado é o do segmento da estrada sob o poste. Voltando do poste
+      // para o eixo pela perpendicular desse heading, o ponto cai num segmento com esse mesmo heading
+      const off = road.width / 2 + 1.5;
+      const cx = l.x - l.side * Math.cos(l.heading) * off;
+      const cz = l.z + l.side * Math.sin(l.heading) * off;
+      let onSegment = false;
+      const segs = road.closed ? count(road) : count(road) - 1;
+      for (let i = 0; i < segs && !onSegment; i++) {
+        const [ax, , az] = pt(road, i);
+        const [bx, , bz] = pt(road, (i + 1) % count(road));
+        const seg = Math.atan2(bx - ax, bz - az);
+        const len = Math.hypot(bx - ax, bz - az);
+        const t = ((cx - ax) * (bx - ax) + (cz - az) * (bz - az)) / (len * len);
+        const dx = ax + (bx - ax) * t - cx;
+        const dz = az + (bz - az) * t - cz;
+        if (t >= -1e-6 && t <= 1 + 1e-6 && Math.hypot(dx, dz) < 1e-3 && Math.abs(Math.atan2(Math.sin(seg - l.heading), Math.cos(seg - l.heading))) <= 1e-6) onSegment = true;
+      }
+      expect(onSegment, `lamp heading of road ${road.id}`).toBe(true);
       // pulado ⇔ a ≤ width/2 + 1 do eixo de outra estrada
       let onOther = false;
       for (const other of net.roads) {

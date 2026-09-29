@@ -8,13 +8,16 @@ import { ChunkManager } from './ChunkManager';
 import { facadeTransform, type Lot, type LotSign } from './lots/LotGenerator';
 import { bridgeParts } from './roads/bridges';
 import type { RoadNetwork } from './roads/RoadGenerator';
-import type { Lamp } from './roads/roadMesh';
+import { lampColor, lampHeadPosition, type Lamp } from './roads/roadMesh';
+import { buildLampLight } from './lampLight';
+import { addLampLight, buildStreetLamps, makeLampLightTexture, makeStreetLampMaterial } from './StreetLamps';
 import type { Heightmap } from './terrain/TerrainGenerator';
 import { Water } from './Water';
 import type { BlockInteriors } from './interiors/BlockInteriors';
 import type { InteriorProps } from './interiors/InteriorProps';
 import { InteriorScene } from './interiors/InteriorScene';
 import { DOWNTOWN_HALF } from './worldMath';
+import { MIRROR_F0, MIRROR_STREAK_GROW, MIRROR_STREAK_TEXELS, MIRROR_TINT } from './mirrorMath';
 
 /**
  * Transforma os dados do mundo da city-terrain em malhas: materiais, o
@@ -34,18 +37,12 @@ const FACADE_ROUGHNESS_FLOOR = [0, 0, 0.6, 0];
 const WINDOW_COLOR = new THREE.Color('#ffd9a0');
 /** brilho percebido das janelas acesas (pedido do usuário: um pouco menos claras); a intensidade emissiva continua 2.2 para o bloom */
 const WINDOW_BRIGHTNESS = 0.7;
-const LAMP_POST_HEIGHT = 6;
 /**
- * raio do blur do reflexo da rua, em texels do alvo de meia resolução (residuals S1):
- * janelas e lâmpadas menores que um texel serrilhavam no alvo e piscavam com a câmera andando
+ * meia-faixa do reflexo da rua perto da câmera (texels do alvo de meia resolução). O uniform
+ * continua `uBlur`: com 0 as 9 amostras caem no mesmo ponto (a sonda `mirrorBlur: false`)
  */
-export const MIRROR_BLUR_TEXELS = 2.5;
+export const MIRROR_BLUR_TEXELS = MIRROR_STREAK_TEXELS;
 
-/**
- * `Reflector.ReflectorShader` com 9 amostras em tenda (1-2-1 × 1-2-1) em volta do ponto
- * projetado, afastadas `uBlur` texels. Com `uBlur` = 0 as 9 caem no mesmo ponto: é o
- * shader de uma amostra de antes (a sonda `mirrorBlur: false` usa isso).
- */
 interface ReflectorShaderDef {
   name: string;
   uniforms: Record<string, THREE.IUniform>;
@@ -53,34 +50,64 @@ interface ReflectorShaderDef {
   fragmentShader: string;
 }
 
-function blurredReflectorShader(width: number, height: number): ReflectorShaderDef {
-  // o shader padrão existe em runtime, mas os tipos do three não o declaram
-  const base = (Reflector as unknown as { ReflectorShader: ReflectorShaderDef }).ReflectorShader;
+const glslFloat = (v: number) => (Number.isInteger(v) ? v.toFixed(1) : String(v));
+
+/**
+ * Espelho da rua molhada (night-city S2): 13 amostras em tenda ao longo do eixo vertical da tela,
+ * com a meia-faixa `streakTexels` crescendo com a distância, vezes o tom `MIRROR_TINT` e o
+ * Fresnel. Sem o `blendOverlay` do three, que deixava o reflexo mais forte que a fonte.
+ * Mantém os uniforms `color`, `tDiffuse` e `textureMatrix` que o `Reflector` preenche.
+ */
+export function streakReflectorShader(width: number, height: number): ReflectorShaderDef {
+  const [tr, tg, tb] = MIRROR_TINT;
   return {
-    name: 'BlurredReflectorShader',
+    name: 'StreakReflectorShader',
     uniforms: {
-      ...base.uniforms,
+      color: { value: null },
+      tDiffuse: { value: null },
+      textureMatrix: { value: null },
       uTexel: { value: new THREE.Vector2(1 / width, 1 / height) },
       uBlur: { value: MIRROR_BLUR_TEXELS },
     },
-    vertexShader: base.vertexShader,
-    fragmentShader: base.fragmentShader
-      .replace(
-        'varying vec4 vUv;',
-        `varying vec4 vUv;
+    vertexShader: /* glsl */ `
+		uniform mat4 textureMatrix;
+		varying vec4 vUv;
+		varying vec3 vWorld;
+		#include <common>
+		#include <logdepthbuf_pars_vertex>
+		void main() {
+			vUv = textureMatrix * vec4( position, 1.0 );
+			vWorld = ( modelMatrix * vec4( position, 1.0 ) ).xyz;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+			#include <logdepthbuf_vertex>
+		}`,
+    fragmentShader: /* glsl */ `
+		uniform sampler2D tDiffuse;
 		uniform vec2 uTexel;
-		uniform float uBlur;`,
-      )
-      .replace(
-        'vec4 base = texture2DProj( tDiffuse, vUv );',
-        `vec2 uv = vUv.xy / vUv.w;
-			vec2 d = uTexel * uBlur;
-			vec4 base = 0.25 * texture2D( tDiffuse, uv );
-			base += 0.125 * ( texture2D( tDiffuse, uv + vec2( d.x, 0.0 ) ) + texture2D( tDiffuse, uv - vec2( d.x, 0.0 ) )
-				+ texture2D( tDiffuse, uv + vec2( 0.0, d.y ) ) + texture2D( tDiffuse, uv - vec2( 0.0, d.y ) ) );
-			base += 0.0625 * ( texture2D( tDiffuse, uv + d ) + texture2D( tDiffuse, uv - d )
-				+ texture2D( tDiffuse, uv + vec2( d.x, -d.y ) ) + texture2D( tDiffuse, uv - vec2( d.x, -d.y ) ) );`,
-      ),
+		uniform float uBlur;
+		varying vec4 vUv;
+		varying vec3 vWorld;
+		#include <logdepthbuf_pars_fragment>
+		void main() {
+			#include <logdepthbuf_fragment>
+			vec2 uv = vUv.xy / vUv.w;
+			vec3 toEye = cameraPosition - vWorld;
+			float dist = length( toEye );
+			// meia-faixa: streakTexels(uBlur, dist) de mirrorMath.ts
+			float streak = uBlur * ( 1.0 + dist * ${glslFloat(MIRROR_STREAK_GROW)} );
+			vec2 dv = vec2( 0.0, uTexel.y * streak / 6.0 );
+			vec3 base = vec3( 0.0 );
+			for ( int k = -6; k <= 6; k ++ ) {
+				float w = ( 7.0 - abs( float( k ) ) ) / 49.0;
+				base += w * texture2D( tDiffuse, uv + dv * float( k ) ).rgb;
+			}
+			// Fresnel de Schlick (mirrorFresnel): ${glslFloat(MIRROR_F0)} de cima, 1 rasante
+			float c = clamp( abs( toEye.y ) / max( dist, 1e-4 ), 0.0, 1.0 );
+			float fresnel = ${glslFloat(MIRROR_F0)} + ${glslFloat(1 - MIRROR_F0)} * pow( 1.0 - c, 5.0 );
+			gl_FragColor = vec4( base * vec3( ${glslFloat(tr)}, ${glslFloat(tg)}, ${glslFloat(tb)} ) * fresnel, 1.0 );
+			#include <tonemapping_fragment>
+			#include <colorspace_fragment>
+		}`,
   };
 }
 
@@ -119,6 +146,8 @@ export class CityScene {
   readonly signMaterials: THREE.MeshStandardMaterial[] = [];
   readonly lampMaterial: THREE.MeshStandardMaterial;
   readonly lampMeshes: THREE.InstancedMesh[];
+  /** luz dos postes no chão (night-city door 2), lida por asfalto, calçada e terreno */
+  readonly lampLight: THREE.DataTexture;
   readonly reflector: Reflector | null;
   readonly reflectorSize = DOWNTOWN_HALF * 2;
   readonly water: Water;
@@ -144,7 +173,7 @@ export class CityScene {
         textureWidth,
         textureHeight,
         color: 0x8a8f9a,
-        shader: blurredReflectorShader(textureWidth, textureHeight),
+        shader: streakReflectorShader(textureWidth, textureHeight),
       });
       this.reflector.rotation.x = -Math.PI / 2;
       this.reflector.position.y = 0;
@@ -189,12 +218,16 @@ export class CityScene {
       this.group.add(mesh);
     }
 
-    this.lampMaterial = new THREE.MeshStandardMaterial({
-      color: '#000000',
-      emissive: '#ffd9a0',
-      emissiveIntensity: 2.5,
-    });
-    this.lampMeshes = this.buildLamps(data.lamps);
+    this.lampMaterial = makeStreetLampMaterial();
+    this.lampMeshes = [buildStreetLamps(data.lamps, data.network, this.lampMaterial)];
+    this.lampLight = makeLampLightTexture(
+      buildLampLight(data.lamps.map((l) => ({ ...lampHeadPosition(l), color: lampColor(l, data.network.roads[l.roadId]!) }))),
+    );
+    // o asfalto molhado brilha sob o poste; calçada e terra só recebem a luz no difuso
+    addLampLight(this.roadMaterial, this.lampLight, 3, 0.12, 'road-downtown');
+    addLampLight(this.roadOuterMaterial, this.lampLight, 3, 0.12, 'road-outer');
+    addLampLight(this.sidewalkMaterial, this.lampLight, 3, 0, 'sidewalk');
+    addLampLight(this.terrainMaterial, this.lampLight, 3, 0, 'terrain');
     this.group.add(...this.lampMeshes);
     this.group.add(...this.buildSigns(data.signs));
     scene.add(this.group);
@@ -245,28 +278,6 @@ export class CityScene {
     mesh.count = lots.length;
     mesh.frustumCulled = false;
     return mesh;
-  }
-
-  private buildLamps(lamps: Lamp[]): THREE.InstancedMesh[] {
-    const count = Math.max(1, lamps.length);
-    const posts = new THREE.InstancedMesh(
-      new THREE.CylinderGeometry(0.08, 0.1, LAMP_POST_HEIGHT, 6),
-      new THREE.MeshStandardMaterial({ color: '#2a2b33', roughness: 0.6, metalness: 0.6 }),
-      count,
-    );
-    const heads = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.2, 0.5), this.lampMaterial, count);
-    const m = new THREE.Matrix4();
-    lamps.forEach((lamp, i) => {
-      m.makeTranslation(lamp.x, lamp.y + LAMP_POST_HEIGHT / 2, lamp.z);
-      posts.setMatrixAt(i, m);
-      m.makeTranslation(lamp.x, lamp.y + LAMP_POST_HEIGHT, lamp.z);
-      heads.setMatrixAt(i, m);
-    });
-    posts.count = lamps.length;
-    heads.count = lamps.length;
-    posts.frustumCulled = false;
-    heads.frustumCulled = false;
-    return [posts, heads];
   }
 
   /** Um InstancedMesh por cor da paleta: o emissive (e o flicker) é por material. */
