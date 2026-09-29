@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { advanceSim, gotoGame } from './helpers';
+import { advanceSim, gotoGame, waitFrames } from './helpers';
 
 /**
  * block-life-extras: estacionados, vapor, gatos, holofotes e trem no browser,
@@ -33,7 +33,7 @@ const hexChannels = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, 
 test.describe('block-life-extras - extras do miolo e trem', () => {
   test.beforeEach(async ({ page }) => {
     await gotoGame(page);
-    await page.waitForTimeout(300);
+    await waitFrames(page, 20);
   });
 
   // C14 (AC 14)

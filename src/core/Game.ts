@@ -437,6 +437,7 @@ export class Game {
               materialColor: o.car.paintMaterial ? `#${o.car.paintMaterial.color.getHexString()}` : null,
               resets: o.resets,
               progress: { ...o.progress },
+              prev: { ...o.prev },
             };
           });
         },
@@ -463,7 +464,11 @@ export class Game {
         crossNextGate: () => game.race.crossNextGate(game.car),
         /** põe um oponente em (x, y, z), parado (para as provas do minimapa) */
         placeOpponent: (i: number, x: number, y: number, z: number, heading: number) =>
-          game.race.opponents[i]?.car.teleport(x, y, z, heading),
+          game.race.opponents[i]?.placeAt(x, y, z, heading),
+        /** test-hardening C24: segura a contagem em `countdown` */
+        set holdCountdown(on: boolean) {
+          game.race.holdCountdown = on;
+        },
       },
       get simTime() {
         return game.simTime;

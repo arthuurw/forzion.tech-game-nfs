@@ -115,3 +115,48 @@ export function insideLot(
   const v = dx * Math.cos(lot.rotation) - dz * Math.sin(lot.rotation);
   return Math.abs(u) <= lot.width / 2 && Math.abs(v) <= lot.depth / 2;
 }
+
+/** Espera o jogo renderizar mais `n` quadros (`__game.frames`); substitui esperas de relógio. */
+export async function waitFrames(page: Page, n: number): Promise<void> {
+  const start = await page.evaluate(() => (window as any).__game.frames as number);
+  await page.waitForFunction((target) => (window as any).__game.frames >= target, start + n, { timeout: SIM_TIMEOUT_MS });
+}
+
+/** Espera `n` quadros do navegador (rAF), para quando não existe `__game` (boot que falhou). */
+export async function pageFrames(page: Page, n: number): Promise<void> {
+  await page.evaluate(
+    (n) =>
+      new Promise<void>((done) => {
+        let left = n;
+        const tick = () => (--left <= 0 ? done() : requestAnimationFrame(tick));
+        requestAnimationFrame(tick);
+      }),
+    n,
+  );
+}
+
+/**
+ * Amostra, dentro do navegador e a cada quadro, a maior velocidade (km/h) de todos os carros
+ * enquanto a corrida está em `countdown`. Falha com `countdown não terminou em N s` se a
+ * contagem não acaba em `deadlineS` de simulação (test-hardening C24).
+ */
+export async function sampleCountdown(page: Page, deadlineS: number): Promise<number> {
+  const r = await page.evaluate(
+    (deadlineS) =>
+      new Promise<{ ended: boolean; maxKmh: number }>((done) => {
+        const g = (window as any).__game;
+        const end = g.simTime + deadlineS;
+        let maxKmh = 0;
+        const tick = () => {
+          if (g.race.state !== 'countdown') return done({ ended: true, maxKmh });
+          if (g.simTime >= end) return done({ ended: false, maxKmh });
+          maxKmh = Math.max(maxKmh, Math.abs(g.car.speedKmh), ...g.race.opponents.map((o: any) => Math.abs(o.speedKmh)));
+          requestAnimationFrame(tick);
+        };
+        tick();
+      }),
+    deadlineS,
+  );
+  if (!r.ended) throw new Error(`countdown não terminou em ${deadlineS} s`);
+  return r.maxKmh;
+}

@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
-import { advanceSim, gotoGame } from './helpers';
+import { advanceSim, gotoGame, waitFrames } from './helpers';
 
 test.describe('render', () => {
   test.beforeEach(async ({ page }) => {
     await gotoGame(page);
-    await page.waitForTimeout(500);
+    await waitFrames(page, 30);
   });
 
   // visual-upgrade C8 (supersede free-roam-city C21: reflector + GTAO + pós somam passes)

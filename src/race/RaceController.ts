@@ -49,6 +49,8 @@ const GO_HOLD_S = 1;
 export class RaceController {
   readonly races: RaceDef[];
   session: Session = createSession();
+  /** Só DEV/testes (test-hardening C24): segura a contagem para provar o prazo do teste */
+  holdCountdown = false;
   opponents: Opponent[] = [];
   player: RacerProgress = createProgress();
   /** marcador com prompt agora (índice da corrida) ou `null` */
@@ -159,7 +161,7 @@ export class RaceController {
     const race = this.race;
     if (!race) return;
     if (this.session.state === 'countdown') {
-      this.session = tickSession(this.session, dt, false);
+      if (!this.holdCountdown) this.session = tickSession(this.session, dt, false);
       if (this.session.state === 'racing') {
         for (const op of this.opponents) op.startClock(0);
       }

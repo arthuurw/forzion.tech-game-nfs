@@ -43,4 +43,41 @@ describe('test hygiene', () => {
     // drivetrain: a razão `t` só era conferida > 0, o que o rpm acima da marcha lenta já prova
     expect(read('tests/unit/drivetrain.test.ts')).not.toContain('const t = (back.state.rpm - spec.idleRpm)');
   });
+
+  // C23 (AC 18, AC 20)
+  it('e2e has no fixed clock waits nor fixed screenshot paths', () => {
+    const hits: string[] = [];
+    for (const f of walk('tests/e2e')) {
+      read(f)
+        .split('\n')
+        .forEach((line, i) => {
+          if (/waitForTimeout\s*\(/.test(line)) hits.push(`${f}:${i + 1} waitForTimeout`);
+          if (/screenshot\(\s*\{[^}]*path:\s*['"`]test-results\//.test(line)) hits.push(`${f}:${i + 1} screenshot path`);
+        });
+    }
+    expect(hits).toEqual([]);
+  });
+
+  // C28 (AC 24, door 1)
+  it('ci workflow runs build and unit tests', () => {
+    const ci = read('.github/workflows/ci.yml');
+    expect(ci).toMatch(/^on:\s*\[push, pull_request\]\s*$/m);
+    expect(ci).toMatch(/runs-on:\s*ubuntu-latest/);
+    expect(ci).toMatch(/node-version:\s*24\b/);
+    const runs = [...ci.matchAll(/^\s*- run:\s*(.+?)\s*$/gm)].map((m) => m[1]);
+    expect(runs).toEqual(['npm ci', 'npm run build', 'npm test']);
+  });
+
+  // C26 (AC 22)
+  it('old city generator is gone', () => {
+    const src = walk('src').map((f) => [f, read(f)] as const);
+    for (const name of ['generateCity', 'streetsFor', 'lampsFor', 'laneMarksFor', 'CITY_EXTENT']) {
+      expect(src.filter(([, text]) => new RegExp(`\\b${name}\\b`).test(text)).map(([f]) => f), name).toEqual([]);
+    }
+    const gen = read('src/world/CityGenerator.ts');
+    for (const name of ['mulberry32', 'NEON_PALETTE', 'FACADE_TYPES', 'DEFAULT_SEED']) {
+      expect(gen, name).toMatch(new RegExp(`export (const|function) ${name}\\b`));
+    }
+    expect(gen).not.toMatch(/8×8|202/);
+  });
 });

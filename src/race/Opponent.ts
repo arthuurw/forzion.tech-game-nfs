@@ -37,7 +37,8 @@ export class Opponent {
   resets = 0;
   /** o input entregue ao carro no último passo */
   lastInput: DriveInput = { ...HOLD_INPUT };
-  private prev = { x: 0, z: 0 };
+  /** posição do passo anterior, de onde sai o segmento que cruza os portões */
+  prev = { x: 0, z: 0 };
 
   constructor(
     world: RAPIER.World,
@@ -81,6 +82,11 @@ export class Opponent {
     this.place(resetTarget(this.race, this.progress.lastGate, this.index));
     this.resets++;
     restartStuck(this.ai, time);
+  }
+
+  /** Põe o oponente parado em (x, y, z): como o grid e o reset, atualiza `prev` e a IA junto (hook DEV `placeOpponent`). */
+  placeAt(x: number, y: number, z: number, heading: number): void {
+    this.place({ x, y: y - PLACE_HEIGHT, z, heading });
   }
 
   dispose(): void {
