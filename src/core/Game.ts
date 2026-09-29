@@ -1220,6 +1220,7 @@ export class Game {
         const read = (m: THREE.Material) => (m.userData.lampLight?.uLampLight.value as THREE.Texture | undefined)?.uuid ?? null;
         return {
           uuid: t.uuid,
+          version: t.version,
           width: t.image.width,
           height: t.image.height,
           linear: t.magFilter === THREE.LinearFilter && t.minFilter === THREE.LinearFilter,

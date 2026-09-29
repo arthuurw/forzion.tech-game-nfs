@@ -43,7 +43,7 @@ test.describe('night-city - postes', () => {
   });
 
   // C8 (AC 2)
-  test('lamp colors in the browser', async ({ page }) => {
+  test('lamp colors in the browser', { tag: '@smoke' }, async ({ page }) => {
     await open(page);
     const r = await page.evaluate(() => {
       const w = (window as any).__game.world;
@@ -69,6 +69,16 @@ test.describe('night-city - postes', () => {
     expect(l.linear).toBe(true);
     expect(l.mipmaps).toBe(false);
     for (const [name, uuid] of Object.entries(l.materials)) expect(uuid, name).toBe(l.uuid);
+  });
+
+  // C26 (AC 22): a grade de luz é montada uma vez e não muda com o tempo
+  test('lamp light map is built once', async ({ page }) => {
+    await open(page);
+    const a = await page.evaluate(() => (window as any).__game.world.lampLight);
+    await advanceSim(page, 1);
+    const b = await page.evaluate(() => (window as any).__game.world.lampLight);
+    expect(b.uuid).toBe(a.uuid);
+    expect(b.version).toBe(a.version);
   });
 });
 
@@ -117,7 +127,7 @@ test.describe('night-city - céu', () => {
   });
 
   // C15 (AC 12, door 3)
-  test('fog takes the horizon color', async ({ page }) => {
+  test('fog takes the horizon color', { tag: '@smoke' }, async ({ page }) => {
     await open(page);
     const s = await page.evaluate(() => (window as any).__game.world.sky);
     expect(s.fog).toBe('#2a1a3e');
@@ -162,5 +172,27 @@ test.describe('night-city - letreiros', () => {
       }
     }
     expect(total).toBeGreaterThan(0);
+  });
+});
+
+test.describe('night-city - qualidade baixa', () => {
+  // C27 (AC 23)
+  test('low quality keeps the night city', async ({ page }) => {
+    await open(page, '?quality=low');
+    const r = await page.evaluate(() => {
+      const g = (window as any).__game;
+      return {
+        lamps: g.world.lamps,
+        sky: g.world.sky,
+        light: g.world.lampLight,
+        signs: g.world.signs.map((s: any) => s.depth),
+        reflector: g.scene.reflector,
+      };
+    });
+    expect(r.lamps).toHaveLength(1);
+    expect(r.sky.inScene).toBe(true);
+    for (const [name, uuid] of Object.entries(r.light.materials)) expect(uuid, name).toBe(r.light.uuid);
+    for (const d of r.signs) expect(d).toBeCloseTo(0.12, 6);
+    expect(r.reflector.present).toBe(false);
   });
 });

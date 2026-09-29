@@ -19,7 +19,7 @@ describe('test hygiene', () => {
   // C7 (AC 7, door 2)
   it('every e2e spec file has a smoke test', () => {
     expect(e2eSpecs.sort()).toEqual(
-      ['audio', 'drive', 'extras', 'hud', 'interiors', 'race', 'render', 'visual', 'world'].map((n) => `${n}.spec.ts`),
+      ['audio', 'drive', 'extras', 'hud', 'interiors', 'nightCity', 'race', 'render', 'visual', 'world'].map((n) => `${n}.spec.ts`),
     );
     for (const f of e2eSpecs) {
       const smoke = read(`tests/e2e/${f}`).match(/\{\s*tag:\s*'@smoke'\s*\}/g) ?? [];

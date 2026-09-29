@@ -87,16 +87,17 @@ Proof: `npx playwright test tests/e2e/visual.spec.ts -g "lit windows stay stable
 
 ### S5 - orçamento e calma · 5 files · 60 KB · ~15k
 
-**C24** - No grid do centro em corrida: `render.calls` ≤ 218 (AC 20)
+**C24** - ✅ No grid do centro em corrida: `render.calls` ≤ 218 (AC 20)
 Proof: `npx playwright test tests/e2e/race.spec.ts -g "draw calls within budget while racing"`
 
-**C25** - Nas 5 poses de `render.spec.ts`: `render.calls` ≤ 220 (AC 21)
+**C25** - ✅ Nas 5 poses de `render.spec.ts`: `render.calls` ≤ 220 (AC 21)
 Proof: `npx playwright test tests/e2e/render.spec.ts -g "draw calls at most 220 across the world"`
 
-**C26** - Os textos de shader novos (céu, lente do poste, luz no chão, faixa do espelho, tinta de janela, glifo de letreiro) não declaram nem leem uniform de tempo (`uTime`, `time`), e a grade de luz é montada uma vez (AC 22)
+**C26** - ✅ Os textos de shader novos (céu, lente do poste, luz no chão, faixa do espelho, tinta de janela, glifo de letreiro) não declaram nem leem uniform de tempo (`uTime`, `time`), e a grade de luz é montada uma vez (AC 22)
 Proof: `npx vitest run tests/unit/nightCityShaders.test.ts -t "nothing new reads the clock"`
+Proof: `npx playwright test tests/e2e/nightCity.spec.ts -g "lamp light map is built once"` (mesma textura e mesma `version` depois de 1 s de simulação)
 
-**C27** - Com `?quality=low`: 1 malha de postes, cúpula `sky` na cena, o material do asfalto com o uniform `uLampLight`, letreiros com profundidade 0.12 e nenhum espelho (AC 23)
+**C27** - ✅ Com `?quality=low`: 1 malha de postes, cúpula `sky` na cena, o material do asfalto com o uniform `uLampLight`, letreiros com profundidade 0.12 e nenhum espelho (AC 23)
 Proof: `npx playwright test tests/e2e/nightCity.spec.ts -g "low quality keeps the night city"`
 
 **C28** - ✅ `src/world/lampLight.ts` é puro (sem `three` nem Rapier, direto ou por import relativo) e está na lista da trava de pureza (door 2)
@@ -160,3 +161,8 @@ Cost: 1 arquivo unitário novo (`lampLight.test.ts`), 1 de shaders (`nightCitySh
 - **Settled at checks:** o AC 18 pedia as proporções 70/20/10 contadas sobre as janelas acesas do seed 1337. O sorteio de janela é um hash `sin` que roda na GPU e não reproduz bit a bit em JavaScript, então contar janela na tela mediria o hash da GPU, não a regra. C22 prova a regra (`windowTint` sobre 10 000 valores uniformes) e que o shader usa os mesmos limites e cores com um hash separado do de janela acesa. Decisão delegada pelo usuário
 - **Settled mid-build:** C14 mede só a cúpula. No spawn, as colunas do meio do quadro caem num prédio distante tingido pela névoa (luminância ~0.2 no topo), e a medida comparava prédio com prédio. A sonda esconde o resto da cena durante o quadro; a afirmação sobre o degradê do céu é a mesma
 - **Settled mid-build:** door 3a no plan: cúpula de 500 m, porque a câmera tem `far` de 600 m
+- **Settled mid-build:** o espelho sem faixa ficou mais escuro que o de antes (tom ≤ 1 e Fresnel, sem overlay), e a prova de sensibilidade da residuals (C2, ≥ 0.003) caiu para 0.0012 e depois 0.0029. Em vez de mexer no limite dela, o tom subiu para `[0.88, 0.92, 1.0]` e o Fresnel de cima para 0.65: medido 0.0042 (C2), +0.00016 (C1, limite 0.001), ganho 0.011 contra 0.6 × 0.0096 (C4)
+- **Settled mid-build:** a faixa do espelho usa 13 amostras (o plano dizia 9 no doc do módulo): com 9, longe, o espaçamento passava do tamanho da fonte e a faixa virava pontos. A base passou de 6 para 10 texels, para o reflexo perto da câmera também virar faixa; o crescimento é 0.06 por metro
+- **Settled mid-build:** a sonda `mirrorStreak` esconde o carro do jogador (o reflexo perto cai atrás dele), desliga o bloom (o halo da esfera escorria para baixo da linha do chão) e corta em 25 % do pico (mede a forma da mancha, não o brilho)
+- **Settled mid-build:** `nightCity.spec.ts` entrou na lista da regra de higiene da test-hardening (C7 dela), com 2 testes `@smoke`
+

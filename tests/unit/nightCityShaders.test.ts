@@ -1,18 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { makeFacadeMaterial, streakReflectorShader } from '../../src/world/CityScene';
+import { makeFacadeMaterial, makeSignMaterial, streakReflectorShader } from '../../src/world/CityScene';
+import { createSky } from '../../src/world/Environment';
+import { addLampLight, makeStreetLampMaterial } from '../../src/world/StreetLamps';
 import { MIRROR_F0, MIRROR_STREAK_GROW, MIRROR_TINT, mirrorFresnel, streakTexels } from '../../src/world/mirrorMath';
 import { skylineHeight } from '../../src/world/skyMath';
 import { GLYPH_H, GLYPH_PATTERNS, GLYPH_W, glyphCoverage, glyphMask } from '../../src/world/signGlyphs';
 import { WINDOW_COOL, WINDOW_TV, WINDOW_WARM, windowTint } from '../../src/world/windowTint';
 
 // night-city: shaders e regras puras (checks C12, C16, C19, C22, C26)
-/** texto do fragment shader de fachada depois do `onBeforeCompile`, sobre o shader padrão do three */
-function facadeFragment(): string {
-  const m = makeFacadeMaterial(undefined, 0, { value: 1 }, { value: 1 });
+/** vertex + fragment de um material padrão depois do `onBeforeCompile` dele */
+function compiled(m: THREE.Material): { vertexShader: string; fragmentShader: string; uniforms: Record<string, unknown> } {
   const shader = { uniforms: {}, vertexShader: THREE.ShaderLib.standard.vertexShader, fragmentShader: THREE.ShaderLib.standard.fragmentShader };
   m.onBeforeCompile(shader as unknown as THREE.WebGLProgramParametersWithUniforms, undefined as unknown as THREE.WebGLRenderer);
-  return shader.fragmentShader;
+  return shader;
+}
+
+/** texto do fragment shader de fachada depois do `onBeforeCompile`, sobre o shader padrão do three */
+function facadeFragment(): string {
+  return compiled(makeFacadeMaterial(undefined, 0, { value: 1 }, { value: 1 })).fragmentShader;
 }
 
 const glsl = (v: number) => (Number.isInteger(v) ? v.toFixed(1) : String(v));
@@ -93,6 +99,25 @@ describe('night-city shaders', () => {
     for (const hex of [WINDOW_WARM, WINDOW_COOL, WINDOW_TV]) {
       const c = new THREE.Color(hex);
       expect(frag, hex).toContain(`vec3(${(c.r / warm.r).toFixed(4)}, ${(c.g / warm.g).toFixed(4)}, ${(c.b / warm.b).toFixed(4)})`);
+    }
+  });
+
+  // C26 (AC 22)
+  it('nothing new reads the clock', () => {
+    const ground = new THREE.MeshStandardMaterial();
+    addLampLight(ground, new THREE.Texture(), 3, 0.1, 'test');
+    const sky = createSky().material as THREE.ShaderMaterial;
+    const texts: Array<[string, string, Record<string, unknown>]> = [
+      ['sky', sky.vertexShader + sky.fragmentShader, sky.uniforms],
+      ['street lamp', ...(({ vertexShader, fragmentShader, uniforms }) => [vertexShader + fragmentShader, uniforms] as const)(compiled(makeStreetLampMaterial()))],
+      ['ground light', ...(({ vertexShader, fragmentShader, uniforms }) => [vertexShader + fragmentShader, uniforms] as const)(compiled(ground))],
+      ['mirror streak', streakReflectorShader(320, 180).vertexShader + streakReflectorShader(320, 180).fragmentShader, streakReflectorShader(320, 180).uniforms],
+      ['facade tint', facadeFragment(), {}],
+      ['neon sign', ...(({ vertexShader, fragmentShader, uniforms }) => [vertexShader + fragmentShader, uniforms] as const)(compiled(makeSignMaterial('#ff2d95', new THREE.Texture())))],
+    ];
+    for (const [name, text, uniforms] of texts) {
+      expect(text, name).not.toMatch(/\buTime\b|uniform\s+float\s+time\b/);
+      expect(Object.keys(uniforms).filter((k) => /time/i.test(k)), name).toEqual([]);
     }
   });
 });

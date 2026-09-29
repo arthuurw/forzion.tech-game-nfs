@@ -14,14 +14,14 @@ export const MIRROR_STREAK_GROW = 0.06;
 /** tom do reflexo, frio e abaixo de 1: o asfalto absorve parte da luz */
 export const MIRROR_TINT: readonly [number, number, number] = [0.88, 0.92, 1.0];
 /** refletância olhando de cima (Schlick F0) */
-export const MIRROR_F0 = 0.5;
+export const MIRROR_F0 = 0.65;
 
 /** Meia-faixa (texels) a `d` m da câmera, com base `base` (0 = amostra única). */
 export function streakTexels(base: number, d: number): number {
   return base * (1 + d * MIRROR_STREAK_GROW);
 }
 
-/** Fresnel de Schlick para o cosseno entre a vista e a normal do chão: 0.5 de cima, 1 rasante. */
+/** Fresnel de Schlick para o cosseno entre a vista e a normal do chão: 0.65 de cima, 1 rasante. */
 export function mirrorFresnel(cos: number): number {
   const c = Math.min(1, Math.max(0, cos));
   return MIRROR_F0 + (1 - MIRROR_F0) * (1 - c) ** 5;
