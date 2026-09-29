@@ -17,7 +17,10 @@ import {
 } from './aiDriver';
 import { createProgress, stepProgress } from './raceProgress';
 import type { RaceDef } from './raceRoutes';
-import { HOLD_INPUT, resetTarget } from './raceSession';
+import { HOLD_INPUT, resetTarget, stopInput } from './raceSession';
+
+/** `race` corre com a IA; `hold` segura na contagem; `stop` freia até parar depois da chegada */
+export type DriveMode = 'race' | 'hold' | 'stop';
 
 /** altura acima do ponto de estrada em que um carro é posto (m), como o spawn do jogo */
 export const PLACE_HEIGHT = 1.2;
@@ -56,11 +59,14 @@ export class Opponent {
     this.place(slot);
   }
 
-  /** Antes do `world.step`: o input deste passo; `hold` na contagem. */
-  drive(dt: number, hold: boolean): DriveInput {
+  /**
+   * Antes do `world.step`: o input deste passo. `hold` na contagem; `stop` depois da chegada dele
+   * ou da do jogador (play-fixes AC 9, AC 11): o esterço da IA com o freio até parar.
+   */
+  drive(dt: number, mode: DriveMode): DriveInput {
     const s = this.car.state();
     const input = aiDrive({ x: s.x, y: s.y, z: s.z, heading: s.heading, speedMs: s.speedMs }, this.route, this.ai, this.skill, this.offset);
-    this.lastInput = hold ? { ...HOLD_INPUT } : input;
+    this.lastInput = mode === 'hold' ? { ...HOLD_INPUT } : mode === 'stop' ? stopInput(input, s.speedKmh) : input;
     this.car.fixedUpdate(this.lastInput, dt);
     return this.lastInput;
   }

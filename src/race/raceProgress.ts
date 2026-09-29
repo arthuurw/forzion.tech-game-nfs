@@ -14,10 +14,12 @@ export interface RacerProgress {
   finished: boolean;
   /** tempo de chegada (s), `null` enquanto corre */
   finishTime: number | null;
+  /** fração do passo (0-1) em que cruzou a chegada: desempata chegadas no mesmo passo */
+  finishFrac: number;
 }
 
 export function createProgress(): RacerProgress {
-  return { nextGate: 0, lastGate: -1, lap: 1, finished: false, finishTime: null };
+  return { nextGate: 0, lastGate: -1, lap: 1, finished: false, finishTime: null, finishFrac: 0 };
 }
 
 /** Distância assinada de (x, z) à linha do portão, positiva à frente dele (no sentido do traçado). */
@@ -59,6 +61,7 @@ export function stepProgress(
     if (p.lap >= race.laps) {
       p.finished = true;
       p.finishTime = time;
+      p.finishFrac = t;
       p.nextGate = race.gates.length - 1;
     } else {
       p.lap++;
@@ -94,12 +97,15 @@ export interface Standing {
   distance: number;
 }
 
-/** Ordem: terminados por tempo; depois volta, próximo portão (maiores primeiro) e distância ao portão (menor primeiro). */
+/**
+ * Ordem: terminados por tempo e, no mesmo passo, pela fração do cruzamento (quem cruzou antes
+ * dentro do passo); depois volta, próximo portão (maiores primeiro) e distância ao portão (menor primeiro).
+ */
 export function standings(list: Standing[]): Standing[] {
   return [...list].sort((a, b) => {
     const fa = a.progress.finished;
     const fb = b.progress.finished;
-    if (fa && fb) return a.progress.finishTime! - b.progress.finishTime!;
+    if (fa && fb) return a.progress.finishTime! - b.progress.finishTime! || a.progress.finishFrac - b.progress.finishFrac;
     if (fa !== fb) return fa ? -1 : 1;
     if (a.progress.lap !== b.progress.lap) return b.progress.lap - a.progress.lap;
     if (a.progress.nextGate !== b.progress.nextGate) return b.progress.nextGate - a.progress.nextGate;

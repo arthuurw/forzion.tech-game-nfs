@@ -463,6 +463,7 @@ export class Game {
               resets: o.resets,
               progress: { ...o.progress },
               prev: { ...o.prev },
+              lastInput: { ...o.lastInput },
             };
           });
         },

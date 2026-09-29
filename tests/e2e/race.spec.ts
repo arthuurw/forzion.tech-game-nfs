@@ -208,6 +208,29 @@ test.describe('races', () => {
     for (const r of rows.slice(1)) expect(r[2]).toBe('--:--.--');
   });
 
+  // play-fixes C16 (AC 11): depois da chegada do jogador, quem ainda corre freia com o esterço da IA
+  test('unfinished opponents brake after the player finishes', async ({ page }) => {
+    await startRace(page, 'sprint-cruzada');
+    await advanceSim(page, 3);
+    const n = await page.evaluate(() => (window as any).__game.race.races.find((x: any) => x.id === 'sprint-cruzada').gates.length as number);
+    for (let k = 0; k < n; k++) {
+      await page.evaluate(() => (window as any).__game.race.crossNextGate());
+      await advanceSim(page, 0.05);
+    }
+    expect(await waitSimUntil(page, "g.race.state === 'finished'", 1)).toBe(true);
+    await advanceSim(page, 0.1);
+    const ops = await page.evaluate(() =>
+      ((window as any).__game.race.opponents as any[]).map((o) => ({ kmh: o.speedKmh as number, finished: o.progress.finished as boolean, input: o.lastInput })),
+    );
+    const running = ops.filter((o) => !o.finished && o.kmh > 5);
+    expect(running.length).toBeGreaterThan(0);
+    for (const o of running) {
+      expect(o.input.handbrake).toBe(false);
+      expect(o.input.brake).toBe(true);
+      expect(o.input.throttle).toBe(false);
+    }
+  });
+
   // C21 (AC 19)
   test('opponents wear their own paint', async ({ page }) => {
     await startRace(page, 'circuito-centro', false);

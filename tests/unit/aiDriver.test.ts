@@ -81,6 +81,11 @@ describe('ai driver', () => {
       marker: { x: 0, z: 0, radius: 10 },
     };
     expect(resetTarget(race, -1, 2)).toEqual({ x: 2, y: 0, z: -10, heading: 0 });
-    expect(resetTarget(race, 0, 2)).toEqual({ x: 0, y: 0, z: 50, heading: 0 });
+    // play-fixes AC 12: com portão, o lugar 2 do grid atrás dele (fileira 16 m, à esquerda)
+    const t = resetTarget(race, 0, 2);
+    expect(t.x).toBeCloseTo(3, 9);
+    expect(t.y).toBeCloseTo(0, 9);
+    expect(t.z).toBeCloseTo(34, 9);
+    expect(t.heading).toBeCloseTo(0, 9);
   });
 });

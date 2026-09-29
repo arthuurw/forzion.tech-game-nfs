@@ -153,8 +153,12 @@ export class RaceController {
   }
 
   beforeStep(dt: number): void {
-    const hold = this.session.state !== 'racing';
-    for (const op of this.opponents) op.drive(dt, hold);
+    const st = this.session.state;
+    for (const op of this.opponents) {
+      // depois da chegada dele, ou da do jogador, o oponente freia até parar (play-fixes AC 9, AC 11)
+      const mode = st === 'countdown' ? 'hold' : st === 'finished' || op.progress.finished ? 'stop' : 'race';
+      op.drive(dt, mode);
+    }
   }
 
   afterStep(dt: number, car: Car): void {

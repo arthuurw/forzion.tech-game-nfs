@@ -42,7 +42,7 @@ Reusa o que já decide cada caso: `createInputState` para limpar o input, o `sho
 3. `core/GameLoop` (exists) → `main.ts` (exists): um throw no quadro para o loop e chama `showError`. O `main` mostra "Gerando cidade..." e cede um quadro antes do `new Game`.
 4. `core/Game` (exists): passa ao áudio o `DriveInput` efetivo do passo; o R do free roam chama `Car.reset` com heading; o resize refaz o espelho, o pixelRatio e o GTAO.
 5. `vehicle/Car` (exists): `teleport` e `reset` voltam o câmbio, o volante e as amostras de g lateral ao estado inicial; `reset` mantém o yaw.
-6. `race/Opponent`, `race/RaceController`, `race/raceSession`, `race/raceProgress` (exists): input de parada depois da chegada, reset por slot e desempate pela fração do cruzamento.
+6. `race/Opponent`, `race/RaceController`, `race/raceSession`, `race/raceProgress`, `race/raceRoutes` (exists): input de parada depois da chegada, reset por slot (o grid montado atrás do portão), desempate pela fração do cruzamento e a chegada do sprint 200 m antes do fim do traçado.
 7. `world/Rain` e `world/rainMath` (exists): a caixa da chuva segue a altura do carro.
 8. `world/interiors/interiorMotion`, `world/interiors/InteriorScene`, `world/interiors/InteriorProps` (exists): caixa orientada do chassi para gato e pedestre, saída da fuga sem rota, cor por identidade, malha de estacionados só com carros.
 9. `world/rail/trainLine` (exists): portal pulado quando uma coluna encosta noutra estrada.
@@ -55,6 +55,8 @@ Reusa o que já decide cada caso: `createInputState` para limpar o input, o `sho
 | checks de outras features | free-roam-city C11 (`drive.spec.ts:186-190`) exige rotação identidade depois do R. Passa a exigir o carro em pé com o heading mantido. Renegociado com o usuário em 2026-09-29 |
 | checks de outras features | block-life-extras C25 (`extrasMotion.test.ts:166`) cobra o gato a ≥ 0.5 m do centro do carro. Passa a cobrar fora da caixa do chassi, o que é mais forte |
 | checks de outras features | races: o hold depois da chegada deixa de ser `HOLD_INPUT`. A contagem continua com `HOLD_INPUT` (races AC 29 e C29) |
+| checks de outras features | races AC 4 e C6 (`raceRoutes.test.ts` "gates spaced and sized") exigiam a chegada do sprint a ≤ 4 m do fim do traçado. A chegada passa a ficar 200 m antes do fim (`SPRINT_RUNOFF`): nas duas sprints do seed 1337 o traçado acaba num T com o anel ou no fim da estrada do morro, e o AC 10 pede parar no traçado. Achado no build |
+| checks de outras features | races C29 (`raceSession.test.ts` "reset target is last gate or grid slot") e o caso de portão de `aiDriver.test.ts` punham o alvo em cima do portão. Com o AC 12 passa a ser o lugar do grid montado atrás do portão, para todos os slots, inclusive o do jogador. Achado no build |
 | checks de outras features | visual-upgrade C4 (alvo do espelho = `floor(innerWidth × 0.5) × floor(innerHeight × 0.5)`) continua valendo, agora também depois de um resize |
 | termo | `AudioEngine.state` era "já chamei start". Passa a ser o `ctx.state` real. Quem lê: `tests/e2e/audio.spec.ts` e o hook DEV `audio` |
 | mundo | com o seed 1337, um portal do trem some no canto NW (o da coluna sobre a avenida 4). A contagem de portais cai em 1 ou mais |

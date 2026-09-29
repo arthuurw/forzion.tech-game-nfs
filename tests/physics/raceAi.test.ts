@@ -4,8 +4,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { Assets } from '../../src/core/Loader';
 import { AI_PAINTS, AI_SKILLS, prepareRoute } from '../../src/race/aiDriver';
 import { Opponent, PLACE_HEIGHT } from '../../src/race/Opponent';
-import { generateRaces, type RaceDef } from '../../src/race/raceRoutes';
-import { resetTarget } from '../../src/race/raceSession';
+import { generateRaces, gridSlotAt, widthAt, type RaceDef } from '../../src/race/raceRoutes';
+import { HOLD_INPUT, resetTarget } from '../../src/race/raceSession';
 import { Car } from '../../src/vehicle/Car';
 import { DEFAULT_CAR } from '../../src/vehicle/carSpec';
 import type { DriveInput } from '../../src/vehicle/drivetrain';
@@ -45,7 +45,7 @@ function runAlone(world: RAPIER.World, race: RaceDef, index: number, maxS: numbe
   op.startClock(0);
   let steps = 0;
   while (!op.progress.finished && steps < maxS * 60) {
-    op.drive(DT, false);
+    op.drive(DT, 'race');
     world.step();
     steps++;
     op.track(steps * DT, true);
@@ -53,6 +53,46 @@ function runAlone(world: RAPIER.World, race: RaceDef, index: number, maxS: numbe
   const out = { time: op.progress.finishTime ?? steps * DT, finished: op.progress.finished, resets: op.resets };
   op.dispose();
   return out;
+}
+
+/** Distância horizontal de (x, z) ao traçado da corrida (polilinha; fechada no circuito). */
+function distToRoute(race: RaceDef, x: number, z: number): number {
+  const p = race.route.points;
+  const n = p.length / 3;
+  const segs = race.route.closed ? n : n - 1;
+  let best = Infinity;
+  for (let i = 0; i < segs; i++) {
+    const j = (i + 1) % n;
+    const ax = p[i * 3]!;
+    const az = p[i * 3 + 2]!;
+    const dx = p[j * 3]! - ax;
+    const dz = p[j * 3 + 2]! - az;
+    const l2 = dx * dx + dz * dz;
+    const t = l2 > 0 ? Math.min(1, Math.max(0, ((x - ax) * dx + (z - az) * dz) / l2)) : 0;
+    best = Math.min(best, Math.hypot(x - ax - dx * t, z - az - dz * t));
+  }
+  return best;
+}
+
+/**
+ * Freia um oponente no modo `stop` por 8 s: quando fica abaixo de 5 km/h, a maior folga
+ * `distância ao traçado − largura / 2` no caminho e se algum passo acima de 5 km/h recebeu `HOLD_INPUT`.
+ */
+function brakeFor8s(world: RAPIER.World, op: Opponent, race: RaceDef, k0: number) {
+  let stoppedAt = -1;
+  let worst = -Infinity;
+  let held = false;
+  for (let k = 0; k < 8 * 60; k++) {
+    const before = op.car.state().speedKmh;
+    const input = op.drive(DT, 'stop');
+    if (Math.abs(before) > 5 && input.handbrake) held = true;
+    world.step();
+    op.track((k0 + k + 1) * DT, false);
+    const t = op.car.body.translation();
+    worst = Math.max(worst, distToRoute(race, t.x, t.z) - widthAt(network, t.x, t.z) / 2);
+    if (stoppedAt < 0 && Math.abs(op.car.speedKmh()) < 5) stoppedAt = (k + 1) * DT;
+  }
+  return { stoppedAt, worst, held, endKmh: Math.abs(op.car.speedKmh()) };
 }
 
 describe('race opponents in the real world', () => {
@@ -65,7 +105,7 @@ describe('race opponents in the real world', () => {
     const inputs: DriveInput[] = [];
     const trace: Array<{ p: RAPIER.Vector; q: RAPIER.Rotation }> = [];
     for (let k = 0; k < 20 * 60; k++) {
-      inputs.push({ ...op.drive(DT, false) });
+      inputs.push({ ...op.drive(DT, 'race') });
       a.step();
       op.track((k + 1) * DT, true);
       trace.push({ p: { ...op.car.body.translation() }, q: { ...op.car.body.rotation() } });
@@ -114,7 +154,7 @@ describe('race opponents in the real world', () => {
     op.startClock(0);
     let k = 0;
     const step = () => {
-      op.drive(DT, false);
+      op.drive(DT, 'race');
       world.step();
       k++;
       op.track(k * DT, true);
@@ -158,4 +198,67 @@ describe('race opponents in the real world', () => {
     expect({ bodies: world.bodies.len(), colliders: world.colliders.len(), vehicles: world.vehicleControllers.size }).toEqual(before);
     expect(car.mesh.parent).toBeNull();
   }, 120_000);
+
+  // play-fixes C14 (AC 9, AC 10): cada oponente chega na última volta, a 400 m da chegada
+  it('finished opponents stop on the road in every race', { tags: ['slow'], timeout: 900_000 }, () => {
+    const world = makeWorld();
+    for (const race of races) {
+      for (let index = 0; index < AI_SKILLS.length; index++) {
+        const label = `${race.id} oponente ${index}`;
+        const op = new Opponent(world, new THREE.Scene(), ASSETS, race, prepareRoute(race.route), index);
+        const finish = race.gates[race.gates.length - 1]!;
+        const start = gridSlotAt(race.route, finish.s - 400 + 16, 0);
+        op.placeAt(start.x, start.y + PLACE_HEIGHT, start.z, start.heading);
+        op.progress.lap = race.laps;
+        op.progress.nextGate = race.gates.length - 1;
+        op.progress.lastGate = race.gates.length - 2;
+        op.startClock(0);
+        let k = 0;
+        while (!op.progress.finished && k < 60 * 60) {
+          op.drive(DT, 'race');
+          world.step();
+          k++;
+          op.track(k * DT, true);
+        }
+        expect(op.progress.finished, label).toBe(true);
+        const r = brakeFor8s(world, op, race, k);
+        expect(r.stoppedAt, label).toBeGreaterThan(0);
+        expect(r.stoppedAt, label).toBeLessThanOrEqual(8);
+        expect(r.endKmh, label).toBeLessThan(5);
+        expect(r.worst, label).toBeLessThanOrEqual(0);
+        expect(r.held, label).toBe(false);
+        op.dispose();
+      }
+    }
+  });
+
+  // play-fixes C15 (AC 11): a sessão acabou (o jogador chegou) com o oponente ainda correndo
+  it('opponents still racing stop when the player finishes', () => {
+    const race = byId('circuito-centro');
+    const world = makeWorld();
+    const op = new Opponent(world, new THREE.Scene(), ASSETS, race, prepareRoute(race.route), 2);
+    op.startClock(0);
+    let k = 0;
+    while (op.car.speedKmh() < 60 && k < 30 * 60) {
+      op.drive(DT, 'race');
+      world.step();
+      k++;
+      op.track(k * DT, true);
+    }
+    expect(op.car.speedKmh()).toBeGreaterThanOrEqual(60);
+    expect(op.progress.finished).toBe(false);
+    // cada passo recebe o `stopInput` do esterço da IA, nunca o freio de mão acima de 5 km/h
+    const ai = op.drive(DT, 'stop');
+    expect(ai).toEqual({ throttle: false, brake: true, steer: ai.steer, handbrake: false });
+    expect(ai).not.toEqual(HOLD_INPUT);
+    world.step();
+    k++;
+    op.track(k * DT, false);
+    const r = brakeFor8s(world, op, race, k);
+    expect(r.held).toBe(false);
+    expect(r.stoppedAt).toBeGreaterThan(0);
+    expect(r.stoppedAt).toBeLessThanOrEqual(8);
+    expect(r.endKmh).toBeLessThan(5);
+    expect(r.worst).toBeLessThanOrEqual(0);
+  }, 300_000);
 });
