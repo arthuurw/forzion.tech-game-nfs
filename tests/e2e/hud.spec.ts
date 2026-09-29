@@ -204,3 +204,35 @@ test.describe('hud - rodada 2', () => {
     expect(Math.abs(sample.rpmWidth - expectedWidth)).toBeLessThan(15);
   });
 });
+
+test.describe('hud - erro e carregamento', () => {
+  // play-fixes C11 (AC 7)
+  test('a frame error shows the error overlay', async ({ page }) => {
+    await gotoGame(page);
+    await page.evaluate(() => (window as any).__game.failNextStep('boom'));
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('#error')!).display !== 'none', null, { timeout: 5_000 });
+    expect(await page.textContent('#error')).toBe('Erro no jogo: boom');
+    const t0 = await page.evaluate(() => (window as any).__game.simTime as number);
+    // 0.5 s de relógio e pelo menos 10 quadros do navegador, sem o loop do jogo
+    const since = await page.evaluate(() => performance.now());
+    await pageFrames(page, 10);
+    await page.waitForFunction((since) => performance.now() - since >= 500, since);
+    expect(await page.evaluate(() => (window as any).__game.simTime as number)).toBe(t0);
+  });
+
+  // play-fixes C12 (AC 8): um quadro roda com o texto novo antes de o mundo existir
+  test('loading paints city generation before building the world', async ({ page }) => {
+    await page.addInitScript(() => {
+      const w = window as any;
+      w.__sawCityText = false;
+      const tick = () => {
+        const el = document.querySelector('#loading-text');
+        if (!w.__game && el?.textContent === 'Gerando cidade...') w.__sawCityText = true;
+        if (!w.__game) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    await gotoGame(page);
+    expect(await page.evaluate(() => (window as any).__sawCityText)).toBe(true);
+  });
+});

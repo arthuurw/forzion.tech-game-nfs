@@ -39,6 +39,7 @@ import { addNightLights, createNightEnvironment, createSky } from '../world/Envi
 import { GameLoop } from './GameLoop';
 import { InputManager } from './InputManager';
 import type { Assets } from './Loader';
+import type { DriveInput } from '../vehicle/drivetrain';
 
 /**
  * Ponto de spawn: na avenida que passa mais perto da origem, 6 pontos (12 m)
@@ -121,6 +122,10 @@ export class Game {
   /** corridas (races): marcadores, sessão, oponentes e HUD de corrida */
   readonly race: RaceController;
   readonly audio = new AudioEngine();
+  /** o `DriveInput` que chegou ao carro do jogador no último passo */
+  /** só DEV (play-fixes C11): mensagem do throw forçado no próximo passo */
+  private failNext: string | null = null;
+  private driveInput: DriveInput = { throttle: false, brake: false, steer: 0, handbrake: false };
   readonly input = new InputManager();
   readonly loop: GameLoop;
   ready = false;
@@ -276,6 +281,9 @@ export class Game {
     this.race = new RaceController(this.world, this.scene, assets, network, hudRoot);
 
     this.input.setFirstKeyHandler(() => this.audio.start());
+    // um contexto suspenso (autoplay, aba oculta) volta no próximo gesto; a aba oculta suspende o som
+    this.input.setGestureHandler(() => this.audio.resume());
+    document.addEventListener('visibilitychange', this.handleVisibility);
     // na corrida, R volta ao último portão (races AC 27); no free roam desvira no lugar
     this.input.onPress('KeyR', () => {
       if (!this.race.resetPlayer(this.car)) this.car.reset();
@@ -294,13 +302,16 @@ export class Game {
   }
 
   private readonly fixedUpdate = (dt: number): void => {
+    if (this.failNext !== null) {
+      const message = this.failNext;
+      this.failNext = null;
+      throw new Error(message);
+    }
     const s = this.input.state;
     // sentido do movimento antes do passo: a batida zera a velocidade, então o lado do impacto vem daqui
     const movingDir = this.car.speedMs() >= 0 ? 1 : -1;
-    this.car.fixedUpdate(
-      this.race.playerInput({ throttle: s.throttle, brake: s.brake, steer: steerAxis(s), handbrake: s.handbrake }),
-      dt,
-    );
+    this.driveInput = this.race.playerInput({ throttle: s.throttle, brake: s.brake, steer: steerAxis(s), handbrake: s.handbrake });
+    this.car.fixedUpdate(this.driveInput, dt);
     this.race.beforeStep(dt);
     this.world.step(this.eventQueue);
     this.simTime += dt;
@@ -367,7 +378,8 @@ export class Game {
     (this.grade.uniforms.uBlur as { value: number }).value = blurFor(state.speedKmh);
     this.hud.update(state);
     this.minimap.update(state, this.race.render(state));
-    this.audio.update(state.rpm, this.input.state.throttle);
+    // o acelerador que chegou ao carro: na contagem, o segurado (play-fixes AC 6)
+    this.audio.update(state.rpm, this.driveInput.throttle);
 
     this.sky.position.copy(this.chase.camera.position);
     this.renderer.info.reset();
@@ -379,6 +391,11 @@ export class Game {
       this.ready = true;
       this.onFirstFrame();
     }
+  };
+
+  private readonly handleVisibility = (): void => {
+    if (document.visibilityState === 'hidden') this.audio.suspend();
+    else this.audio.resume();
   };
 
   private readonly handleResize = (): void => {
@@ -396,6 +413,10 @@ export class Game {
     return {
       get ready() {
         return game.ready;
+      },
+      /** só DEV (play-fixes C11): o próximo `fixedUpdate` lança `Error(message)` */
+      failNextStep: (message: string) => {
+        game.failNext = message;
       },
       /** só DEV (races): corridas, sessão, oponentes, portão e sondas das provas */
       race: {
@@ -1148,6 +1169,8 @@ export class Game {
         get throttling() {
           return game.audio.isThrottling();
         },
+        /** só DEV (play-fixes C5): suspende o contexto como a aba oculta faz */
+        suspend: () => game.audio.suspend(),
       },
     };
   }

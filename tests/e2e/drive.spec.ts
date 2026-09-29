@@ -51,6 +51,20 @@ test.describe('drive', () => {
     expect(gear).toEqual({ label: 'R', value: -1 });
   });
 
+  // play-fixes C3 (AC 1): o keyup de W iria para outra janela
+  test('window blur releases the throttle', async ({ page }) => {
+    await page.keyboard.down('KeyW');
+    await advanceSim(page, 1);
+    await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+    await advanceSim(page, 0.5);
+    const a = await speedKmh(page);
+    await advanceSim(page, 1);
+    const b = await speedKmh(page);
+    await page.keyboard.up('KeyW');
+    expect(a).toBeGreaterThan(5);
+    expect(b - a).toBeLessThanOrEqual(0.5);
+  });
+
   // extra: sinal da direção (A vira à esquerda = heading cresce)
   test('A turns left', async ({ page }) => {
     const h0 = await heading(page);

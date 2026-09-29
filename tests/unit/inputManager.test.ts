@@ -63,4 +63,60 @@ describe('InputManager', () => {
     target.dispatchEvent(key('keyup', 'KeyR'));
     expect(presses).toBe(2);
   });
+
+  // play-fixes C1 (AC 1)
+  const HELD = ['KeyW', 'KeyS', 'KeyA', 'KeyD', 'Space'] as const;
+  const released = (input: InputManager) => ({
+    throttle: input.state.throttle,
+    brake: input.state.brake,
+    steerLeft: input.state.steerLeft,
+    steerRight: input.state.steerRight,
+    handbrake: input.state.handbrake,
+  });
+  const NONE = { throttle: false, brake: false, steerLeft: false, steerRight: false, handbrake: false };
+
+  it('blur releases every held key', () => {
+    const { target, input } = setup();
+    for (const code of HELD) target.dispatchEvent(key('keydown', code));
+    expect(released(input)).toEqual({ throttle: true, brake: true, steerLeft: true, steerRight: true, handbrake: true });
+    target.dispatchEvent(new Event('blur'));
+    expect(released(input)).toEqual(NONE);
+  });
+
+  // play-fixes C2 (AC 2)
+  it('hidden page releases every held key', () => {
+    const target = new EventTarget();
+    const doc = Object.assign(new EventTarget(), { visibilityState: 'visible' as DocumentVisibilityState });
+    const input = new InputManager(target as unknown as Window, doc as unknown as Document);
+    for (const code of HELD) target.dispatchEvent(key('keydown', code));
+    doc.dispatchEvent(new Event('visibilitychange'));
+    expect(released(input)).toEqual({ throttle: true, brake: true, steerLeft: true, steerRight: true, handbrake: true });
+    doc.visibilityState = 'hidden';
+    doc.dispatchEvent(new Event('visibilitychange'));
+    expect(released(input)).toEqual(NONE);
+  });
+
+  // play-fixes C6 (AC 4)
+  it('gesture handler on every keydown and pointerdown', () => {
+    const { target, input } = setup();
+    let gestures = 0;
+    input.setGestureHandler(() => gestures++);
+    target.dispatchEvent(key('keydown', 'KeyW'));
+    target.dispatchEvent(key('keydown', 'KeyW', true));
+    target.dispatchEvent(key('keydown', 'ShiftLeft'));
+    target.dispatchEvent(new Event('pointerdown'));
+    target.dispatchEvent(key('keyup', 'KeyW'));
+    expect(gestures).toBe(4);
+  });
+
+  // play-fixes C6 (AC 5)
+  it('first key handler runs after the key is applied', () => {
+    const { target, input } = setup();
+    let seen: boolean | null = null;
+    input.setFirstKeyHandler(() => {
+      seen = input.state.throttle;
+    });
+    target.dispatchEvent(key('keydown', 'KeyW'));
+    expect(seen).toBe(true);
+  });
 });

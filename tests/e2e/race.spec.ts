@@ -138,6 +138,23 @@ test.describe('races', () => {
     expect(await state(page)).toBe('racing');
   });
 
+  // play-fixes C9 (AC 6): na contagem o acelerador não chega ao carro, nem ao som
+  test('countdown keeps the engine sound at idle', async ({ page }) => {
+    await startRace(page, 'circuito-centro', false);
+    await page.waitForFunction(() => (window as any).__game.audio.state === 'running', null, { timeout: 5_000 });
+    await page.keyboard.down('KeyW');
+    await advanceSim(page, 1);
+    const a = await page.evaluate(() => ({
+      state: (window as any).__game.race.state as string,
+      target: (window as any).__game.audio.gains.engineTarget as number,
+      real: (window as any).__game.audio.params.engineGain as number,
+    }));
+    await page.keyboard.up('KeyW');
+    expect(a.state).toBe('countdown');
+    expect(a.target).toBeCloseTo(0.048, 6);
+    expect(a.real).toBeLessThan(0.06);
+  });
+
   // C14 (AC 12)
   test('only the next gate is shown', async ({ page }) => {
     await startRace(page, 'circuito-centro');

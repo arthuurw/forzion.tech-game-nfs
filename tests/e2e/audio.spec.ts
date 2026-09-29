@@ -134,4 +134,70 @@ test.describe('audio', () => {
     await page.keyboard.press('KeyM');
     expect((await page.evaluate(() => (window as any).__game.audio.gains)).master).toBeCloseTo(1, 6);
   });
+
+  // play-fixes C4 (AC 3)
+  test('hidden tab suspends the audio', async ({ page }) => {
+    await startAudio(page);
+    const setVisibility = (v: string) =>
+      page.evaluate((v) => {
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => v });
+        document.dispatchEvent(new Event('visibilitychange'));
+      }, v);
+    await setVisibility('hidden');
+    await page.waitForFunction(() => (window as any).__game.audio.contextState === 'suspended', null, { timeout: 5_000 });
+    await setVisibility('visible');
+    await page.waitForFunction(() => (window as any).__game.audio.contextState === 'running', null, { timeout: 5_000 });
+  });
+
+  // play-fixes C5 (AC 4)
+  test('key or pointer resumes a suspended context', async ({ page }) => {
+    await startAudio(page);
+    const suspend = async () => {
+      await page.evaluate(() => (window as any).__game.audio.suspend());
+      await page.waitForFunction(() => (window as any).__game.audio.contextState === 'suspended', null, { timeout: 5_000 });
+    };
+    await suspend();
+    await page.keyboard.press('ShiftLeft');
+    await page.waitForFunction(() => (window as any).__game.audio.contextState === 'running', null, { timeout: 5_000 });
+    await suspend();
+    await page.locator('#game').dispatchEvent('pointerdown');
+    await page.waitForFunction(() => (window as any).__game.audio.contextState === 'running', null, { timeout: 5_000 });
+  });
+
+  // play-fixes C7 (AC 4): `idle` sem contexto; depois, o `ctx.state` real
+  test('audio state mirrors the context', async ({ page }) => {
+    const read = () => page.evaluate(() => ({ state: (window as any).__game.audio.state, ctx: (window as any).__game.audio.contextState }));
+    expect(await read()).toEqual({ state: 'idle', ctx: 'none' });
+    await startAudio(page);
+    expect(await read()).toEqual({ state: 'running', ctx: 'running' });
+    await page.evaluate(() => (window as any).__game.audio.suspend());
+    await page.waitForFunction(() => (window as any).__game.audio.contextState === 'suspended', null, { timeout: 5_000 });
+    expect(await read()).toEqual({ state: 'suspended', ctx: 'suspended' });
+  });
+});
+
+test.describe('audio unavailable', () => {
+  // play-fixes C8 (AC 5)
+  test('game runs silent when audio fails', async ({ page }) => {
+    await page.addInitScript(() => {
+      (window as any).AudioContext = function () {
+        throw new Error('sem Web Audio');
+      };
+    });
+    const warns: string[] = [];
+    const pageErrors: string[] = [];
+    page.on('console', (m) => {
+      if (m.type() === 'warning') warns.push(m.text());
+    });
+    page.on('pageerror', (e) => pageErrors.push(e.message));
+    await gotoGame(page);
+    await page.keyboard.down('KeyW');
+    await advanceSim(page, 1);
+    const kmh = await page.evaluate(() => (window as any).__game.car.speedKmh as number);
+    await page.keyboard.up('KeyW');
+    expect(kmh).toBeGreaterThan(5);
+    expect(warns.some((w) => w.startsWith('Áudio indisponível'))).toBe(true);
+    expect(pageErrors).toEqual([]);
+    expect(await page.evaluate(() => (window as any).__game.audio.state)).toBe('idle');
+  });
 });
