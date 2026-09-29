@@ -1,9 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { streakReflectorShader } from '../../src/world/CityScene';
+import * as THREE from 'three';
+import { makeFacadeMaterial, streakReflectorShader } from '../../src/world/CityScene';
 import { MIRROR_F0, MIRROR_STREAK_GROW, MIRROR_TINT, mirrorFresnel, streakTexels } from '../../src/world/mirrorMath';
 import { skylineHeight } from '../../src/world/skyMath';
+import { GLYPH_H, GLYPH_PATTERNS, GLYPH_W, glyphCoverage, glyphMask } from '../../src/world/signGlyphs';
+import { WINDOW_COOL, WINDOW_TV, WINDOW_WARM, windowTint } from '../../src/world/windowTint';
 
 // night-city: shaders e regras puras (checks C12, C16, C19, C22, C26)
+/** texto do fragment shader de fachada depois do `onBeforeCompile`, sobre o shader padrão do three */
+function facadeFragment(): string {
+  const m = makeFacadeMaterial(undefined, 0, { value: 1 }, { value: 1 });
+  const shader = { uniforms: {}, vertexShader: THREE.ShaderLib.standard.vertexShader, fragmentShader: THREE.ShaderLib.standard.fragmentShader };
+  m.onBeforeCompile(shader as unknown as THREE.WebGLProgramParametersWithUniforms, undefined as unknown as THREE.WebGLRenderer);
+  return shader.fragmentShader;
+}
+
 const glsl = (v: number) => (Number.isInteger(v) ? v.toFixed(1) : String(v));
 
 describe('night-city shaders', () => {
@@ -43,6 +54,45 @@ describe('night-city shaders', () => {
     for (const az of [-3, -1.2, 0, 0.7, 2.5]) {
       expect(skylineHeight(az + 2 * Math.PI)).toBe(skylineHeight(az));
       expect(skylineHeight(az)).toBe(skylineHeight(az));
+    }
+  });
+
+  // C19 (AC 16)
+  it('sign glyphs cover part of the face', () => {
+    expect(GLYPH_PATTERNS).toBe(8);
+    for (let p = 0; p < GLYPH_PATTERNS; p++) {
+      const mask = glyphMask(p);
+      expect(mask.length, `pattern ${p}`).toBe(GLYPH_W * GLYPH_H);
+      const c = glyphCoverage(mask);
+      expect(c, `pattern ${p}`).toBeGreaterThanOrEqual(0.15);
+      expect(c, `pattern ${p}`).toBeLessThanOrEqual(0.45);
+      expect(glyphMask(p)).toEqual(mask);
+    }
+  });
+
+  // C22 (AC 18)
+  it('window tints come in three fixed colors', () => {
+    const counts = new Map<string, number>();
+    for (let i = 0; i < 10_000; i++) {
+      const c = windowTint((i + 0.5) / 10_000);
+      counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+    expect([...counts.keys()].sort()).toEqual([WINDOW_TV, WINDOW_COOL, WINDOW_WARM].sort());
+    expect(Math.abs(counts.get(WINDOW_WARM)! / 10_000 - 0.7)).toBeLessThanOrEqual(0.01);
+    expect(Math.abs(counts.get(WINDOW_COOL)! / 10_000 - 0.2)).toBeLessThanOrEqual(0.01);
+    expect(Math.abs(counts.get(WINDOW_TV)! / 10_000 - 0.1)).toBeLessThanOrEqual(0.01);
+    expect([WINDOW_WARM, WINDOW_COOL, WINDOW_TV]).toEqual(['#ffd9a0', '#cfe0ff', '#7fa8ff']);
+    // o shader de fachada usa os mesmos limites, as três cores e um hash próprio (não o de janela acesa)
+    const frag = facadeFragment();
+    expect(frag).toContain('float tintHash = windowHash(cellId + 7.7, vSeedF);');
+    expect(frag).toContain('tintHash < 0.70 ?');
+    expect(frag).toContain('tintHash < 0.90 ?');
+    expect(frag).toContain('step(windowHash(cellId, vSeedF)');
+    expect(frag).not.toContain('windowHash(cellId + 7.7, vSeedF), ');
+    const warm = new THREE.Color(WINDOW_WARM);
+    for (const hex of [WINDOW_WARM, WINDOW_COOL, WINDOW_TV]) {
+      const c = new THREE.Color(hex);
+      expect(frag, hex).toContain(`vec3(${(c.r / warm.r).toFixed(4)}, ${(c.g / warm.g).toFixed(4)}, ${(c.b / warm.b).toFixed(4)})`);
     }
   });
 });

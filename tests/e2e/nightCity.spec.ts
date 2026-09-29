@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { signPattern } from '../../src/world/signGlyphs';
 import { advanceSim } from './helpers';
 
 // night-city: provas no browser (checks C6, C8-C11, C14, C15, C17, C18, C20, C27, C29)
@@ -141,5 +142,25 @@ test.describe('night-city - céu', () => {
     expect(await page.evaluate(() => (window as any).__game.render.skyStill() as number)).toBe(-1);
     await advanceSim(page, 1);
     expect(await page.evaluate(() => (window as any).__game.render.skyStill() as number)).toBe(0);
+  });
+});
+
+test.describe('night-city - letreiros', () => {
+  // C20 (AC 16): o padrão de cada letreiro é o da regra pura, sorteado da posição dele
+  test('signs are framed boxes with a glyph pattern', async ({ page }) => {
+    await open(page);
+    const groups = await page.evaluate(() => (window as any).__game.world.signs as Array<{ depth: number; signs: Array<{ x: number; z: number; pattern: number }> }>);
+    expect(groups).toHaveLength(4);
+    let total = 0;
+    for (const g of groups) {
+      expect(g.depth).toBeCloseTo(0.12, 6);
+      for (const sg of g.signs) {
+        expect(sg.pattern).toBe(signPattern(sg.x, sg.z));
+        expect(sg.pattern).toBeGreaterThanOrEqual(0);
+        expect(sg.pattern).toBeLessThanOrEqual(7);
+        total++;
+      }
+    }
+    expect(total).toBeGreaterThan(0);
   });
 });

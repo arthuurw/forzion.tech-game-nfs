@@ -8,7 +8,7 @@
  * pelo tom `MIRROR_TINT` (≤ 1 por canal) e pelo Fresnel (`mirrorFresnel`, em [0, 1]).
  */
 /** meia-faixa vertical perto da câmera (texels do alvo de meia resolução) */
-export const MIRROR_STREAK_TEXELS = 6;
+export const MIRROR_STREAK_TEXELS = 10;
 /** quanto a meia-faixa cresce por metro de distância (fração) */
 export const MIRROR_STREAK_GROW = 0.06;
 /** tom do reflexo, frio e abaixo de 1: o asfalto absorve parte da luz */

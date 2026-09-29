@@ -18,6 +18,8 @@ import type { InteriorProps } from './interiors/InteriorProps';
 import { InteriorScene } from './interiors/InteriorScene';
 import { DOWNTOWN_HALF } from './worldMath';
 import { MIRROR_F0, MIRROR_STREAK_GROW, MIRROR_STREAK_TEXELS, MIRROR_TINT } from './mirrorMath';
+import { GLYPH_H, GLYPH_PATTERNS, GLYPH_W, glyphMask, signPattern } from './signGlyphs';
+import { WINDOW_COOL, WINDOW_COOL_BELOW, WINDOW_TV, WINDOW_WARM, WINDOW_WARM_BELOW } from './windowTint';
 
 /**
  * Transforma os dados do mundo da city-terrain em malhas: materiais, o
@@ -34,9 +36,24 @@ export const TILE_M = 4;
 const FACADE_NORMAL_SCALE = [1, 0.2, 0.25, 1];
 /** rugosidade mínima por tipo, antes do vidro (facade-glint: o tijolo liso brilhava aos pontos sob o farol) */
 const FACADE_ROUGHNESS_FLOOR = [0, 0, 0.6, 0];
-const WINDOW_COLOR = new THREE.Color('#ffd9a0');
+const WINDOW_COLOR = new THREE.Color(WINDOW_WARM);
+/** profundidade do letreiro (night-city AC 16) */
+export const SIGN_DEPTH_M = 0.12;
 /** brilho percebido das janelas acesas (pedido do usuário: um pouco menos claras); a intensidade emissiva continua 2.2 para o bloom */
 const WINDOW_BRIGHTNESS = 0.7;
+/** cor da janela relativa à quente (o emissive do material), em linear, como `vec3` do GLSL */
+function tintGlsl(hex: string): string {
+  const c = new THREE.Color(hex);
+  return `vec3(${(c.r / WINDOW_COLOR.r).toFixed(4)}, ${(c.g / WINDOW_COLOR.g).toFixed(4)}, ${(c.b / WINDOW_COLOR.b).toFixed(4)})`;
+}
+/** média das três cores de janela, pesada pelas proporções: o que a janela vira de longe */
+const AVERAGE_TINT_GLSL = (() => {
+  const w = [WINDOW_WARM_BELOW, WINDOW_COOL_BELOW - WINDOW_WARM_BELOW, 1 - WINDOW_COOL_BELOW];
+  const cs = [WINDOW_WARM, WINDOW_COOL, WINDOW_TV].map((h) => new THREE.Color(h));
+  const avg = (k: 'r' | 'g' | 'b') => cs.reduce((sum, c, i) => sum + w[i]! * c[k], 0) / WINDOW_COLOR[k];
+  return `vec3(${avg('r').toFixed(4)}, ${avg('g').toFixed(4)}, ${avg('b').toFixed(4)})`;
+})();
+
 /**
  * meia-faixa do reflexo da rua perto da câmera (texels do alvo de meia resolução). O uniform
  * continua `uBlur`: com 0 as 9 amostras caem no mesmo ponto (a sonda `mirrorBlur: false`)
@@ -144,6 +161,7 @@ export class CityScene {
   /** lotes de cada malha de fachada, na ordem das instâncias */
   readonly facadeLots: Lot[][] = [];
   readonly signMaterials: THREE.MeshStandardMaterial[] = [];
+  readonly signMeshes: THREE.InstancedMesh[] = [];
   readonly lampMaterial: THREE.MeshStandardMaterial;
   readonly lampMeshes: THREE.InstancedMesh[];
   /** luz dos postes no chão (night-city door 2), lida por asfalto, calçada e terreno */
@@ -229,7 +247,8 @@ export class CityScene {
     addLampLight(this.sidewalkMaterial, this.lampLight, 3, 0, 'sidewalk');
     addLampLight(this.terrainMaterial, this.lampLight, 3, 0, 'terrain');
     this.group.add(...this.lampMeshes);
-    this.group.add(...this.buildSigns(data.signs));
+    this.signMeshes.push(...this.buildSigns(data.signs));
+    this.group.add(...this.signMeshes);
     scene.add(this.group);
 
     const bridges = data.network.roads.flatMap((road) =>
@@ -280,9 +299,13 @@ export class CityScene {
     return mesh;
   }
 
-  /** Um InstancedMesh por cor da paleta: o emissive (e o flicker) é por material. */
+  /**
+   * Um InstancedMesh por cor da paleta: o emissive (e o respiro) é por material. Cada letreiro é
+   * uma caixa de 12 cm com moldura escura; só os tubos do padrão dele brilham, na face da frente
+   * e na de trás (night-city AC 16, AC 17).
+   */
   private buildSigns(signs: LotSign[]): THREE.InstancedMesh[] {
-    const geometry = new THREE.PlaneGeometry(1, 1);
+    const glyphs = makeGlyphTexture();
     const meshes: THREE.InstancedMesh[] = [];
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
@@ -291,23 +314,25 @@ export class CityScene {
     const up = new THREE.Vector3(0, 1, 0);
     for (const color of NEON_PALETTE) {
       const mine = signs.filter((sign) => sign.color === color);
-      const material = new THREE.MeshStandardMaterial({
-        color: '#000000',
-        emissive: color,
-        emissiveIntensity: 2.6,
-        side: THREE.DoubleSide,
-      });
+      const material = makeSignMaterial(color, glyphs);
       this.signMaterials.push(material);
-      const mesh = new THREE.InstancedMesh(geometry, material, Math.max(1, mine.length));
+      const geometry = new THREE.BoxGeometry(1, 1, SIGN_DEPTH_M);
+      const count = Math.max(1, mine.length);
+      const patterns = new Float32Array(count);
+      const mesh = new THREE.InstancedMesh(geometry, material, count);
       mine.forEach((sign, i) => {
         p.set(sign.x, sign.y, sign.z);
         q.setFromAxisAngle(up, sign.rotationY);
         s.set(sign.width, sign.height, 1);
         m.compose(p, q, s);
         mesh.setMatrixAt(i, m);
+        patterns[i] = signPattern(sign.x, sign.z);
       });
+      geometry.setAttribute('aPattern', new THREE.InstancedBufferAttribute(patterns, 1));
+      geometry.computeBoundingBox();
       mesh.count = mine.length;
       mesh.frustumCulled = false;
+      mesh.name = 'neon-signs';
       meshes.push(mesh);
     }
     return meshes;
@@ -430,7 +455,7 @@ totalEmissiveRadiance += vec3(0.16, 0.155, 0.13) * laneMark;`,
  * janela por célula de 4 m: vidro escuro no albedo, luz quente no emissive
  * quando o hash (seed, célula) diz que está acesa.
  */
-function makeFacadeMaterial(
+export function makeFacadeMaterial(
   set: PbrSet | undefined,
   type: number,
   specularAA: { value: number },
@@ -531,7 +556,10 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.03, 0.035, 0.05), glass);`,
         '#include <emissivemap_fragment>',
         `#include <emissivemap_fragment>
 float warm = ${WINDOW_BRIGHTNESS.toFixed(2)} * mix(0.8, 0.5 + 0.5 * windowHash(cellId + 3.1, vSeedF), detail);
-totalEmissiveRadiance *= lit * warm;`,
+// night-city AC 18: cor fixa por janela, por um hash próprio; longe, a média das três (sem ruído)
+float tintHash = windowHash(cellId + 7.7, vSeedF);
+vec3 cellTint = tintHash < ${WINDOW_WARM_BELOW.toFixed(2)} ? ${tintGlsl(WINDOW_WARM)} : (tintHash < ${WINDOW_COOL_BELOW.toFixed(2)} ? ${tintGlsl(WINDOW_COOL)} : ${tintGlsl(WINDOW_TV)});
+totalEmissiveRadiance *= lit * warm * mix(${AVERAGE_TINT_GLSL}, cellTint, detail);`,
       )
       .replace(
         '#include <roughnessmap_fragment>',
@@ -559,5 +587,55 @@ material.specularF90 *= uFacadeSpecular;`,
   // chave única por tipo para o three não reaproveitar o programa de outro material
   material.userData.specularAA = specularAA;
   material.customProgramCacheKey = () => `facade-${type}-${set ? 'pbr' : 'flat'}`;
+  return material;
+}
+
+/** As 8 máscaras de `glyphMask` empilhadas: 64 × 256, um canal, filtro linear (tubo com borda suave). */
+function makeGlyphTexture(): THREE.DataTexture {
+  const data = new Uint8Array(GLYPH_W * GLYPH_H * GLYPH_PATTERNS);
+  for (let p = 0; p < GLYPH_PATTERNS; p++) {
+    const mask = glyphMask(p);
+    for (let k = 0; k < mask.length; k++) data[p * mask.length + k] = mask[k]! * 255;
+  }
+  const t = new THREE.DataTexture(data, GLYPH_W, GLYPH_H * GLYPH_PATTERNS, THREE.RedFormat, THREE.UnsignedByteType);
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearFilter;
+  t.generateMipmaps = false;
+  t.needsUpdate = true;
+  return t;
+}
+
+/** Letreiro: moldura metálica escura; emissão só nos tubos, nas faces de frente e de trás. */
+export function makeSignMaterial(color: string, glyphs: THREE.Texture): THREE.MeshStandardMaterial {
+  const material = new THREE.MeshStandardMaterial({
+    color: '#101014',
+    roughness: 0.5,
+    metalness: 0.6,
+    emissive: color,
+    emissiveIntensity: 2.6,
+  });
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uGlyphs = { value: glyphs };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>
+attribute float aPattern;
+varying vec2 vSignUv;
+varying float vSignFace;
+flat varying float vPattern;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+vSignUv = uv;
+vSignFace = step(0.5, abs(normal.z));
+vPattern = aPattern;`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>
+uniform sampler2D uGlyphs;
+varying vec2 vSignUv;
+varying float vSignFace;
+flat varying float vPattern;`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+float tube = texture2D(uGlyphs, vec2(vSignUv.x, (vPattern + vSignUv.y) / ${GLYPH_PATTERNS.toFixed(1)})).r;
+totalEmissiveRadiance *= tube * vSignFace;`);
+  };
+  material.customProgramCacheKey = () => 'neon-sign';
   return material;
 }

@@ -21,7 +21,7 @@ import { RaceController } from '../race/RaceController';
 import { Car } from '../vehicle/Car';
 import { DEFAULT_CAR } from '../vehicle/carSpec';
 import { steerAxis } from './input';
-import { DEFAULT_SEED } from '../world/CityGenerator';
+import { DEFAULT_SEED, NEON_PALETTE } from '../world/CityGenerator';
 import { CityScene, type WorldData } from '../world/CityScene';
 import { generateLots } from '../world/lots/LotGenerator';
 import { generateRoads, type Road } from '../world/roads/RoadGenerator';
@@ -1186,6 +1186,18 @@ export class Game {
         const c = game.city.lampMeshes[0]!.geometry.getAttribute('aLampColor') as THREE.InstancedBufferAttribute;
         const hex = '#' + [c.getX(i), c.getY(i), c.getZ(i)].map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
         return { x: lamp.x, y: lamp.y, z: lamp.z, heading: lamp.heading, side: lamp.side, kind: data.network.roads[lamp.roadId]!.kind, color: hex, head: lampHeadPosition(lamp) };
+      },
+      /** night-city C20: por cor, profundidade da caixa do letreiro e o padrão de cada um, com a posição */
+      get signs() {
+        return game.city.signMeshes.map((m, c) => {
+          const b = m.geometry.boundingBox!;
+          const pat = m.geometry.getAttribute('aPattern') as THREE.InstancedBufferAttribute;
+          const mine = data.signs.filter((sg) => sg.color === NEON_PALETTE[c]);
+          return {
+            depth: b.max.z - b.min.z,
+            signs: mine.map((sg, i) => ({ x: sg.x, z: sg.z, pattern: pat.getX(i) })),
+          };
+        });
       },
       /** night-city C15, C17: névoa, fundo, uniform de horizonte e posição da cúpula */
       get sky() {

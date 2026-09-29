@@ -69,20 +69,20 @@ Proof: `npx playwright test tests/e2e/nightCity.spec.ts -g "sky is still"`
 
 ### S4 - letreiros e janelas · 4 files · 70 KB · ~18k
 
-**C19** - `glyphMask(pattern)` de cada um dos 8 padrões (64 × 32): a fração de texels de tubo fica entre 0.15 e 0.45 (AC 16)
+**C19** - ✅ `glyphMask(pattern)` de cada um dos 8 padrões (64 × 32): a fração de texels de tubo fica entre 0.15 e 0.45 (AC 16)
 Proof: `npx vitest run tests/unit/nightCityShaders.test.ts -t "sign glyphs cover part of the face"`
 
-**C20** - A geometria de letreiro é uma caixa de profundidade 0.12 m, e cada letreiro recebe um padrão em [0, 7] sorteado da sua semente com `mulberry32`, igual em duas montagens (AC 16)
+**C20** - ✅ A geometria de letreiro é uma caixa de profundidade 0.12 m, e cada letreiro recebe um padrão em [0, 7] sorteado da sua semente com `mulberry32`, igual em duas montagens (AC 16)
 Proof: `npx playwright test tests/e2e/nightCity.spec.ts -g "signs are framed boxes with a glyph pattern"`
 
-**C21** - Os 4 materiais de letreiro seguem com `emissiveIntensity` ≥ 2 e o respiro em [2.0, 3.2] (AC 17)
+**C21** - ✅ Os 4 materiais de letreiro seguem com `emissiveIntensity` ≥ 2 e o respiro em [2.0, 3.2] (AC 17)
 Proof: `npx playwright test tests/e2e/render.spec.ts -g "neon emissive intensity at least 2"`
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "neon signs flicker"`
 
-**C22** - `windowTint(h)` sobre 10 000 valores de `h` uniformes em [0, 1): 70 % ± 1 quente `#ffd9a0`, 20 % ± 1 fria `#cfe0ff`, 10 % ± 1 azul `#7fa8ff`; o shader de fachada usa os mesmos limites (0.70, 0.90) e cores, interpolados, e um hash separado do hash de janela acesa (AC 18; ver Handoff)
+**C22** - ✅ `windowTint(h)` sobre 10 000 valores de `h` uniformes em [0, 1): 70 % ± 1 quente `#ffd9a0`, 20 % ± 1 fria `#cfe0ff`, 10 % ± 1 azul `#7fa8ff`; o shader de fachada usa os mesmos limites (0.70, 0.90) e cores, interpolados, e um hash separado do hash de janela acesa (AC 18; ver Handoff)
 Proof: `npx vitest run tests/unit/nightCityShaders.test.ts -t "window tints come in three fixed colors"`
 
-**C23** - As provas de janela estável e da facade-glint seguem com os limites de hoje (AC 19)
+**C23** - ✅ As provas de janela estável e da facade-glint seguem com os limites de hoje (AC 19)
 Proof: `npx playwright test tests/e2e/visual.spec.ts -g "lit windows stay stable while the camera moves|headlight adds no facade glint|probe detects glint without specular antialiasing|headlight still lights the facade|brick facade glint has margin"`
 
 ### S5 - orçamento e calma · 5 files · 60 KB · ~15k
