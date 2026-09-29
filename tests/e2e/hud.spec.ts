@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { advanceSim, gotoGame, holdKeySim, teleport, waitSimUntil } from './helpers';
+import { advanceSim, gotoGame, holdKeySim, pageFrames, teleport, waitFrames, waitSimUntil } from './helpers';
 
 test.describe('hud', () => {
   // C26 (AC 20)
@@ -30,7 +30,7 @@ test.describe('hud', () => {
   });
 
   // C32 (AC 25)
-  test('webgl2 missing shows error overlay', async ({ page }) => {
+  test('webgl2 missing shows error overlay', { tag: '@smoke' }, async ({ page }) => {
     await page.addInitScript(() => {
       const original = HTMLCanvasElement.prototype.getContext;
       HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, type: string, ...rest: unknown[]) {
@@ -42,7 +42,7 @@ test.describe('hud', () => {
     const error = page.locator('#error');
     await expect(error).toBeVisible();
     await expect(error).toHaveText('Seu navegador não suporta WebGL2');
-    await page.waitForTimeout(1_000);
+    await pageFrames(page, 30);
     const hasGame = await page.evaluate(() => (window as any).__game !== undefined);
     expect(hasGame).toBe(false);
     await expect(page.locator('#loading')).toBeHidden();
@@ -90,15 +90,15 @@ test.describe('hud - rodada 2', () => {
     const error = page.locator('#error');
     await expect(error).toBeVisible();
     await expect(error).toContainText(/^Falha ao iniciar o jogo:/);
-    await page.waitForTimeout(500);
+    await pageFrames(page, 30);
     expect(await page.evaluate(() => (window as any).__game !== undefined)).toBe(false);
     await expect(page.locator('#loading')).toBeHidden();
   });
 
   // C42 (AC 23) - o canvas real do minimapa tem as estradas e o carro desenhados (city-terrain C41)
-  test('minimap draws roads and car', async ({ page }) => {
+  test('minimap draws roads and car', { tag: '@smoke' }, async ({ page }) => {
     await gotoGame(page);
-    await page.waitForTimeout(200);
+    await waitFrames(page, 2);
     const result = await page.evaluate(() => {
       const canvas = document.querySelector<HTMLCanvasElement>('#minimap')!;
       const ctx = canvas.getContext('2d')!;
@@ -125,7 +125,7 @@ test.describe('hud - rodada 2', () => {
     const here = await page.evaluate(() => (window as any).__game.car.position);
     await teleport(page, here.x, here.y + 0.2, here.z, Math.PI / 2);
     await advanceSim(page, 0.1);
-    await page.waitForTimeout(100);
+    await waitFrames(page, 2);
     const tip = await page.evaluate(() => {
       const canvas = document.querySelector<HTMLCanvasElement>('#minimap')!;
       const { data } = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height);

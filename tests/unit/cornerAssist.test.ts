@@ -15,10 +15,6 @@ const TOL = 1e-3;
 describe('corner assist', () => {
   // C6 (AC 6, door 1) - table-driven over the 10 rows
   it('corner assist force fills lateral acceleration above the start', () => {
-    // os valores da tabela da C6
-    expect((100 * Math.tan(0.05)) / 2.6).toBeCloseTo(1.9247, 4);
-    expect(0.9 * 9.81).toBeCloseTo(8.829, 6);
-
     const rows: Array<[string, number, number, number, boolean, number]> = [
       ['below the start', 0.05, 10, 4, false, 0],
       ['free', 0.1, 20, 4, false, 6607.103],

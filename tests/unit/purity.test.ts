@@ -1,5 +1,6 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 // free-roam-city C39 (door 1) + visual-upgrade C26 + city-terrain C45 + car-handling C27 + yaw-assist C9 + block-fill C7 + corner-assist C8 + races C35 - table-driven over the 33 pure modules
@@ -52,13 +53,58 @@ const PURE_MODULES = [
 // cobre `import x from 'three'`, `import 'three'`, `import('three')` e `require('three')`
 const FORBIDDEN = /(from\s+|import\s+|import\s*\(\s*|require\s*\(\s*)['"](three|@dimforge\/rapier3d-compat)(\/[^'"]*)?['"]/;
 
+// imports relativos que carregam código (não `import type`), com e sem `from`
+const RELATIVE = /(?:^|\n)\s*(import|export)\s+(type\s+)?(?:[^'";]*?\sfrom\s+)?['"](\.{1,2}\/[^'"]+)['"]/g;
+
+function resolveLocal(fromFile: string, spec: string): string | null {
+  const base = resolve(dirname(fromFile), spec);
+  for (const f of [base, `${base}.ts`, join(base, 'index.ts')]) if (existsSync(f) && f.endsWith('.ts')) return f;
+  return null;
+}
+
+/**
+ * test-hardening C20 (AC 16): o primeiro arquivo, seguindo imports relativos que não são
+ * `import type`, que importa three ou rapier; null se nenhum.
+ */
+function forbiddenReach(file: string, seen = new Set<string>()): string | null {
+  if (seen.has(file)) return null;
+  seen.add(file);
+  const source = readFileSync(file, 'utf8');
+  if (FORBIDDEN.test(source)) return file;
+  for (const m of source.matchAll(RELATIVE)) {
+    if (m[2]) continue; // `import type ... from` não carrega código
+    const next = resolveLocal(file, m[3]!);
+    if (!next) continue;
+    const hit = forbiddenReach(next, seen);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 describe('pure modules', () => {
   it('pure modules do not import three or rapier', () => {
     expect(PURE_MODULES.length).toBe(36);
     for (const rel of PURE_MODULES) {
-      const source = readFileSync(resolve(process.cwd(), rel), 'utf8');
+      const file = resolve(process.cwd(), rel);
+      const source = readFileSync(file, 'utf8');
       expect(FORBIDDEN.test(source), rel).toBe(false);
       expect(source.length, rel).toBeGreaterThan(0);
+      expect(forbiddenReach(file), rel).toBeNull();
     }
+  });
+
+  // test-hardening C20 (AC 16)
+  it('transitive imports are followed', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'purity-'));
+    const put = (name: string, body: string) => writeFileSync(join(dir, name), body);
+    put('heavy.ts', "import * as THREE from 'three';\nexport const v = new THREE.Vector3();\n");
+    put('middle.ts', "export { v } from './heavy';\n");
+    put('indirect.ts', "import { v } from './middle';\nexport const x = v.x;\n");
+    put('typeOnly.ts', "import type { v } from './heavy';\nexport type V = typeof v;\n");
+    put('clean.ts', "import { x } from './leaf';\nexport const y = x;\n");
+    put('leaf.ts', 'export const x = 1;\n');
+    expect(forbiddenReach(join(dir, 'indirect.ts'))).toBe(join(dir, 'heavy.ts'));
+    expect(forbiddenReach(join(dir, 'typeOnly.ts'))).toBeNull();
+    expect(forbiddenReach(join(dir, 'clean.ts'))).toBeNull();
   });
 });

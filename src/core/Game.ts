@@ -177,6 +177,7 @@ export class Game {
     this.car = new Car(this.world, this.scene, assets, { x: spawn.x, y: spawn.y + 1.2, z: spawn.z }, DEFAULT_CAR);
     this.car.teleport(spawn.x, spawn.y + 1.2, spawn.z, spawn.heading);
     this.city.chunks.update(spawn.x, spawn.z);
+    this.city.chunks.endFrame(); // o build do boot não conta como quadro
 
     // farol: única luz presa ao carro
     const headlight = new THREE.SpotLight('#dfe8ff', 40, 60, Math.PI / 5, 0.6, 1.2);
@@ -350,6 +351,7 @@ export class Game {
     const state = this.car.state();
     this.chase.update(dt, state, this.car.yawRate(), this.car.bodyRoll);
     this.city.chunks.update(state.x, state.z);
+    this.city.chunks.endFrame();
     this.city.water.update(this.simTime);
     this.city.interiors.update(this.simTime);
     this.trainScene?.update(this.simTime);
@@ -435,6 +437,7 @@ export class Game {
               materialColor: o.car.paintMaterial ? `#${o.car.paintMaterial.color.getHexString()}` : null,
               resets: o.resets,
               progress: { ...o.progress },
+              prev: { ...o.prev },
             };
           });
         },
@@ -461,7 +464,11 @@ export class Game {
         crossNextGate: () => game.race.crossNextGate(game.car),
         /** põe um oponente em (x, y, z), parado (para as provas do minimapa) */
         placeOpponent: (i: number, x: number, y: number, z: number, heading: number) =>
-          game.race.opponents[i]?.car.teleport(x, y, z, heading),
+          game.race.opponents[i]?.placeAt(x, y, z, heading),
+        /** test-hardening C24: segura a contagem em `countdown` */
+        set holdCountdown(on: boolean) {
+          game.race.holdCountdown = on;
+        },
       },
       get simTime() {
         return game.simTime;

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { formatRaceTime } from '../../src/race/raceProgress';
-import { advanceSim, gotoGame, holdKeySim, position, speedKmh, waitSimUntil } from './helpers';
+import { advanceSim, gotoGame, holdKeySim, position, sampleCountdown, speedKmh, waitSimUntil } from './helpers';
 
 // races: provas no browser (checks C9-C14, C16-C19, C21, C24, C25, C27-C32, C34, C36)
 
@@ -88,7 +88,7 @@ test.describe('races', () => {
   });
 
   // C10 (AC 8)
-  test('prompt appears at the marker', async ({ page }) => {
+  test('prompt appears at the marker', { tag: '@smoke' }, async ({ page }) => {
     await place(page, await nearMarker(page, 'circuito-centro', 5));
     expect(await shown(page, '#race-prompt')).toBe(true);
     expect(await page.textContent('#race-prompt')).toBe('ENTER · Circuito Centro');
@@ -128,21 +128,11 @@ test.describe('races', () => {
   // C13 (AC 11)
   test('countdown holds every car', async ({ page }) => {
     await startRace(page, 'circuito-centro', false);
-    await page.waitForFunction(() => document.querySelector('#race-countdown')!.textContent !== '');
+    await page.waitForFunction(() => document.querySelector('#race-countdown')!.textContent !== '', null, { timeout: 10_000 });
     expect(await page.textContent('#race-countdown')).toBe('3');
     await page.keyboard.down('KeyW');
-    let maxKmh = 0;
-    for (;;) {
-      const s = await page.evaluate(() => {
-        const g = (window as any).__game;
-        return {
-          state: g.race.state as string,
-          speeds: [Math.abs(g.car.speedKmh), ...g.race.opponents.map((o: any) => Math.abs(o.speedKmh))] as number[],
-        };
-      });
-      if (s.state !== 'countdown') break;
-      maxKmh = Math.max(maxKmh, ...s.speeds);
-    }
+    // test-hardening C24: amostra cada quadro no navegador, com prazo de 4 s de simulação
+    const maxKmh = await sampleCountdown(page, 4);
     await page.keyboard.up('KeyW');
     expect(maxKmh).toBeLessThan(1);
     expect(await state(page)).toBe('racing');
@@ -176,9 +166,9 @@ test.describe('races', () => {
     expect(s.time).toBeGreaterThan(0);
     expect(s.timeText).toBe(formatRaceTime(s.time));
     expect(s.lapText).toBe('VOLTA 1/2');
-    expect(s.posText).toBe(`POS ${s.pos}/4`);
-    expect(s.pos).toBeGreaterThanOrEqual(1);
-    expect(s.pos).toBeLessThanOrEqual(4);
+    // test-hardening C11: parado no grid com os 3 oponentes andando, o jogador é o último
+    expect(s.pos).toBe(4);
+    expect(s.posText).toBe('POS 4/4');
   });
 
   // C18, C27 (AC 16, 25)
@@ -195,10 +185,10 @@ test.describe('races', () => {
     const rows = await page.$$eval('#race-results .race-row', (els) => els.map((e) => [...e.children].map((c) => c.textContent)));
     expect(rows).toHaveLength(4);
     expect(rows.map((r) => r[0])).toEqual(['1', '2', '3', '4']);
-    const me = rows.find((r) => r[1] === 'VOCÊ');
-    expect(me).toBeDefined();
-    expect(me![2]).toMatch(/^\d+:\d\d\.\d\d$/);
-    for (const r of rows) expect(r[2]).toMatch(/^(\d+:\d\d\.\d\d|--:--\.--)$/);
+    // test-hardening C12: o jogador chegou antes de todos; os 3 oponentes ainda correm
+    expect(rows[0]![1]).toBe('VOCÊ');
+    expect(rows[0]![2]).toMatch(/^\d+:\d\d\.\d\d$/);
+    for (const r of rows.slice(1)) expect(r[2]).toBe('--:--.--');
   });
 
   // C21 (AC 19)
@@ -334,7 +324,7 @@ test.describe('races', () => {
   test('draw calls within budget while racing', async ({ page }) => {
     await startRace(page, 'circuito-centro');
     await advanceSim(page, 0.2);
-    await page.screenshot({ path: 'test-results/race-grid.png' });
+    await test.info().attach('race-grid', { body: await page.screenshot(), contentType: 'image/png' });
     expect(await page.evaluate(() => (window as any).__game.render.calls as number)).toBeLessThanOrEqual(220);
   });
 
@@ -381,7 +371,7 @@ test.describe('block-life-extras - pintura e provas da races', () => {
   });
 
   // C4 (AC 4)
-  test('opponent material is white and body color is the paint', async ({ page }) => {
+  test('opponent material is white and body color is the paint', { tag: '@smoke' }, async ({ page }) => {
     await startRace(page, 'circuito-centro', false);
     const ops = (await race(page)).opponents as Array<{ index: number; paint: string; bodyColor: string; materialColor: string }>;
     expect(ops).toHaveLength(3);
@@ -434,5 +424,57 @@ test.describe('block-life-extras - pintura e provas da races', () => {
     expect((await counts(page)).bodies).toBe(before.bodies);
     const p1 = await position(page);
     expect(Math.hypot(p1.x - p0.x, p1.z - p0.z)).toBeLessThanOrEqual(0.5);
+  });
+});
+
+test.describe('test-hardening - provas da corrida', () => {
+  test.beforeEach(async ({ page }) => {
+    await gotoGame(page);
+  });
+
+  // C10 (AC 9): o portão cruzado dirigindo, pelo caminho real (RaceController.afterStep), sem crossNextGate
+  test('player crosses a gate by driving', async ({ page }) => {
+    await startRace(page, 'sprint-cruzada');
+    const p = await page.evaluate(() => {
+      const g = (window as any).__game;
+      const gate = g.race.races.find((x: any) => x.id === 'sprint-cruzada').gates[0];
+      const x = gate.x - Math.sin(gate.heading) * 15;
+      const z = gate.z - Math.cos(gate.heading) * 15;
+      return { x, y: g.world.nearestRoad(x, z).y + 1.2, z, heading: gate.heading };
+    });
+    await place(page, p);
+    expect((await race(page)).player.lastGate).toBe(-1);
+    await page.keyboard.down('KeyW');
+    const crossed = await waitSimUntil(page, 'g.race.player.lastGate === 0', 5);
+    await page.keyboard.up('KeyW');
+    expect(crossed).toBe(true);
+  });
+
+  // C24 (AC 19): a contagem presa faz o teste falhar com mensagem, não por timeout genérico
+  test('countdown deadline message', async ({ page }) => {
+    await startRace(page, 'circuito-centro', false);
+    await page.evaluate(() => {
+      (window as any).__game.race.holdCountdown = true;
+    });
+    await expect(sampleCountdown(page, 4)).rejects.toThrow('countdown não terminou em 4 s');
+    expect(await state(page)).toBe('countdown');
+  });
+
+  // C25 (AC 21): pôr um oponente logo depois de um portão não conta o portão
+  test('placing an opponent does not cross gates', async ({ page }) => {
+    await startRace(page, 'circuito-centro');
+    const r = await page.evaluate(() => {
+      const g = (window as any).__game;
+      const op = g.race.opponents[0];
+      const gate = g.race.races.find((x: any) => x.id === 'circuito-centro').gates[op.progress.nextGate];
+      const x = gate.x + Math.sin(gate.heading) * 2;
+      const z = gate.z + Math.cos(gate.heading) * 2;
+      g.race.placeOpponent(0, x, g.world.nearestRoad(x, z).y + 1.2, z, gate.heading);
+      return { x, z, lastGate: op.progress.lastGate as number, prev: g.race.opponents[0].prev as { x: number; z: number } };
+    });
+    expect(Math.abs(r.prev.x - r.x)).toBeLessThanOrEqual(0.01);
+    expect(Math.abs(r.prev.z - r.z)).toBeLessThanOrEqual(0.01);
+    await advanceSim(page, 0.2);
+    expect((await race(page)).opponents[0].progress.lastGate).toBe(r.lastGate);
   });
 });

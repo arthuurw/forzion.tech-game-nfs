@@ -1,17 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
+import { describe, expect, it, vi } from 'vitest';
+import { Effects } from '../../src/vehicle/Effects';
 import {
   CollisionTracker,
   ParticlePool,
-  SKID_CAP,
-  SKID_MIN_KMH,
-  SKID_QUADS_PER_STEP,
-  SMOKE_CAP,
-  SMOKE_LIFETIME_S,
-  SMOKE_PER_STEP,
-  SPARK_BURST,
-  SPARK_CAP,
-  SPARK_IMPULSE_THRESHOLD,
-  SPARK_LIFETIME_S,
   SkidBuffer,
   isSkidding,
   sparkBurstFor,
@@ -61,18 +53,66 @@ describe('effects math', () => {
     expect(pool.alive).toBe(0);
   });
 
-  // visual-upgrade C38 - constantes dos efeitos (AC 13, 14, 15)
+  // visual-upgrade C38 - os números dos efeitos (AC 13, 14, 15), provados pelo `Effects` real
+  // (test-hardening C21: comportamento no lugar de comparar a constante com o próprio número)
   it('effect constants', () => {
-    expect(SMOKE_PER_STEP).toBe(4);
-    expect(SMOKE_LIFETIME_S).toBeCloseTo(0.8, 9);
-    expect(SMOKE_CAP).toBe(256);
-    expect(SKID_CAP).toBe(400);
-    expect(SKID_MIN_KMH).toBe(20);
-    expect(SKID_QUADS_PER_STEP).toBe(2);
-    expect(SPARK_CAP).toBe(128);
-    expect(SPARK_LIFETIME_S).toBeCloseTo(0.4, 9);
-    expect(SPARK_BURST).toBe(40);
-    expect(SPARK_IMPULSE_THRESHOLD).toBe(3000);
+    // `Effects` desenha a textura da partícula num canvas; em node basta um canvas falso
+    const ctx = { createRadialGradient: () => ({ addColorStop() {} }), fillRect() {}, fillStyle: '' };
+    vi.stubGlobal('document', { createElement: () => ({ width: 0, height: 0, getContext: () => ctx }) });
+    try {
+      const dt = 1 / 60;
+      const wheels = [
+        { x: 0, z: 0 },
+        { x: 1.5, z: 0 },
+      ];
+      // um passo derrapando: 4 de fumaça e 2 marcas (uma por roda traseira)
+      const fx = new Effects(new THREE.Scene(), () => 0.5);
+      fx.step(dt, true, wheels, 0);
+      expect(fx.smoke.alive).toBe(4);
+      expect(fx.skidCount).toBe(2);
+      fx.step(dt, false, wheels, 0);
+      expect(fx.smoke.alive).toBe(4);
+      expect(fx.skidCount).toBe(2);
+
+      // vida da fumaça: viva a 0.79 s, morta a 0.81 s
+      const life = new Effects(new THREE.Scene(), () => 0.5);
+      life.smoke.spawn(1);
+      life.smoke.step(0.79);
+      expect(life.smoke.alive).toBe(1);
+      life.smoke.step(0.02);
+      expect(life.smoke.alive).toBe(0);
+      // vida da faísca: viva a 0.39 s, morta a 0.41 s
+      life.collide({ impulse: 5000, x: 0, y: 0, z: 0 });
+      life.sparks.step(0.39);
+      expect(life.sparks.alive).toBeGreaterThan(0);
+      life.sparks.step(0.02);
+      expect(life.sparks.alive).toBe(0);
+
+      // faíscas: 40 a partir de 3000 N·s, nada logo abaixo
+      const hit = (impulse: number) => {
+        const e = new Effects(new THREE.Scene(), () => 0.5);
+        e.collide({ impulse, x: 0, y: 0, z: 0 });
+        return e.sparks.alive;
+      };
+      expect(hit(2999)).toBe(0);
+      expect(hit(3000)).toBe(40);
+      expect(hit(3001)).toBe(40);
+
+      // tetos: 256 de fumaça, 128 faíscas, 400 marcas
+      const full = new Effects(new THREE.Scene(), () => 0.5);
+      for (let i = 0; i < 100; i++) full.step(0.001, true, wheels, 0);
+      expect(full.smoke.alive).toBe(256);
+      for (let i = 0; i < 250; i++) full.step(0.001, true, wheels, 0);
+      expect(full.skidCount).toBe(400);
+      for (let i = 0; i < 4; i++) full.collide({ impulse: 3001, x: 0, y: 0, z: 0 });
+      expect(full.sparks.alive).toBe(128);
+
+      // freio de mão só marca acima de 20 km/h
+      expect(isSkidding(true, 20, 0)).toBe(false);
+      expect(isSkidding(true, 20.1, 0)).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   // car-handling C30 (AC 23) - substitui a parte unitária de visual-upgrade C36

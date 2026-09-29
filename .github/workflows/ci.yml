@@ -1,0 +1,18 @@
+# Build e testes unitários/física a cada push e pull request (test-hardening door 1).
+# O e2e (Playwright, ~1 h em SwiftShader) fica fora: roda local e no Verifier.
+name: ci
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm test

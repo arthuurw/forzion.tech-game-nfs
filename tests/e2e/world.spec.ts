@@ -123,7 +123,7 @@ test.describe('city-terrain - mundo', () => {
   });
 
   // C10 (AC 8, door 9)
-  test('falling in the water respawns on the nearest road', async ({ page }) => {
+  test('falling in the water respawns on the nearest road', { tag: '@smoke' }, async ({ page }) => {
     await gotoGame(page);
     const before = await page.evaluate(() => (window as any).__game.world.waterResets as number);
     // um z onde o rio passa longe de qualquer estrada
@@ -211,7 +211,7 @@ test.describe('city-terrain - mundo', () => {
   });
 
   // C25 (AC 19)
-  test('lamp posts are two instanced meshes', async ({ page }) => {
+  test('lamp posts are two instanced meshes', { tag: '@smoke' }, async ({ page }) => {
     await gotoGame(page);
     const l = await page.evaluate(() => ({ meshes: (window as any).__game.world.lamps, count: (window as any).__game.world.lampCount }));
     expect(l.meshes.length).toBe(2);

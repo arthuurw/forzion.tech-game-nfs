@@ -67,19 +67,33 @@ describe('interior extras of seed 1337', () => {
   it('parked cars sit in downtown patios away from everything', () => {
     expect(props.parking.length).toBeGreaterThanOrEqual(60);
     expect(props.parking.length).toBeLessThanOrEqual(160);
+    // cada violação vira uma linha; um `expect` por par carro×objeto custava 3 s (test-hardening AC 2)
+    const bad: string[] = [];
     for (const [k, car] of props.parking.entries()) {
       const zone = bi.zones[car.zoneId]!;
-      expect(zone.kind, `car ${k}`).toBe('downtown');
-      expect(zone.areaM2, `car ${k}`).toBeGreaterThanOrEqual(800);
-      expect(zoneAt(bi, car.x, car.z), `car ${k} zone`).toBe(car.zoneId);
-      for (const l of lots) expect(lotDistance(l, car.x, car.z), `car ${k} lot`).toBeGreaterThanOrEqual(2);
+      if (zone.kind !== 'downtown') bad.push(`car ${k} zone kind ${zone.kind}`);
+      if (!(zone.areaM2 >= 800)) bad.push(`car ${k} zone area ${zone.areaM2}`);
+      if (zoneAt(bi, car.x, car.z) !== car.zoneId) bad.push(`car ${k} zone`);
+      lots.forEach((l, i) => {
+        const d = lotDistance(l, car.x, car.z);
+        if (!(d >= 2)) bad.push(`car ${k} lot ${i} ${d}`);
+      });
       const road = nearestRoad(network, car.x, car.z);
-      expect(road.d, `car ${k} road`).toBeGreaterThanOrEqual(road.width / 2 + 2);
-      for (const s of props.sites) expect(Math.hypot(s.x - car.x, s.z - car.z), `car ${k} site`).toBeGreaterThanOrEqual(12);
-      for (const y of props.yards) expect(Math.hypot(y.lamp.x - car.x, y.lamp.z - car.z), `car ${k} lamp`).toBeGreaterThanOrEqual(8);
-      for (const p of props.pools) expect(Math.hypot(p.x - car.x, p.z - car.z), `car ${k} pool`).toBeGreaterThanOrEqual(8);
-      for (const t of props.trees) expect(Math.hypot(t.x - car.x, t.z - car.z), `car ${k} tree`).toBeGreaterThanOrEqual(8);
+      if (!(road.d >= road.width / 2 + 2)) bad.push(`car ${k} road ${road.d}`);
+      props.sites.forEach((s, i) => {
+        if (!(Math.hypot(s.x - car.x, s.z - car.z) >= 12)) bad.push(`car ${k} site ${i}`);
+      });
+      props.yards.forEach((y, i) => {
+        if (!(Math.hypot(y.lamp.x - car.x, y.lamp.z - car.z) >= 8)) bad.push(`car ${k} lamp ${i}`);
+      });
+      props.pools.forEach((p, i) => {
+        if (!(Math.hypot(p.x - car.x, p.z - car.z) >= 8)) bad.push(`car ${k} pool ${i}`);
+      });
+      props.trees.forEach((t, i) => {
+        if (!(Math.hypot(t.x - car.x, t.z - car.z) >= 8)) bad.push(`car ${k} tree ${i}`);
+      });
     }
+    expect(bad).toEqual([]);
   });
 
   // C10

@@ -88,7 +88,8 @@ describe('race opponents in the real world', () => {
   }, 300_000);
 
   // C22
-  it('each opponent finishes every race in time', () => {
+  // tag `slow`: fora do `npm run test:quick` (test-hardening door 2a); o `npm test` roda
+  it('each opponent finishes every race in time', { tags: ['slow'], timeout: 900_000 }, () => {
     const world = makeWorld();
     for (const race of races) {
       const times: number[] = [];
@@ -103,7 +104,7 @@ describe('race opponents in the real world', () => {
       expect(times[2], race.id).toBeLessThan(times[1]!);
       expect(times[1], race.id).toBeLessThan(times[0]!);
     }
-  }, 900_000);
+  });
 
   // C23
   it('stuck opponent is reset to its last gate', () => {
@@ -134,6 +135,8 @@ describe('race opponents in the real world', () => {
     }
     expect(stoppedAt).toBeGreaterThan(0);
     expect(op.resets).toBe(1);
+    // test-hardening C17 (AC 13): nem antes da janela de 4 s, nem muito depois
+    expect(k * DT - stoppedAt).toBeGreaterThanOrEqual(3.9);
     expect(k * DT - stoppedAt).toBeLessThanOrEqual(4.1);
     const target = resetTarget(race, op.progress.lastGate, 1);
     const p = op.car.body.translation();

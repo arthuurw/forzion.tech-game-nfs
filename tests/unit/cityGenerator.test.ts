@@ -1,112 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { NEON_PALETTE, generateCity } from '../../src/world/CityGenerator';
+import { mulberry32 } from '../../src/world/CityGenerator';
 
+// o gerador da grade 8×8 antiga saiu (test-hardening C26); sobra o PRNG que todo o mundo usa (AD-008)
 describe('CityGenerator', () => {
-  // C16 (AC 12)
-  it('deterministic by seed', () => {
-    expect(JSON.stringify(generateCity(1337))).toBe(JSON.stringify(generateCity(1337)));
-    expect(JSON.stringify(generateCity(1))).not.toBe(JSON.stringify(generateCity(2)));
-  });
-
-  // C17 (AC 13)
-  it('8x8 grid of 40 m blocks with 12 m streets', () => {
-    const city = generateCity(1337);
-    expect(city.blocks.length).toBe(64);
-    expect(city.blockSize).toBe(40);
-    expect(city.streetWidth).toBe(12);
-    expect(city.bounds).toBe(202);
-    const xs = [...new Set(city.blocks.map((b) => b.x))].sort((a, b) => a - b);
-    const zs = [...new Set(city.blocks.map((b) => b.z))].sort((a, b) => a - b);
-    expect(xs.length).toBe(8);
-    expect(zs.length).toBe(8);
-    for (let i = 1; i < 8; i++) {
-      expect(xs[i]! - xs[i - 1]!).toBeCloseTo(52, 6);
-      expect(zs[i]! - zs[i - 1]!).toBeCloseTo(52, 6);
-    }
-    expect(xs[0]).toBeCloseTo(-182, 6);
-    expect(xs[7]).toBeCloseTo(182, 6);
-    expect(zs[0]).toBeCloseTo(-182, 6);
-    expect(zs[7]).toBeCloseTo(182, 6);
-  });
-
-  // C18 (AC 14)
-  it('buildings per block within bounds', () => {
-    const city = generateCity(1337);
-    for (const block of city.blocks) {
-      expect(block.buildings.length).toBeGreaterThanOrEqual(1);
-      expect(block.buildings.length).toBeLessThanOrEqual(4);
-      const half = city.blockSize / 2;
-      for (const b of block.buildings) {
-        expect(b.height).toBeGreaterThanOrEqual(10);
-        expect(b.height).toBeLessThanOrEqual(60);
-        expect(b.x - b.width / 2).toBeGreaterThanOrEqual(block.x - half - 1e-9);
-        expect(b.x + b.width / 2).toBeLessThanOrEqual(block.x + half + 1e-9);
-        expect(b.z - b.depth / 2).toBeGreaterThanOrEqual(block.z - half - 1e-9);
-        expect(b.z + b.depth / 2).toBeLessThanOrEqual(block.z + half + 1e-9);
-      }
-    }
-  });
-
-  // C19 (AC 15) - table-driven over the 4 palette colors
-  it('neon signs use the 4-color palette', () => {
-    expect([...NEON_PALETTE]).toEqual(['#ff2d95', '#00e5ff', '#b026ff', '#ffd400']);
-    const palette = new Set<string>(NEON_PALETTE);
-    const city = generateCity(1337);
-    const used = new Set<string>();
-    for (const block of city.blocks) {
-      expect(block.signs.length).toBeGreaterThanOrEqual(1);
-      for (const s of block.signs) {
-        expect(palette.has(s.color), `color ${s.color}`).toBe(true);
-        used.add(s.color);
-      }
-    }
-    expect(used.size).toBe(4);
-  });
-
-  // visual-upgrade C5 (AC 5, AC 7)
-  it('facade types and lane marks', () => {
-    const city = generateCity(1337);
-    const types = new Set<number>();
-    for (const block of city.blocks) {
-      for (const b of block.buildings) {
-        expect(Number.isInteger(b.facadeType)).toBe(true);
-        expect(b.facadeType).toBeGreaterThanOrEqual(0);
-        expect(b.facadeType).toBeLessThanOrEqual(3);
-        types.add(b.facadeType);
-      }
-    }
-    expect([...types].sort()).toEqual([0, 1, 2, 3]);
-    expect(city.streets.length).toBe(14);
-    for (const street of city.streets) {
-      expect(street.laneMarks.length).toBe(67);
-      for (let i = 1; i < street.laneMarks.length; i++) {
-        expect(street.laneMarks[i]! - street.laneMarks[i - 1]!).toBeCloseTo(6, 2);
-      }
-    }
-  });
-
-  // C20 (AC 16)
-  it('lamp posts every 40 m on both sides', () => {
-    const city = generateCity(1337);
-    const streetsPerAxis = 7;
-    const streetLength = 404;
-    const expected = 2 * (2 * streetsPerAxis) * Math.floor(streetLength / 40);
-    expect(city.lamps.length).toBe(expected);
-
-    // group by street (axis + lateral coordinate) and check spacing along the street
-    const groups = new Map<string, number[]>();
-    for (const lamp of city.lamps) {
-      const key = lamp.axis === 'x' ? `x:${lamp.z.toFixed(3)}` : `z:${lamp.x.toFixed(3)}`;
-      const along = lamp.axis === 'x' ? lamp.x : lamp.z;
-      groups.set(key, [...(groups.get(key) ?? []), along]);
-    }
-    expect(groups.size).toBe(2 * 2 * streetsPerAxis);
-    for (const [key, coords] of groups) {
-      coords.sort((a, b) => a - b);
-      expect(coords.length, key).toBe(Math.floor(streetLength / 40));
-      for (let i = 1; i < coords.length; i++) {
-        expect(coords[i]! - coords[i - 1]!, key).toBeCloseTo(40, 2);
-      }
+  it('mulberry32 is deterministic', () => {
+    const take = (seed: number) => {
+      const rng = mulberry32(seed);
+      return Array.from({ length: 1000 }, () => rng());
+    };
+    const a = take(1337);
+    expect(take(1337)).toEqual(a);
+    expect(take(1338)).not.toEqual(a);
+    for (const v of a) {
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThan(1);
     }
   });
 });

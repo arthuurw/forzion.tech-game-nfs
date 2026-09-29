@@ -19,7 +19,8 @@ export default defineConfig({
   webServer: {
     command: `npx vite --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
-    reuseExistingServer: true,
+    // só reaproveita com E2E_REUSE: sem isso, um servidor de outro checkout na mesma porta faria a suíte testar o código errado
+    reuseExistingServer: !!process.env.E2E_REUSE,
     timeout: 120_000,
   },
 });

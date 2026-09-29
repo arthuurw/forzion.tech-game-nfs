@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 24,
+  "next_id": 29,
   "lessons": [
     {
       "id": "L-001",
@@ -421,6 +421,96 @@
       ],
       "created": "2026-09-27T21:49:54Z",
       "last_seen": "2026-09-27T21:49:54Z"
+    },
+    {
+      "id": "L-024",
+      "key": "ac_gap::size a decision s coverage row from the branches in the code and reconcile it with any branch list the checks own evidence names a shorter row hides a branch",
+      "text": "Size a decision's coverage row from the branches in the code, and reconcile it with any branch list the checks' own evidence names; a shorter row hides a branch.",
+      "signal": "ac_gap",
+      "scope": "tests",
+      "status": "candidate",
+      "features": [
+        "test-hardening"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "test-hardening r1 gap 1 - src/core/InputManager.ts:34 (Space branch unproven) (tests)"
+      ],
+      "created": "2026-09-29T20:35:41Z",
+      "last_seen": "2026-09-29T20:35:41Z"
+    },
+    {
+      "id": "L-025",
+      "key": "ac_gap::a claim naming several literals owes one assertion per literal asserting one half of a compound phrase leaves the other half free to drift",
+      "text": "A claim naming several literals owes one assertion per literal; asserting one half of a compound phrase leaves the other half free to drift.",
+      "signal": "ac_gap",
+      "scope": "docs",
+      "status": "candidate",
+      "features": [
+        "test-hardening"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "test-hardening r1 gap 2 - tests/unit/docs.test.ts:58 (AD-018 world/rail half unasserted) (docs)"
+      ],
+      "created": "2026-09-29T20:35:41Z",
+      "last_seen": "2026-09-29T20:35:41Z"
+    },
+    {
+      "id": "L-026",
+      "key": "ac_gap::a negative sub claim nothing of kind x remains owes its own scan assertion a hand check at verify time proves only that one commit",
+      "text": "A negative sub-claim (nothing of kind X remains) owes its own scan assertion; a hand check at verify time proves only that one commit.",
+      "signal": "ac_gap",
+      "scope": "tests",
+      "status": "candidate",
+      "features": [
+        "test-hardening"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "test-hardening r1 gap 3 - tests/unit/testHygiene.test.ts:16 (C21 no-expect(CONST) sub-claim unasserted) (tests)"
+      ],
+      "created": "2026-09-29T20:35:41Z",
+      "last_seen": "2026-09-29T20:35:41Z"
+    },
+    {
+      "id": "L-027",
+      "key": "spec_precision_gap::a check that states a total count owes a proof that asserts that number a count kept only in the check text goes stale at the next added test",
+      "text": "A check that states a total count owes a proof that asserts that number; a count kept only in the check text goes stale at the next added test.",
+      "signal": "spec_precision_gap",
+      "scope": "checks",
+      "status": "candidate",
+      "features": [
+        "test-hardening"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "test-hardening r1 gap 4 and r2 C4 - .specs/features/test-hardening/checks.md:23 (count 212 stale, 213 at HEAD) (checks)"
+      ],
+      "created": "2026-09-29T20:35:41Z",
+      "last_seen": "2026-09-29T20:35:41Z"
+    },
+    {
+      "id": "L-028",
+      "key": "surviving_mutant::a claim about what an npm script runs owes a proof that runs or reads that script a proof that retypes the script s flags survives any edit to the script",
+      "text": "A claim about what an npm script runs owes a proof that runs or reads that script; a proof that retypes the script's flags survives any edit to the script.",
+      "signal": "surviving_mutant",
+      "scope": "test-tooling",
+      "status": "candidate",
+      "features": [
+        "test-hardening"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "test-hardening r3 R3-F2 - package.json:15 test:quick -> vitest run survived tests/tooling/suite-split.mjs:14-16 and list-has.mjs:14 (C3, C4) (test-tooling)"
+      ],
+      "created": "2026-09-29T20:45:22Z",
+      "last_seen": "2026-09-29T20:45:22Z"
     }
   ]
 }

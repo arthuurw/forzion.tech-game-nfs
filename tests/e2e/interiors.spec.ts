@@ -109,7 +109,7 @@ test.describe('block-fill - chão', () => {
   });
 
   // C10 (AC 9) - parte browser
-  test('ground bounce weight per vertex', async ({ page }) => {
+  test('ground bounce weight per vertex', { tag: '@smoke' }, async ({ page }) => {
     await gotoGame(page);
     const r = await page.evaluate(async () => {
       const m = await import('/src/world/interiors/interiorMotion.ts' as string);
@@ -244,7 +244,7 @@ test.describe('block-fill - quintais', () => {
   });
 
   // C17 (AC 16) - parte browser
-  test('yard bulbs sway', async ({ page }) => {
+  test('yard bulbs sway', { tag: '@smoke' }, async ({ page }) => {
     await gotoGame(page);
     const count = await page.evaluate(() => (window as any).__game.world.interiors.bulbCount as number);
     expect(count).toBeGreaterThan(0);

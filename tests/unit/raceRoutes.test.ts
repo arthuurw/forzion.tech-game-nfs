@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { generateRaces, type RaceDef } from '../../src/race/raceRoutes';
 import { generateRoads, type Road, type RoadNetwork } from '../../src/world/roads/RoadGenerator';
 import { generateTerrain } from '../../src/world/terrain/TerrainGenerator';
@@ -123,8 +123,13 @@ describe('races of seed 1337', () => {
   });
 
   // C3
+  // a segunda geração fica no hook: o teste só compara (test-hardening AC 2)
+  let again: RaceDef[];
+  beforeAll(() => {
+    again = generateRaces(generateRoads(SEED, generateTerrain(SEED)));
+  });
+
   it('same seed same races', () => {
-    const again = generateRaces(generateRoads(SEED, generateTerrain(SEED)));
     expect(again).toEqual(races);
   });
 

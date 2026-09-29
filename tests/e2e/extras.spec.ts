@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { advanceSim, gotoGame } from './helpers';
+import { advanceSim, gotoGame, waitFrames } from './helpers';
 
 /**
  * block-life-extras: estacionados, vapor, gatos, holofotes e trem no browser,
@@ -33,7 +33,7 @@ const hexChannels = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, 
 test.describe('block-life-extras - extras do miolo e trem', () => {
   test.beforeEach(async ({ page }) => {
     await gotoGame(page);
-    await page.waitForTimeout(300);
+    await waitFrames(page, 20);
   });
 
   // C14 (AC 14)
@@ -143,7 +143,7 @@ test.describe('block-life-extras - extras do miolo e trem', () => {
   });
 
   // C26 (AC 23, 26)
-  test('cats are one instanced mesh near the car', async ({ page }) => {
+  test('cats are one instanced mesh near the car', { tag: '@smoke' }, async ({ page }) => {
     const e = await extras(page);
     expect(e.cats.name).toBe('cats');
     expect(e.cats.vertices).toBeLessThanOrEqual(120);
@@ -203,7 +203,7 @@ test.describe('block-life-extras - extras do miolo e trem', () => {
 
 test.describe('block-life-extras - qualidade low', () => {
   // C37 (AC 37)
-  test('low quality halves cats and steam and keeps the rest', async ({ page }) => {
+  test('low quality halves cats and steam and keeps the rest', { tag: '@smoke' }, async ({ page }) => {
     await page.goto('/?quality=low');
     await page.waitForFunction(() => (window as any).__game?.ready === true, null, { timeout: 30_000 });
     const e = await extras(page);
