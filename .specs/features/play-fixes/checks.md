@@ -99,9 +99,11 @@ Proof: `npx playwright test tests/e2e/visual.spec.ts -g "rain falls on the hill 
 
 **C25** - Com os gatos do seed 1337 e o carro passando por eles a 8 m/s e a 20 m/s, em todo passo com o carro a < 8 m, cada gato está em `gone` ou fora da caixa do chassi + 0.3 m (|ao longo| ≥ 2.4 ou |de lado| ≥ 1.2). Substitui a folga de 0.5 m da block-life-extras C25 (AC 19)
 Proof: `npx vitest run tests/unit/extrasMotion.test.ts -t "cats are never inside the car box"`
+Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "car box edges on each axis"`
 
 **C26** - Com 400 pedestres do seed 1337 e o carro passando a 8 m/s e a 20 m/s, em todo passo com o carro a < 8 m, cada pedestre está fora da mesma caixa (AC 20)
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "walkers are never inside the car box"`
+Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "car box edges on each axis"`
 
 **C27** - Um pedestre em fuga sem direção livre dentro da zona sai da fuga em ≤ 1 s de simulação e anda num segmento novo; nos 400 pedestres do seed 1337 com o carro parado ao lado, nenhum fica em fuga com deslocamento zero por mais de 2 s (AC 21)
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "cornered walker leaves the flee"`
@@ -120,6 +122,7 @@ Proof: `npx vitest run tests/unit/docs.test.ts -t "parking comment matches wellI
 
 **C31** - Seed 1337: toda coluna de portal fica a ≥ `largura / 2 + 0.25 + 0.5` m de toda estrada que não é a avenida do portal; o gerador pula o portal que violaria isso, então a coluna que hoje entra 0.29 m na avenida 4 não existe (AC 25)
 Proof: `npx vitest run tests/unit/trainLine.test.ts -t "portal columns stay off other roads"`
+Proof: `npx vitest run tests/unit/trainLine.test.ts -t "portal column just past the road gap is kept and just short is skipped"`
 
 ### S9 - render acompanha a janela · 5 files · 100 KB · ~25k
 

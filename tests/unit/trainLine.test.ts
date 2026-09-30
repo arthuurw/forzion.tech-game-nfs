@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { COLUMN_HALF, DECK_THICKNESS, buildTrainLine, frameColumns, lineCumulative, type TrainLine } from '../../src/world/rail/trainLine';
+import { COLUMN_HALF, DECK_THICKNESS, buildTrainLine, frameColumns, lineCumulative, type TrainFrame, type TrainLine } from '../../src/world/rail/trainLine';
 import { generateRoads, type Road, type RoadNetwork } from '../../src/world/roads/RoadGenerator';
 import { generateTerrain } from '../../src/world/terrain/TerrainGenerator';
 
@@ -170,5 +170,46 @@ describe('train line of seed 1337', () => {
       }
     }
     expect(checked).toBe(line.frames.length * 2 * (network.roads.length - 1));
+  });
+
+  // play-fixes C31 (AC 25): a borda da regra, numa rede mínima (as 4 avenidas retas do quadrado)
+  // mais uma rua paralela à avenida leste. A coluna fica a w/2 + 2.6 m da linha central da avenida
+  // (block-life-extras door 2); o limite até a linha central da rua é largura / 2 + 0.25 + 0.5 m
+  it('portal column just past the road gap is kept and just short is skipped', () => {
+    const AV_W = 14;
+    const ST_W = 8;
+    /** estrada reta a cada 2 m, com `fixed` constante = `at` e o outro eixo de `from` a `to` */
+    const straight = (id: number, kind: Road['kind'], width: number, fixed: 'x' | 'z', at: number, from: number, to: number): Road => {
+      const n = Math.round((to - from) / 2) + 1;
+      const points = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) points.set(fixed === 'x' ? [at, 0, from + 2 * i] : [from + 2 * i, 0, at], i * 3);
+      return { id, kind, lanes: kind === 'avenue' ? 4 : 2, width, closed: false, points, bridges: [] };
+    };
+    const square = [
+      straight(0, 'avenue', AV_W, 'z', -300, -400, 400),
+      straight(1, 'avenue', AV_W, 'z', 300, -400, 400),
+      straight(2, 'avenue', AV_W, 'x', -300, -400, 400),
+      straight(3, 'avenue', AV_W, 'x', 300, -400, 400),
+    ];
+    const colX = 300 + AV_W / 2 + 2.6;
+    const limit = ST_W / 2 + 0.25 + 0.5;
+    const street = (dx: number) => straight(4, 'street', ST_W, 'x', colX + limit + dx, -100, 100);
+    /** portal da avenida leste com a coluna ao lado da rua (z em −100..100) */
+    const beside = (f: TrainFrame) => Math.abs(f.x - 300) < 1e-3 && Math.abs(f.z) <= 100;
+    /** portal longe da ponta da rua o bastante para a regra não pegar pela ponta */
+    const away = (f: TrainFrame) => !(Math.abs(f.x - 300) < 1e-3 && Math.abs(f.z) < 101);
+
+    const base = buildTrainLine({ roads: square })!;
+    const stretch = base.frames.filter(beside);
+    expect(stretch.length).toBeGreaterThan(0);
+    for (const f of stretch) expect(frameColumns(f).some((c) => Math.abs(c.x - colX) < 1e-3)).toBe(true);
+
+    // coluna 0.01 m além do limite: o portal fica, nada muda
+    const kept = buildTrainLine({ roads: [...square, street(0.01)] })!;
+    expect(kept.frames).toEqual(base.frames);
+    // coluna 0.01 m aquém do limite: os portais ao lado da rua somem, os outros ficam
+    const skipped = buildTrainLine({ roads: [...square, street(-0.01)] })!;
+    expect(skipped.frames.filter(beside)).toEqual([]);
+    expect(skipped.frames.filter(away)).toEqual(base.frames.filter(away));
   });
 });

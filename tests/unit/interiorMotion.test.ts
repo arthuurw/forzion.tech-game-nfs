@@ -14,6 +14,7 @@ import {
   carBoxLocal,
   createWalker,
   extraColors,
+  insideCarBox,
   crownSway,
   fireflyMotion,
   stepWalker,
@@ -511,5 +512,40 @@ describe('interior motion', () => {
     }
     // cores distintas entre vizinhos de índice
     expect(new Set(extraColors([0, 1, 2, 3], palette)).size).toBe(4);
+  });
+
+  // play-fixes C25, C26 (AC 19, AC 20): a borda da caixa do chassi + 0.3 m, meia medida 2.4 m ao
+  // longo e 1.2 m de lado. Dentro só com |ao longo| < 2.4 e |de lado| < 1.2; na borda já é fora
+  it('car box edges on each axis', () => {
+    // heading 0 no zero: ao longo = +z, direita = −x, sem erro de rotação
+    const at0 = { x: 0, z: 0, heading: 0 };
+    expect(insideCarBox(0, 0, at0)).toBe(true);
+    for (const a of [2.4, -2.4]) expect(insideCarBox(0, a, at0), `ao longo ${a}`).toBe(false);
+    for (const s of [1.2, -1.2]) expect(insideCarBox(-s, 0, at0), `de lado ${s}`).toBe(false);
+    // logo dentro e logo fora de cada borda, em cada eixo, com o carro girado (frente (sin h, cos h), direita (−cos h, sin h))
+    const rows: Array<{ along: number; side: number; inside: boolean }> = [
+      { along: 2.39, side: 0, inside: true },
+      { along: 2.41, side: 0, inside: false },
+      { along: -2.39, side: 0, inside: true },
+      { along: -2.41, side: 0, inside: false },
+      { along: 0, side: 1.19, inside: true },
+      { along: 0, side: 1.21, inside: false },
+      { along: 0, side: -1.19, inside: true },
+      { along: 0, side: -1.21, inside: false },
+      { along: 2.39, side: 1.19, inside: true },
+      { along: -2.39, side: -1.21, inside: false },
+      { along: -2.41, side: 1.19, inside: false },
+    ];
+    for (const h of [0, 1, -2.5]) {
+      const car = { x: 10, z: -5, heading: h };
+      for (const r of rows) {
+        const x = car.x + Math.sin(h) * r.along - Math.cos(h) * r.side;
+        const z = car.z + Math.cos(h) * r.along + Math.sin(h) * r.side;
+        expect(insideCarBox(x, z, car), `h ${h} ao longo ${r.along} de lado ${r.side}`).toBe(r.inside);
+      }
+    }
+    // sem heading vale 0
+    expect(insideCarBox(10, -5 + 2.39, { x: 10, z: -5 })).toBe(true);
+    expect(insideCarBox(10, -5 + 2.41, { x: 10, z: -5 })).toBe(false);
   });
 });
