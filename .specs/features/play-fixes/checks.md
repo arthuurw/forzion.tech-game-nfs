@@ -58,6 +58,7 @@ Proof: `npx vitest run tests/unit/raceSession.test.ts -t "stop input after the f
 
 **C14** - Com o `Car` real, em cada uma das 4 corridas, cada oponente que termina fica com |velocidade| < 5 km/h em até 8 s de simulação depois da chegada, e em nenhum passo desse intervalo o centro do chassi passa de `largura da estrada / 2` do traçado (AC 9, AC 10)
 Proof: `npx vitest run tests/physics/raceAi.test.ts -t "finished opponents stop on the road in every race"`
+Proof: `npx vitest run tests/physics/raceAi.test.ts -t "race controller stops an opponent that finished while the race goes on"`
 
 **C15** - Com o `Car` real, um oponente a ≥ 60 km/h no meio da corrida, dirigido no modo de parada (o que a sessão `finished` pede), recebe a cada passo `stopInput` (nunca `HOLD_INPUT` enquanto passa de 5 km/h), fica abaixo de 5 km/h em até 8 s e dentro de `largura / 2` do traçado (AC 11)
 Proof: `npx vitest run tests/physics/raceAi.test.ts -t "opponents still racing stop when the player finishes"`
@@ -163,6 +164,7 @@ Proof: `npx playwright test tests/e2e/visual.spec.ts -g "renderer without msaa k
 | --- | --- | --- |
 | Regra pura (`stopInput`, `resetTarget`, desempate em `raceProgress`, `rainY`, movimento de gato e pedestre, portal do trem) | uma na própria camada, vitest | um caso por linha da tabela de decisão, mais as bordas de cada limite |
 | Física com o `Car` real (parada do oponente, reset, teleport) | uma em `tests/physics` (AD-011) | um caso por caminho, com o número medido |
+| Fiação da corrida (`RaceController.beforeStep` escolhe `hold`, `race` ou `stop` para cada oponente) | uma em `tests/physics` com o `RaceController` e o `Car` reais, passando por `beforeStep` | um caso por modo escolhido: `hold` na contagem, `race` correndo, `stop` para o oponente que terminou com a sessão `racing`, `stop` para o que não terminou com a sessão `finished`; o `lastInput` comparado com `HOLD_INPUT`, com o input da IA ou com `stopInput` |
 | Fiação no browser (`InputManager`, `AudioEngine`, `GameLoop`, `main`, `Game` resize) | uma e2e lendo `__game`; o `InputManager` e o `GameLoop` também numa unitária com alvo falso | um caso por evento ou estado afirmado |
 
 Evidence:
@@ -197,3 +199,4 @@ Cost: 3 arquivos novos (`tests/unit/gameLoop.test.ts`, `tests/physics/reset.test
 - **Settled mid-build:** recuar a chegada redistribuía todos os portões da sprint, e a test-hardening C17 ("stuck opponent is reset to its last gate", janela de 4 s ± 0.1) mediu 3.88 s num cenário que mudou de lugar. Os portões do meio voltaram às posições de antes; só a chegada vai para `fim − 200 m`, e cai o portão que ficaria a menos de 50 m antes dela. C17 da test-hardening passa sem mudança
 - **Settled mid-build:** no Chromium headless a troca de `deviceScaleFactor` pelo CDP não dispara o `change` da media query `(resolution: Ndppx)`. O `Game` confere `devicePixelRatio` a cada quadro e chama o mesmo `handleResize`. C33 prova as duas trocas (só o DPR, depois o tamanho)
 - **Settled mid-build:** C22 e C24 ganharam assentamento no setup (1 s de cabeça para baixo antes do R; a altura medida é a do carro, não a do portão)
+- **Settled at verify:** a verificação 1 achou o mutante F1 vivo (`RaceController.beforeStep` sem o `stop` do oponente que terminou). C14 ganha uma segunda prova que passa pelo controlador ("race controller stops an opponent that finished while the race goes on"), e o Test policy ganha a linha da fiação da corrida, que nenhuma linha classificava. O texto da C14 não muda. Decisão delegada pelo usuário

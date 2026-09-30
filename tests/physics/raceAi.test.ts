@@ -2,10 +2,11 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { Assets } from '../../src/core/Loader';
-import { AI_PAINTS, AI_SKILLS, prepareRoute } from '../../src/race/aiDriver';
+import { AI_PAINTS, AI_SKILLS, aiDrive, prepareRoute, type AiRoute } from '../../src/race/aiDriver';
 import { Opponent, PLACE_HEIGHT } from '../../src/race/Opponent';
-import { generateRaces, gridSlotAt, widthAt, type RaceDef } from '../../src/race/raceRoutes';
-import { HOLD_INPUT, resetTarget } from '../../src/race/raceSession';
+import { RaceController } from '../../src/race/RaceController';
+import { PLAYER_SLOT, generateRaces, gridSlotAt, widthAt, type RaceDef } from '../../src/race/raceRoutes';
+import { HOLD_INPUT, resetTarget, stopInput } from '../../src/race/raceSession';
 import { Car } from '../../src/vehicle/Car';
 import { DEFAULT_CAR } from '../../src/vehicle/carSpec';
 import type { DriveInput } from '../../src/vehicle/drivetrain';
@@ -93,6 +94,13 @@ function brakeFor8s(world: RAPIER.World, op: Opponent, race: RaceDef, k0: number
     if (stoppedAt < 0 && Math.abs(op.car.speedKmh()) < 5) stoppedAt = (k + 1) * DT;
   }
   return { stoppedAt, worst, held, endKmh: Math.abs(op.car.speedKmh()) };
+}
+
+/** O input da IA para o passo que vai rodar, tirado de uma cópia do estado da IA (o oponente não muda). */
+function aiInputNow(op: Opponent, route: AiRoute): { ai: DriveInput; kmh: number } {
+  const s = op.car.state();
+  const ai = aiDrive({ x: s.x, y: s.y, z: s.z, heading: s.heading, speedMs: s.speedMs }, route, { ...op.ai }, op.skill, op.offset);
+  return { ai, kmh: s.speedKmh };
 }
 
 describe('race opponents in the real world', () => {
@@ -260,5 +268,96 @@ describe('race opponents in the real world', () => {
     expect(r.stoppedAt).toBeLessThanOrEqual(8);
     expect(r.endKmh).toBeLessThan(5);
     expect(r.worst).toBeLessThanOrEqual(0);
+  }, 300_000);
+
+  // play-fixes C14 (AC 9, AC 11) pelo controlador: `RaceController.beforeStep` escolhe o modo de cada
+  // oponente. Contagem → `hold`; correndo → a IA; terminou com a sessão ainda `racing` → `stopInput`;
+  // sessão `finished` → `stopInput` para quem não terminou
+  it('race controller stops an opponent that finished while the race goes on', () => {
+    const race = byId('sprint-cruzada');
+    const route = prepareRoute(race.route);
+    const world = makeWorld();
+    const scene = new THREE.Scene();
+    const hud = { querySelector: () => ({ style: {}, textContent: '' }) } as unknown as HTMLElement;
+    const rc = new RaceController(world, scene, ASSETS, network, hud);
+    const slot = race.grid[PLAYER_SLOT]!;
+    const car = new Car(world, scene, ASSETS, { x: slot.x, y: slot.y + PLACE_HEIGHT, z: slot.z }, DEFAULT_CAR);
+    car.teleport(race.marker.x, slot.y + PLACE_HEIGHT, race.marker.z, slot.heading);
+    rc.enter(car);
+    expect(rc.session).toMatchObject({ state: 'countdown', race: races.indexOf(race) });
+    expect(rc.opponents).toHaveLength(3);
+    const idle: DriveInput = { throttle: false, brake: false, steer: 0, handbrake: false };
+    const step = () => {
+      car.fixedUpdate(rc.playerInput(idle), DT);
+      rc.beforeStep(DT);
+      world.step();
+      rc.afterStep(DT, car);
+    };
+
+    // contagem: `hold`
+    step();
+    for (const op of rc.opponents) expect(op.lastInput).toEqual(HOLD_INPUT);
+    let k = 0;
+    while (rc.session.state === 'countdown' && k < 10 * 60) {
+      step();
+      k++;
+    }
+    expect(rc.session.state).toBe('racing');
+
+    // o oponente 0 sai a 400 m da chegada na última volta, como na prova de C14; o 1 segue do grid
+    const done = rc.opponents[0]!;
+    const other = rc.opponents[1]!;
+    const finish = race.gates[race.gates.length - 1]!;
+    const start = gridSlotAt(race.route, finish.s - 400 + 16, 0);
+    done.placeAt(start.x, start.y + PLACE_HEIGHT, start.z, start.heading);
+    done.progress.lap = race.laps;
+    done.progress.nextGate = race.gates.length - 1;
+    done.progress.lastGate = race.gates.length - 2;
+    done.startClock(rc.time);
+    k = 0;
+    while (!done.progress.finished && k < 60 * 60) {
+      const want = aiInputNow(done, route);
+      const wantOther = aiInputNow(other, route);
+      step();
+      k++;
+      expect(done.lastInput, `corrida, passo ${k}`).toEqual(want.ai);
+      expect(other.lastInput, `corrida, passo ${k}`).toEqual(wantOther.ai);
+    }
+    expect(done.progress.finished).toBe(true);
+    expect(rc.session.state).toBe('racing');
+
+    // terminou com a sessão `racing`: `stopInput` do esterço da IA a cada passo, até parar
+    let stoppedAt = -1;
+    for (let j = 0; j < 8 * 60; j++) {
+      const want = aiInputNow(done, route);
+      const wantOther = aiInputNow(other, route);
+      step();
+      if (j === 0) {
+        expect(want.kmh).toBeGreaterThan(5);
+        expect(done.lastInput).toEqual({ throttle: false, brake: true, steer: want.ai.steer, handbrake: false });
+      }
+      expect(done.lastInput, `parada, passo ${j}`).toEqual(stopInput(want.ai, want.kmh));
+      expect(other.lastInput, `parada, passo ${j}`).toEqual(wantOther.ai);
+      if (stoppedAt < 0 && Math.abs(done.car.speedKmh()) < 5) stoppedAt = (j + 1) * DT;
+    }
+    expect(rc.session.state).toBe('racing');
+    expect(stoppedAt).toBeGreaterThan(0);
+    expect(stoppedAt).toBeLessThanOrEqual(8);
+    expect(Math.abs(done.car.speedKmh())).toBeLessThan(5);
+
+    // o jogador chega: sessão `finished`, e o oponente que ainda corre também recebe `stopInput`
+    expect(other.progress.finished).toBe(false);
+    k = 0;
+    while (rc.session.state === 'racing' && k < 200) {
+      rc.crossNextGate(car);
+      step();
+      k++;
+    }
+    expect(rc.session.state).toBe('finished');
+    const want = aiInputNow(other, route);
+    step();
+    expect(want.kmh).toBeGreaterThan(5);
+    expect(other.lastInput).toEqual({ throttle: false, brake: true, steer: want.ai.steer, handbrake: false });
+    expect(other.lastInput).toEqual(stopInput(want.ai, want.kmh));
   }, 300_000);
 });
