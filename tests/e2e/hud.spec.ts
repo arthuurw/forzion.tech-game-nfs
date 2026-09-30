@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { advanceSim, gotoGame, holdKeySim, pageFrames, teleport, waitFrames, waitSimUntil } from './helpers';
+import { BOOT_TIMEOUT_MS, advanceSim, gotoGame, holdKeySim, pageFrames, teleport, waitFrames, waitSimUntil } from './helpers';
 
 test.describe('hud', () => {
   // C26 (AC 20)
@@ -23,7 +23,7 @@ test.describe('hud', () => {
     const loading = page.locator('#loading');
     await expect(loading).toBeVisible();
     await expect(loading).toContainText('Carregando...');
-    await page.waitForFunction(() => (window as any).__game?.ready === true, null, { timeout: 30_000 });
+    await page.waitForFunction(() => (window as any).__game?.ready === true, null, { timeout: BOOT_TIMEOUT_MS });
     await expect(loading).toBeHidden();
     await expect(loading).toHaveCSS('display', 'none');
     await expect(page.locator('#hud')).toBeVisible();
@@ -40,7 +40,7 @@ test.describe('hud', () => {
     });
     await page.goto('/');
     const error = page.locator('#error');
-    await expect(error).toBeVisible();
+    await expect(error).toBeVisible({ timeout: BOOT_TIMEOUT_MS });
     await expect(error).toHaveText('Seu navegador não suporta WebGL2');
     await pageFrames(page, 30);
     const hasGame = await page.evaluate(() => (window as any).__game !== undefined);
@@ -88,7 +88,8 @@ test.describe('hud - rodada 2', () => {
     });
     await page.goto('/');
     const error = page.locator('#error');
-    await expect(error).toBeVisible();
+    // a falha só aparece no fim da montagem, depois do mundo gerado
+    await expect(error).toBeVisible({ timeout: BOOT_TIMEOUT_MS });
     await expect(error).toContainText(/^Falha ao iniciar o jogo:/);
     await pageFrames(page, 30);
     expect(await page.evaluate(() => (window as any).__game !== undefined)).toBe(false);

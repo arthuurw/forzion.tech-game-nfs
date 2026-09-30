@@ -393,8 +393,7 @@ test.describe('block-fill - árvores', () => {
     expect(high).toBeGreaterThan(0);
     expect(high).toBeLessThanOrEqual(600);
     await nearTrees(high);
-    await page.goto('/?quality=low');
-    await page.waitForFunction(() => (window as any).__game?.ready === true, null, { timeout: 30_000 });
+    await gotoGame(page, '?quality=low');
     const low = await page.evaluate(() => (window as any).__game.world.interiors.summary().fireflies as number);
     expect(low).toBeGreaterThan(0);
     expect(low).toBeLessThanOrEqual(300);

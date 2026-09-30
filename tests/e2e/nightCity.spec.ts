@@ -1,14 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 import { SKYLINE_STEPS, skylineHeight } from '../../src/world/skyMath';
 import { signPattern } from '../../src/world/signGlyphs';
-import { advanceSim } from './helpers';
+import { advanceSim, gotoGame } from './helpers';
 
 // night-city: provas no browser (checks C6, C8-C11, C14, C15, C17, C18, C20, C27, C29-C32)
 
-async function open(page: Page, query = ''): Promise<void> {
-  await page.goto(`/${query}`);
-  await page.waitForFunction(() => (window as any).__game?.ready === true, null, { timeout: 30_000 });
-}
+const open = gotoGame;
 
 type Pose = { x: number; y: number; z: number; tx: number; ty: number; tz: number };
 type P3 = { x: number; y: number; z: number };

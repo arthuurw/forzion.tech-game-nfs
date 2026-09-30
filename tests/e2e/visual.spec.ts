@@ -1,13 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
-import { advanceSim, buildingScenario, holdKeySim, insideLot, position, teleport } from './helpers';
+import { advanceSim, buildingScenario, gotoGame, holdKeySim, insideLot, position, teleport } from './helpers';
 
 const SETS = ['Asphalt012', 'PavingStones070', 'Concrete034', 'MetalPlates006', 'Bricks059', 'PaintedPlaster017'];
 const KINDS = ['Color', 'NormalGL', 'Roughness'];
 
-async function open(page: Page, query = ''): Promise<void> {
-  await page.goto(`/${query}`);
-  await page.waitForFunction(() => (window as any).__game?.ready === true, null, { timeout: 30_000 });
-}
+const open = gotoGame;
 
 test.describe('visual - S2 materiais', () => {
   // C1 (AC 1, door 1)

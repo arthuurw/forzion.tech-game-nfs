@@ -8,10 +8,16 @@ import type { Page } from '@playwright/test';
  */
 const SIM_TIMEOUT_MS = 90_000;
 
-/** Abre o jogo e espera o primeiro frame (`window.__game.ready`). */
-export async function gotoGame(page: Page): Promise<void> {
-  await page.goto('/');
-  await page.waitForFunction(() => (window as any).__game?.ready === true, null, { timeout: 30_000 });
+/**
+ * Prazo de relógio do boot: sozinho leva 3-5 s, mas com a máquina ocupada (workers em paralelo,
+ * outra suíte num worktree) passava dos 30 s de antes.
+ */
+export const BOOT_TIMEOUT_MS = 90_000;
+
+/** Abre o jogo (com `query`, ex. `?quality=low`) e espera o primeiro frame (`window.__game.ready`). */
+export async function gotoGame(page: Page, query = ''): Promise<void> {
+  await page.goto(`/${query}`);
+  await page.waitForFunction(() => (window as any).__game?.ready === true, null, { timeout: BOOT_TIMEOUT_MS });
 }
 
 export function simTime(page: Page): Promise<number> {
