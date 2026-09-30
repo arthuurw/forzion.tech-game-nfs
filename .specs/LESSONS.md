@@ -192,6 +192,12 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: verification.md round 1 Test policy row Regra pura - interiorMotion.ts insideCarBox, trainLine.ts COLUMN_ROAD_GAP (world)
 - last seen: 2026-09-30T00:59:44Z
 
+### L-031 - When a plan renegotiates another feature's check, list every proof of that check (unit and browser) in Impact and rerun them all, not only the one that was edited.
+- signal: `gate_fail` · recurrence: 1 feature(s) · scope: `race` · harmful: 0
+- features: play-fixes
+- evidence: tests/e2e/race.spec.ts:304,333 (races C29, C30) (race)
+- last seen: 2026-09-30T17:25:57Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.

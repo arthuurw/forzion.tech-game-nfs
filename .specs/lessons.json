@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 31,
+  "next_id": 32,
   "lessons": [
     {
       "id": "L-001",
@@ -549,6 +549,24 @@
       ],
       "created": "2026-09-30T00:59:44Z",
       "last_seen": "2026-09-30T00:59:44Z"
+    },
+    {
+      "id": "L-031",
+      "key": "gate_fail::when a plan renegotiates another feature s check list every proof of that check unit and browser in impact and rerun them all not only the one that was edited",
+      "text": "When a plan renegotiates another feature's check, list every proof of that check (unit and browser) in Impact and rerun them all, not only the one that was edited.",
+      "signal": "gate_fail",
+      "scope": "race",
+      "status": "candidate",
+      "features": [
+        "play-fixes"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "tests/e2e/race.spec.ts:304,333 (races C29, C30) (race)"
+      ],
+      "created": "2026-09-30T17:25:57Z",
+      "last_seen": "2026-09-30T17:25:57Z"
     }
   ]
 }
