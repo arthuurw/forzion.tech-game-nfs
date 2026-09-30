@@ -3,7 +3,7 @@
 Profile: standard
 Plan: `.specs/features/night-city/plan.md`
 
-29 checks in 5 slices · 3 one-way doors · 0 open, of which 0 block
+33 checks in 6 slices · 3 one-way doors · 0 open, of which 0 block
 
 ## Checks
 
@@ -106,19 +106,39 @@ Proof: `npx vitest run tests/unit/purity.test.ts -t "pure modules do not import 
 **C29** - ✅ O asfalto do centro, o de fora, a calçada e o terreno leem o mesmo `uLampLight` (a mesma `DataTexture`), e a textura tem 1536 × 1536, filtro linear e sem mipmap (door 2)
 Proof: `npx playwright test tests/e2e/nightCity.spec.ts -g "ground materials share the lamp light map"`
 
+### S6 - provas de pixel da rodada 1 do Verifier · 5 files · 70 KB · ~18k
+
+Checks acrescentados depois do FAIL da rodada 1 (`verification.md`): o F5 sobreviveu e a linha "Shader" do `Test policy` não tinha sonda de pixel para a silhueta, a lente e o letreiro. Nenhum check aprovado foi reescrito.
+
+**C30** - A cúpula desenha a silhueta de `skylineHeight`: o uniform `uSkyline` é `SKYLINE_TABLE`, o fragment indexa por `fract((atan(d.x, d.z) + PI) / (2π))` e pinta `SKY_SILHOUETTE` abaixo da altura; no browser, só com a cúpula, em 12 azimutes (meio dos degraus 0, 8, …, 88), a luminância 0.006 abaixo de `skylineHeight(az)` é ≤ 0.5 × a de 0.01 acima (AC 13, door 3)
+Proof: `npx vitest run tests/unit/nightCityShaders.test.ts -t "dome shader draws the skyline table"`
+Proof: `npx playwright test tests/e2e/nightCity.spec.ts -g "dome draws the skyline silhouette"`
+
+**C31** - A geometria do poste tem haste (cilindro de 6 lados) e 3 caixas; só os 24 vértices da lente têm `aLens` = 1, na ponta do braço (|x − 1.6| ≤ 0.25) a 5.82 m ± 0.01; a carcaça (0.6 m de largura) está lá, entre 5.83 e 5.97 m; o fragment só emite com `vLens · vLampColor`. No browser, só com os postes e sem luzes, a lente mede luminância ≥ 0.5, a haste e o braço ≤ 0.05 (AC 1; completa a carcaça de C7)
+Proof: `npx vitest run tests/unit/nightCityShaders.test.ts -t "lamp geometry has a housing and only the lens glows"`
+Proof: `npx playwright test tests/e2e/nightCity.spec.ts -g "only the lamp lens glows"`
+
+**C32** - O material do letreiro tem cor `#101014`, marca `vSignFace = step(0.5, abs(normal.z))` e emite só `tube · vSignFace`. No browser, só com os letreiros e sem luzes, um letreiro de ≥ 2 × 1 m tem luminância máxima ≥ 0.5 numa grade de 9 × 5 pontos da face da frente e da de trás, e ≤ 0.05 em 15 pontos da lateral da caixa (AC 16)
+Proof: `npx vitest run tests/unit/nightCityShaders.test.ts -t "sign shader lights tubes only on the front and back faces"`
+Proof: `npx playwright test tests/e2e/nightCity.spec.ts -g "sign tubes glow on both faces and the frame stays dark"`
+
+**C33** - `lampFalloff(d)` = `(1 − (d/9)²)²` ± 1e-12 em d ∈ {0, 1, 2.25, 4.5, 6, 8, 8.99}; `lampFalloff(4.5)` = 0.5625; 0 em 9 e 12 m (door 2; precisão de C4)
+Proof: `npx vitest run tests/unit/lampLight.test.ts -t "lamp falloff is squared"`
+
 ## Coverage
 
 | Set (size) | Member -> proof | Unproven |
 | --- | --- | --- |
-| partes do poste (4) | haste C1, C7 · braço C1, C7 · carcaça C7 · lente C1, C8 | - |
+| partes do poste (4) | haste C1, C7, C31 · braço C1, C7, C31 · carcaça C31 · lente C1, C8, C31 | - |
 | casos de `lampColor` (5) | centro/qualquer C3 · `avenue` fora C3 · `highway` fora C3 · `hill` fora C3, C8 · `street` fora C3 | - |
-| propriedades da grade de luz (4) | sob a lente C4 · zero a ≥ 9 m C4 · não sobe com a distância C4 · tamanho e origem C5 | - |
+| propriedades da grade de luz (5) | sob a lente C4 · zero a ≥ 9 m C4, C33 · não sobe com a distância C4 · queda quadrática C33 · tamanho e origem C5 | - |
 | materiais de chão que leem a luz (4) | asfalto do centro C29 · asfalto de fora C29 · calçada C29 · terreno C29 | - |
 | modos do espelho (2) | faixa C9, C11, C13 · amostra única C10, C13 | - |
 | distâncias da faixa (2) | 20 m C9, C11 · 60 m C11 | - |
 | garantias do reflexo (3) | sem overlay C12 · tom ≤ 1 C12 · Fresnel em [0, 1] C12 | - |
 | provas da residuals mantidas (4) | cintilação C13 · sensibilidade C13 · alvo C13 · ganho C13 | - |
-| partes do céu (4) | degradê e brilho C14 · névoa da mesma cor C15 · silhueta C16 · segue a câmera fora do espelho C17 | - |
+| partes do céu (4) | degradê e brilho C14 · névoa da mesma cor C15 · silhueta C16, C30 · segue a câmera fora do espelho C17 | - |
+| faces do letreiro (3) | tubos da frente C32 · tubos de trás C32 · moldura escura C32 | - |
 | cores de janela (3) | quente C22 · fria C22 · azul C22 | - |
 | padrões de glifo (8) | C19, table-driven sobre os 8 | - |
 | orçamento (2 lugares) | grid da corrida C24 · 5 poses do mundo C25 | - |
@@ -165,4 +185,4 @@ Cost: 1 arquivo unitário novo (`lampLight.test.ts`), 1 de shaders (`nightCitySh
 - **Settled mid-build:** a faixa do espelho usa 13 amostras (o plano dizia 9 no doc do módulo): com 9, longe, o espaçamento passava do tamanho da fonte e a faixa virava pontos. A base passou de 6 para 10 texels, para o reflexo perto da câmera também virar faixa; o crescimento é 0.06 por metro
 - **Settled mid-build:** a sonda `mirrorStreak` esconde o carro do jogador (o reflexo perto cai atrás dele), desliga o bloom (o halo da esfera escorria para baixo da linha do chão) e corta em 25 % do pico (mede a forma da mancha, não o brilho)
 - **Settled mid-build:** `nightCity.spec.ts` entrou na lista da regra de higiene da test-hardening (C7 dela), com 2 testes `@smoke`
-
+- **Settled after verification round 1:** o Verifier deu FAIL (F5 sobreviveu; linha "Shader" do `Test policy` sem sonda de pixel para silhueta, lente e letreiro; carcaça e faces do letreiro sem prova). Entraram C30-C33 (S6) e a sonda DEV `render.isolatedLum` (só os objetos pedidos, sem pós nem luzes, sobre preto). Com o F5 reinjetado, C30 falha nas duas provas (e2e: 0.118 contra ≤ 0.051). Os checks C1-C29 não mudaram

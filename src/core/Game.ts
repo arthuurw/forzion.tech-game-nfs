@@ -869,6 +869,68 @@ export class Game {
           };
         },
         /**
+         * só DEV/testes (night-city C30-C32): um quadro sem pós, sem luzes e sobre preto, só com os
+         * objetos chamados `names`, por uma câmera em `pose` olhando para `(tx, ty, tz)`. Devolve a
+         * maior luminância (0-1) numa janela `(2·win + 1)²` em volta de cada ponto projetado (null
+         * fora da tela). A cúpula do céu vai junto com a câmera, como no jogo.
+         */
+        isolatedLum: (
+          names: string[],
+          pose: { x: number; y: number; z: number; tx: number; ty: number; tz: number },
+          points: Array<{ x: number; y: number; z: number }>,
+          win = 0,
+        ): Array<number | null> => {
+          const keep = new Set<THREE.Object3D>();
+          for (const n of names) game.scene.getObjectsByProperty('name', n).forEach((o) => keep.add(o));
+          const path = new Set<THREE.Object3D>();
+          keep.forEach((o) => o.traverseAncestors((a) => path.add(a)));
+          const changed: Array<[THREE.Object3D, boolean]> = [];
+          const visit = (o: THREE.Object3D) => {
+            if (keep.has(o)) return;
+            if (path.has(o)) {
+              o.children.forEach(visit);
+              return;
+            }
+            changed.push([o, o.visible]);
+            o.visible = false;
+          };
+          game.scene.children.forEach(visit);
+          const cam = new THREE.PerspectiveCamera(game.chase.camera.fov, game.chase.camera.aspect, 0.1, 1000);
+          cam.position.set(pose.x, pose.y, pose.z);
+          cam.lookAt(pose.tx, pose.ty, pose.tz);
+          cam.updateMatrixWorld();
+          const skyAt = game.sky.position.clone();
+          game.sky.position.copy(cam.position);
+          const bg = game.scene.background;
+          game.scene.background = null;
+          const clear = game.renderer.getClearColor(new THREE.Color());
+          const alpha = game.renderer.getClearAlpha();
+          game.renderer.setClearColor(0x000000, 1);
+          game.renderer.setRenderTarget(null);
+          game.renderer.render(game.scene, cam);
+          const gl = game.renderer.getContext();
+          const W = gl.drawingBufferWidth;
+          const H = gl.drawingBufferHeight;
+          const side = 2 * win + 1;
+          const px = new Uint8Array(side * side * 4);
+          const out = points.map((p) => {
+            const v = new THREE.Vector3(p.x, p.y, p.z).project(cam);
+            if (!(v.z > -1 && v.z < 1)) return null;
+            const sx = Math.round(((v.x + 1) / 2) * (W - 1));
+            const sy = Math.round(((v.y + 1) / 2) * (H - 1));
+            if (sx - win < 0 || sy - win < 0 || sx + win >= W || sy + win >= H) return null;
+            gl.readPixels(sx - win, sy - win, side, side, gl.RGBA, gl.UNSIGNED_BYTE, px);
+            let best = 0;
+            for (let k = 0; k < side * side; k++) best = Math.max(best, (0.2126 * px[4 * k]! + 0.7152 * px[4 * k + 1]! + 0.0722 * px[4 * k + 2]!) / 255);
+            return best;
+          });
+          game.renderer.setClearColor(clear, alpha);
+          game.scene.background = bg;
+          game.sky.position.copy(skyAt);
+          changed.forEach(([o, v]) => (o.visible = v));
+          return out;
+        },
+        /**
          * só DEV/testes (night-city C6): um quadro pelo composer, sem chuva nem partículas, e a
          * luminância média 3 × 3 em volta de cada ponto do mundo projetado na tela (null se atrás).
          */
@@ -1195,7 +1257,7 @@ export class Game {
           const mine = data.signs.filter((sg) => sg.color === NEON_PALETTE[c]);
           return {
             depth: b.max.z - b.min.z,
-            signs: mine.map((sg, i) => ({ x: sg.x, z: sg.z, pattern: pat.getX(i) })),
+            signs: mine.map((sg, i) => ({ x: sg.x, y: sg.y, z: sg.z, width: sg.width, height: sg.height, rotationY: sg.rotationY, pattern: pat.getX(i) })),
           };
         });
       },

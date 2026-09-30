@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { makeFacadeMaterial, makeSignMaterial, streakReflectorShader } from '../../src/world/CityScene';
 import { createSky } from '../../src/world/Environment';
-import { addLampLight, makeStreetLampMaterial } from '../../src/world/StreetLamps';
+import { addLampLight, buildStreetLamps, makeStreetLampMaterial } from '../../src/world/StreetLamps';
+import { LAMP_ARM_M, LAMP_POST_HEIGHT } from '../../src/world/roads/roadMesh';
 import { MIRROR_F0, MIRROR_STREAK_GROW, MIRROR_TINT, mirrorFresnel, streakTexels } from '../../src/world/mirrorMath';
-import { skylineHeight } from '../../src/world/skyMath';
+import { SKYLINE_STEPS, SKYLINE_TABLE, SKY_SILHOUETTE, skylineHeight } from '../../src/world/skyMath';
 import { GLYPH_H, GLYPH_PATTERNS, GLYPH_W, glyphCoverage, glyphMask } from '../../src/world/signGlyphs';
 import { WINDOW_COOL, WINDOW_TV, WINDOW_WARM, windowTint } from '../../src/world/windowTint';
 
-// night-city: shaders e regras puras (checks C12, C16, C19, C22, C26)
+// night-city: shaders e regras puras (checks C12, C16, C19, C22, C26, C30-C32)
 /** vertex + fragment de um material padrão depois do `onBeforeCompile` dele */
 function compiled(m: THREE.Material): { vertexShader: string; fragmentShader: string; uniforms: Record<string, unknown> } {
   const shader = { uniforms: {}, vertexShader: THREE.ShaderLib.standard.vertexShader, fragmentShader: THREE.ShaderLib.standard.fragmentShader };
@@ -119,5 +120,61 @@ describe('night-city shaders', () => {
       expect(text, name).not.toMatch(/\buTime\b|uniform\s+float\s+time\b/);
       expect(Object.keys(uniforms).filter((k) => /time/i.test(k)), name).toEqual([]);
     }
+  });
+
+  // C30 (AC 13, door 3): o fragment da cúpula lê a tabela de `skylineHeight` e desenha a silhueta abaixo dela
+  it('dome shader draws the skyline table', () => {
+    const sky = createSky().material as THREE.ShaderMaterial;
+    expect(sky.uniforms.uSkyline!.value).toEqual([...SKYLINE_TABLE]);
+    expect(sky.fragmentShader).toContain(`uniform float uSkyline[${SKYLINE_STEPS}];`);
+    expect(sky.fragmentShader).toContain('float turn = fract((atan(d.x, d.z) + PI) / (2.0 * PI));');
+    expect(sky.fragmentShader).toContain(`floor(turn * ${SKYLINE_STEPS.toFixed(1)})`);
+    const sil = new THREE.Color(SKY_SILHOUETTE);
+    expect(sky.fragmentShader).toContain(`if (e < uSkyline[idx]) sky = mix(vec3( ${sil.r.toFixed(5)}, ${sil.g.toFixed(5)}, ${sil.b.toFixed(5)} ), uHorizon`);
+    // a tabela é a função pura, degrau por degrau
+    for (let k = 0; k < SKYLINE_STEPS; k++) expect(skylineHeight(-Math.PI + ((k + 0.5) * 2 * Math.PI) / SKYLINE_STEPS)).toBe(SKYLINE_TABLE[k]);
+  });
+
+  // C31 (AC 1): haste, braço, carcaça e lente numa geometria; só os vértices da lente têm `aLens` = 1
+  it('lamp geometry has a housing and only the lens glows', () => {
+    const lamp = { x: 0, y: 0, z: 0, heading: 0, side: -1, roadId: 0 };
+    const net = { roads: [{ id: 0, kind: 'avenue', width: 16, closed: false, points: new Float32Array([0, 0, 0, 0, 0, 10]) }] };
+    const mesh = buildStreetLamps([lamp as never], net as never, makeStreetLampMaterial());
+    const g = mesh.geometry;
+    const pos = g.getAttribute('position');
+    const lens = g.getAttribute('aLens');
+    const cylinder = new THREE.CylinderGeometry(0.08, 0.1, LAMP_POST_HEIGHT, 6).getAttribute('position').count;
+    expect(pos.count).toBe(cylinder + 3 * 24);
+    let lensVerts = 0;
+    let housingVerts = 0;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      if (lens.getX(i) === 1) {
+        lensVerts++;
+        // lente: 0.5 × 0.02 × 0.22 na ponta do braço, embaixo da carcaça
+        expect(Math.abs(x - LAMP_ARM_M)).toBeLessThanOrEqual(0.25 + 1e-6);
+        expect(Math.abs(y - (LAMP_POST_HEIGHT - 0.18))).toBeLessThanOrEqual(0.01 + 1e-6);
+      } else if (Math.abs(x - LAMP_ARM_M) <= 0.3 + 1e-6 && Math.abs(x - LAMP_ARM_M) > 0.25 + 1e-6) {
+        // só a carcaça (0.6 m de largura) chega além da lente na ponta do braço
+        housingVerts++;
+        expect(y).toBeGreaterThanOrEqual(LAMP_POST_HEIGHT - 0.17 - 1e-6);
+        expect(y).toBeLessThanOrEqual(LAMP_POST_HEIGHT - 0.03 + 1e-6);
+      }
+    }
+    expect(lensVerts).toBe(24);
+    expect(housingVerts).toBeGreaterThan(0);
+    // o fragment só emite onde `vLens` = 1, na cor do poste
+    expect(compiled(makeStreetLampMaterial()).fragmentShader).toContain('totalEmissiveRadiance *= vLens * vLampColor;');
+  });
+
+  // C32 (AC 16): tubos só nas faces da frente e de trás, sobre a caixa escura
+  it('sign shader lights tubes only on the front and back faces', () => {
+    const m = makeSignMaterial('#ff2d95', new THREE.Texture());
+    expect(`#${m.color.getHexString()}`).toBe('#101014');
+    const { vertexShader, fragmentShader } = compiled(m);
+    expect(vertexShader).toContain('vSignFace = step(0.5, abs(normal.z));');
+    expect(fragmentShader).toContain(`float tube = texture2D(uGlyphs, vec2(vSignUv.x, (vPattern + vSignUv.y) / ${GLYPH_PATTERNS.toFixed(1)})).r;`);
+    expect(fragmentShader).toContain('totalEmissiveRadiance *= tube * vSignFace;');
   });
 });

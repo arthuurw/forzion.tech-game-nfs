@@ -1,12 +1,21 @@
 import { expect, test, type Page } from '@playwright/test';
+import { SKYLINE_STEPS, skylineHeight } from '../../src/world/skyMath';
 import { signPattern } from '../../src/world/signGlyphs';
 import { advanceSim } from './helpers';
 
-// night-city: provas no browser (checks C6, C8-C11, C14, C15, C17, C18, C20, C27, C29)
+// night-city: provas no browser (checks C6, C8-C11, C14, C15, C17, C18, C20, C27, C29-C32)
 
 async function open(page: Page, query = ''): Promise<void> {
   await page.goto(`/${query}`);
   await page.waitForFunction(() => (window as any).__game?.ready === true, null, { timeout: 30_000 });
+}
+
+type Pose = { x: number; y: number; z: number; tx: number; ty: number; tz: number };
+type P3 = { x: number; y: number; z: number };
+
+/** `render.isolatedLum`: só os objetos `names`, câmera em `pose`, maior luminância em volta de cada ponto */
+function isolatedLum(page: Page, names: string[], pose: Pose, points: P3[], win = 0): Promise<Array<number | null>> {
+  return page.evaluate(([n, p, pts, w]) => (window as any).__game.render.isolatedLum(n, p, pts, w), [names, pose, points, win] as const);
 }
 
 test.describe('night-city - postes', () => {
@@ -40,6 +49,38 @@ test.describe('night-city - postes', () => {
     expect(under).not.toBeNull();
     expect(between).not.toBeNull();
     expect(under!).toBeGreaterThanOrEqual(1.3 * between!);
+  });
+
+  // C31 (AC 1): só a lente brilha; haste e braço ficam escuros
+  test('only the lamp lens glows', async ({ page }) => {
+    await open(page);
+    const l = await page.evaluate(() => {
+      const w = (window as any).__game.world;
+      for (let i = 0; i < w.lampCount; i++) {
+        const l = w.lampAt(i);
+        if (l.kind === 'avenue' && Math.abs(l.x) < 400 && Math.abs(l.z) < 400) return l;
+      }
+      return null;
+    });
+    expect(l).not.toBeNull();
+    // braço para a estrada: (−side·cos h, 0, side·sin h); câmera 8 m para a estrada, 1.5 m do chão
+    const ax = -l.side * Math.cos(l.heading);
+    const az = l.side * Math.sin(l.heading);
+    const pose = { x: l.x + ax * 8, y: l.y + 1.5, z: l.z + az * 8, tx: l.head.x, ty: l.head.y - 1, tz: l.head.z };
+    const [lens, post, arm] = await isolatedLum(
+      page,
+      ['street-lamps'],
+      pose,
+      [
+        { x: l.head.x, y: l.y + 5.81, z: l.head.z },
+        { x: l.x, y: l.y + 3, z: l.z },
+        { x: l.x + ax * 0.8, y: l.y + 5.95, z: l.z + az * 0.8 },
+      ],
+      1,
+    );
+    expect(lens!).toBeGreaterThanOrEqual(0.5);
+    expect(post!).toBeLessThanOrEqual(0.05);
+    expect(arm!).toBeLessThanOrEqual(0.05);
   });
 
   // C8 (AC 2)
@@ -146,6 +187,30 @@ test.describe('night-city - céu', () => {
     expect(skipped).toContain('sky');
   });
 
+  // C30 (AC 13, door 3): a cúpula desenha a silhueta de `skylineHeight`
+  test('dome draws the skyline silhouette', async ({ page }) => {
+    await open(page);
+    const cam = await page.evaluate(() => (window as any).__game.world.sky.camera as P3);
+    const dir = (az: number, e: number) => ({
+      x: cam.x + Math.sin(az) * Math.cos(e) * 400,
+      y: cam.y + Math.sin(e) * 400,
+      z: cam.z + Math.cos(az) * Math.cos(e) * 400,
+    });
+    let dark = 0;
+    for (let k = 0; k < SKYLINE_STEPS; k += 8) {
+      // meio do degrau k: azimute como atan2(x, z) em [−π, π)
+      const az = -Math.PI + ((k + 0.5) * 2 * Math.PI) / SKYLINE_STEPS;
+      const h = skylineHeight(az);
+      const look = dir(az, 0.03);
+      const [below, above] = await isolatedLum(page, ['sky'], { ...cam, tx: look.x, ty: look.y, tz: look.z }, [dir(az, h - 0.006), dir(az, h + 0.01)]);
+      expect(below, `degrau ${k}`).not.toBeNull();
+      expect(above, `degrau ${k}`).not.toBeNull();
+      expect(below!, `degrau ${k}`).toBeLessThanOrEqual(0.5 * above!);
+      dark++;
+    }
+    expect(dark).toBe(12);
+  });
+
   // C18 (AC 15)
   test('sky is still', async ({ page }) => {
     await open(page);
@@ -156,6 +221,44 @@ test.describe('night-city - céu', () => {
 });
 
 test.describe('night-city - letreiros', () => {
+  // C32 (AC 16): tubos na face da frente e na de trás; as laterais da caixa ficam escuras
+  test('sign tubes glow on both faces and the frame stays dark', async ({ page }) => {
+    await open(page);
+    const sg = await page.evaluate(() => {
+      const all = ((window as any).__game.world.signs as Array<{ signs: any[] }>).flatMap((c) => c.signs);
+      return all.find((s) => s.width >= 2 && s.height >= 1) ?? null;
+    });
+    expect(sg).not.toBeNull();
+    // eixos locais da caixa girada por `rotationY`: +x (largura), +z (normal da face)
+    const r = sg.rotationY as number;
+    const ux = { x: Math.cos(r), z: -Math.sin(r) };
+    const nz = { x: Math.sin(r), z: Math.cos(r) };
+    const at = (u: number, v: number, w: number): P3 => ({
+      x: sg.x + ux.x * u * sg.width + nz.x * w,
+      y: sg.y + v * sg.height,
+      z: sg.z + ux.z * u * sg.width + nz.z * w,
+    });
+    const grid = (w: number) => {
+      const pts: P3[] = [];
+      for (let i = -4; i <= 4; i++) for (let j = -2; j <= 2; j++) pts.push(at(i / 10, j / 6, w));
+      return pts;
+    };
+    const face = async (sideSign: number) => {
+      const eye = at(0, 0, sideSign * 5);
+      const lum = await isolatedLum(page, ['neon-signs'], { ...eye, tx: sg.x, ty: sg.y, tz: sg.z }, grid(sideSign * 0.061), 2);
+      return Math.max(...lum.map((v) => v ?? 0));
+    };
+    expect(await face(1)).toBeGreaterThanOrEqual(0.5);
+    expect(await face(-1)).toBeGreaterThanOrEqual(0.5);
+    // de lado: a face lateral (0.12 m de fundo) em x = +largura/2
+    const eye = { x: sg.x + ux.x * (sg.width / 2 + 3), y: sg.y, z: sg.z + ux.z * (sg.width / 2 + 3) };
+    const sidePts: P3[] = [];
+    for (let j = -2; j <= 2; j++) for (const w of [-0.04, 0, 0.04]) sidePts.push({ ...at(0.5, j / 6, w), x: at(0.5, j / 6, w).x + ux.x * 0.001, z: at(0.5, j / 6, w).z + ux.z * 0.001 });
+    const side = await isolatedLum(page, ['neon-signs'], { ...eye, tx: sg.x, ty: sg.y, tz: sg.z }, sidePts);
+    expect(side.every((v) => v !== null)).toBe(true);
+    expect(Math.max(...side.map((v) => v!))).toBeLessThanOrEqual(0.05);
+  });
+
   // C20 (AC 16): o padrão de cada letreiro é o da regra pura, sorteado da posição dele
   test('signs are framed boxes with a glyph pattern', async ({ page }) => {
     await open(page);

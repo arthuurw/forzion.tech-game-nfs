@@ -4,6 +4,7 @@ import {
   LAMP_LIGHT_RADIUS_M,
   LAMP_LIGHT_SIZE,
   buildLampLight,
+  lampFalloff,
   lampLightCellCenter,
 } from '../../src/world/lampLight';
 import { generateRoads, type Road } from '../../src/world/roads/RoadGenerator';
@@ -116,5 +117,14 @@ describe('night-city lamps', () => {
     expect(lampLightCellCenter(0)).toBe(-1535);
     expect(lampLightCellCenter(1535)).toBe(1535);
     expect(grid.origin).toBe(-1536);
+  });
+
+  // C33 (door 2): a queda é o quadrado de 1 − (d / 9)²
+  it('lamp falloff is squared', () => {
+    expect(LAMP_LIGHT_RADIUS_M).toBe(9);
+    for (const d of [0, 1, 2.25, 4.5, 6, 8, 8.99]) expect(lampFalloff(d), `${d} m`).toBeCloseTo((1 - (d / 9) ** 2) ** 2, 12);
+    expect(lampFalloff(4.5)).toBeCloseTo(0.5625, 12);
+    expect(lampFalloff(9)).toBe(0);
+    expect(lampFalloff(12)).toBe(0);
   });
 });
