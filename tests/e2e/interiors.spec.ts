@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { advanceSim, gotoGame, simTime, speedKmh, waitSimUntil } from './helpers';
+import { advanceSim, gotoGame, simTime, speedKmh, teleport, waitSimUntil } from './helpers';
 
 /**
  * block-fill: o miolo das quadras no browser, lendo `__game.world.interiors`.
@@ -519,6 +519,50 @@ test.describe('block-fill - pedestres', () => {
   });
 
   // C35 (AC 33)
+  // play-fixes C28 (AC 22): a cor é do pedestre ou do gato, não da vaga na malha
+  test('extra colors stay with their spawn', async ({ page }) => {
+    await gotoGame(page);
+    await advanceSim(page, 1);
+    const read = () =>
+      page.evaluate(() => {
+        const g = (window as any).__game;
+        return { walkers: g.world.interiors.walkerSlots(), cats: g.world.extras.cats.slots() } as Record<string, Array<{ spawn: number; color: string }>>;
+      });
+    const a = await read();
+    // anda 120 m: parte dos extras sai, outros entram, e as vagas mudam de dono
+    const p = await page.evaluate(() => ({ ...(window as any).__game.car.position, h: (window as any).__game.car.heading as number }));
+    await teleport(page, p.x + Math.sin(p.h) * 120, p.y + 1, p.z + Math.cos(p.h) * 120, p.h);
+    await advanceSim(page, 1);
+    const b = await read();
+    let common = 0;
+    let moved = 0;
+    for (const kind of ['walkers', 'cats']) {
+      const before = new Map(a[kind]!.map((s, k) => [s.spawn, { ...s, k }]));
+      b[kind]!.forEach((s, k) => {
+        const was = before.get(s.spawn);
+        if (!was) return;
+        common++;
+        if (was.k !== k) moved++;
+        expect(s.color, `${kind} ${s.spawn}`).toBe(was.color);
+      });
+    }
+    expect(common).toBeGreaterThan(0);
+    expect(moved).toBeGreaterThan(0);
+  });
+
+  // play-fixes C29 (AC 23): miolo sem estacionados, sem malha e sem erro de shader
+  test('no parked cars builds no parked mesh', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('console', (m) => {
+      if (m.type() === 'error') errors.push(m.text());
+    });
+    await gotoGame(page);
+    const r = await page.evaluate(() => (window as any).__game.world.extras.parking.probeEmpty());
+    await advanceSim(page, 0.2);
+    expect(r).toEqual({ parkedMesh: false, named: false });
+    expect(errors.filter((e) => /shader|WebGLProgram/i.test(e))).toEqual([]);
+  });
+
   test('walkers have no colliders', async ({ page }) => {
     await gotoGame(page);
     await advanceSim(page, 1);

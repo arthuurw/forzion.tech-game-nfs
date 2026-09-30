@@ -405,9 +405,10 @@ export function placeInteriorProps(seed: number, interiors: BlockInteriors, lots
   }
 
   // --- estacionamentos: fileiras nos pátios do centro com 800 m² ou mais (block-life-extras) ---
-  // um ponto é "bem dentro" do pátio quando ele e os 8 pontos a 6 m em volta caem na zona e o
-  // vértice mais perto fica a 7 m ou mais de qualquer lote: assim o carro fica a 2 m dos lotes
-  // e a `w/2 + 2` das estradas mesmo sem a rede aqui (o miolo já exclui `w/2 + 2` m de estrada)
+  // um ponto é "bem dentro" do pátio quando ele e os 8 pontos a 4 m em volta caem na zona e o
+  // vértice mais perto fica a 5.5 m ou mais da fachada (as chamadas abaixo passam raio 4 m e
+  // fachada 5.5 m); das estradas o carro fica longe mesmo sem a rede aqui, porque o miolo já
+  // exclui `w/2 + 2` m de estrada
   const wellInside = (zoneId: number, x: number, z: number, radius: number, facade: number): boolean => {
     if (zoneAtXZ(x, z) !== zoneId) return false;
     if (bi.facadeDist[nearestVertex(bi, x, z)]! < facade) return false;

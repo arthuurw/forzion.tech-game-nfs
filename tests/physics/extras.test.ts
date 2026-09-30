@@ -128,10 +128,11 @@ describe('parked cars in the real world', () => {
   // C14 (sem o glb)
   it('parked cars fall back to boxes without the glb', () => {
     const scene = new InteriorScene(interiors, props, 1337, qualityPreset('high'), carved, { carModel: null, placeholder: true });
-    expect(scene.parkedMesh.name).toBe('parked-cars');
+    expect(scene.parkedMesh).not.toBeNull();
+    expect(scene.parkedMesh!.name).toBe('parked-cars');
     expect(scene.parkedPlaceholder).toBe(true);
-    expect(scene.parkedMesh.count).toBe(props.parking.length);
-    expect(scene.parkedMesh.geometry.getAttribute('position').count).toBeLessThanOrEqual(200);
+    expect(scene.parkedMesh!.count).toBe(props.parking.length);
+    expect(scene.parkedMesh!.geometry.getAttribute('position').count).toBeLessThanOrEqual(200);
   });
 });
 

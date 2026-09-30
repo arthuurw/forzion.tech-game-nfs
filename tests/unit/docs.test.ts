@@ -75,4 +75,27 @@ describe('docs', () => {
     expect(doc).not.toMatch(/Só para testes e debug/);
     expect(section(readme, 'Como é feito')).toContain('## Intent');
   });
+
+  // play-fixes C30 (AC 24): o comentário do estacionamento cita os números que o código usa
+  it('parking comment matches wellInside', () => {
+    const src = read('src/world/interiors/InteriorProps.ts');
+    const at = src.indexOf('const wellInside =');
+    expect(at).toBeGreaterThan(0);
+    const before = src.slice(0, at).split('\n');
+    const comment: string[] = [];
+    for (let i = before.length - 2; i >= 0 && before[i]!.trim().startsWith('//'); i--) comment.unshift(before[i]!.trim());
+    const text = comment.join(' ');
+    const calls = [...src.matchAll(/wellInside\(zone\.id, x, z, ([\d.]+), ([\d.]+)\)/g)].map((m) => [m[1]!, m[2]!]);
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+    for (const [radius, facade] of calls) {
+      expect(radius).toBe(calls[0]![0]);
+      expect(facade).toBe(calls[0]![1]);
+    }
+    const [radius, facade] = calls[0]!;
+    expect([radius, facade]).toEqual(['4', '5.5']);
+    expect(text).toContain(`pontos a ${radius} m em volta`);
+    expect(text).toContain(`${facade} m ou mais da fachada`);
+    expect(text).toContain(`raio ${radius} m`);
+    expect(text).toContain(`fachada ${facade} m`);
+  });
 });

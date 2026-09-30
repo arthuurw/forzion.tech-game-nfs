@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { findBlockInteriors } from '../../src/world/interiors/BlockInteriors';
 import { placeInteriorProps } from '../../src/world/interiors/InteriorProps';
 import {
+  CAR_BOX_ALONG,
+  CAR_BOX_SIDE,
   CAT_CROUCH,
   SEARCHLIGHT_LENGTH,
+  carBoxLocal,
   SEARCHLIGHT_TILT,
   createCat,
   searchlightHeading,
@@ -255,5 +258,31 @@ describe('extras motion', () => {
     const a = trainPose(0, line, 0, cum);
     const b = trainPose(2, line, 0, cum);
     expect(Math.abs((((b.s - a.s) % L) + L) % L - 36)).toBeLessThanOrEqual(1e-6);
+  });
+
+  // play-fixes C25 (AC 19): o carro passa por cima de cada gato do seed 1337 a 8 e a 20 m/s
+  it('cats are never inside the car box', () => {
+    expect([CAR_BOX_ALONG, CAR_BOX_SIDE]).toEqual([2.4, 1.2]);
+    let near = 0;
+    for (const speed of [8, 20]) {
+      props.cats.forEach((spawn, i) => {
+        const cat = createCat(spawn, i);
+        const heading = (i * 2.399) % (2 * Math.PI);
+        const f = { x: Math.sin(heading), z: Math.cos(heading) };
+        const car = { x: cat.x - f.x * 20, z: cat.z - f.z * 20, heading };
+        for (let step = 0; step * speed * DT < 40; step++) {
+          car.x += f.x * speed * DT;
+          car.z += f.z * speed * DT;
+          stepCat(cat, DT, car, interiors);
+          if (cat.state === 'gone' || Math.hypot(cat.x - car.x, cat.z - car.z) >= 8) continue;
+          near++;
+          const l = carBoxLocal(cat.x, cat.z, car);
+          const outside = Math.abs(l.along) >= CAR_BOX_ALONG || Math.abs(l.side) >= CAR_BOX_SIDE;
+          if (!outside) expect.fail(`gato ${i} a ${speed} m/s, passo ${step}: along ${l.along.toFixed(2)} side ${l.side.toFixed(2)}`);
+        }
+      });
+    }
+    expect(props.cats.length).toBeGreaterThan(20);
+    expect(near).toBeGreaterThan(1000);
   });
 });

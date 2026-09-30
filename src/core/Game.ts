@@ -32,6 +32,7 @@ import { WorldPhysics } from '../world/WorldPhysics';
 import { findBlockInteriors } from '../world/interiors/BlockInteriors';
 import { FLOOD_REACH, placeInteriorProps } from '../world/interiors/InteriorProps';
 import { SEARCHLIGHT_TILT } from '../world/interiors/interiorMotion';
+import { InteriorScene } from '../world/interiors/InteriorScene';
 import { buildTrainLine, type TrainLine } from '../world/rail/trainLine';
 import { TrainScene } from '../world/rail/TrainScene';
 import { WORLD_HALF, nearestRoadPoint, needsWaterReset } from '../world/worldMath';
@@ -318,7 +319,8 @@ export class Game {
     this.race.afterStep(dt, this.car);
     // pedestres do miolo (block-fill): sem collider, só leem a posição do carro
     const carNow = this.car.body.translation();
-    this.city.interiors.stepWalkers(dt, { x: carNow.x, z: carNow.z }, this.simTime);
+    // com o heading: gato e pedestre ficam fora da caixa do chassi (play-fixes AC 19, AC 20)
+    this.city.interiors.stepWalkers(dt, { x: carNow.x, z: carNow.z, heading: this.car.heading() }, this.simTime);
 
     // caiu na água (door 9): volta em pé, parado, 1 m acima do ponto de estrada mais próximo
     const pos = this.car.body.translation();
@@ -1473,17 +1475,31 @@ export class Game {
         get count() {
           return it.props.parking.length;
         },
-        meshName: it.parkedMesh.name,
+        meshName: it.parkedMesh?.name ?? null,
         get instanceCount() {
-          return it.parkedMesh.count;
+          return it.parkedMesh?.count ?? 0;
         },
         placeholder: it.parkedPlaceholder,
         colorAt: (i: number) => {
+          if (!it.parkedMesh) return null;
           const c = new THREE.Color();
           it.parkedMesh.getColorAt(i, c);
           return `#${c.getHexString()}`;
         },
         list: () => it.props.parking.map((p) => ({ ...p })),
+        /**
+         * só DEV (play-fixes C29): monta o miolo do mundo com 0 estacionados numa cena à parte e
+         * renderiza um quadro dela pela câmera atual; diz se criou a malha de estacionados
+         */
+        probeEmpty: () => {
+          const d = game.city.data;
+          const empty = new InteriorScene(d.interiors, { ...d.props, parking: [] }, d.seed, game.quality, d.carved, game.assets);
+          const scene = new THREE.Scene();
+          scene.add(empty.group);
+          game.renderer.setRenderTarget(null);
+          game.renderer.render(scene, game.chase.camera);
+          return { parkedMesh: empty.parkedMesh !== null, named: empty.group.getObjectByName('parked-cars') !== undefined };
+        },
       },
       steam: {
         name: it.steam.name,
@@ -1504,6 +1520,8 @@ export class Game {
         },
         cap: it.catCap,
         spawns: () => it.props.cats.map((c) => ({ ...c })),
+        /** play-fixes C28: ponto de partida e cor de instância de cada vaga da malha */
+        slots: () => slotColors(it.catMesh, it.catSlots),
       },
       searchlights: {
         name: it.searchlightMesh.name,
@@ -1621,6 +1639,8 @@ export class Game {
       beamProbe: (siteIndex: number) => game.probeBeam(siteIndex),
       /** pedestres ativos: posição, zona e se está fugindo do carro */
       walkers: () => scene.walkers.map((w) => ({ x: w.x, z: w.z, zoneId: w.zoneId, fleeing: w.fleeing })),
+      /** play-fixes C28: ponto de partida e cor de instância de cada vaga da malha de pedestres */
+      walkerSlots: () => slotColors(scene.walkerMesh, scene.walkerSlots),
       /** colliders do mundo no Rapier, e o que cada parte do mundo criou */
       colliders: () => ({
         total: game.world.colliders.len(),
@@ -2053,4 +2073,13 @@ export class Game {
     for (let i = 1; i < centers.length; i++) result.spacing.push(centers[i]! - centers[i - 1]!);
     return result;
   }
+}
+
+/** Cor de instância de cada vaga ocupada de uma malha de extras, com o ponto de partida de quem a ocupa. */
+function slotColors(mesh: THREE.InstancedMesh, spawns: number[]): Array<{ spawn: number; color: string }> {
+  const c = new THREE.Color();
+  return spawns.map((spawn, k) => {
+    mesh.getColorAt(k, c);
+    return { spawn, color: `#${c.getHexString()}` };
+  });
 }

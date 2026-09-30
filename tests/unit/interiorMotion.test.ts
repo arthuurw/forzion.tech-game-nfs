@@ -9,7 +9,11 @@ import {
   floodSweep,
   jibAngle,
   bulbSway,
+  CAR_BOX_ALONG,
+  CAR_BOX_SIDE,
+  carBoxLocal,
   createWalker,
+  extraColors,
   crownSway,
   fireflyMotion,
   stepWalker,
@@ -412,5 +416,100 @@ describe('interior motion', () => {
     expect(reached).toBe(true);
     expect(fled).toBeGreaterThan(100);
     expect(walked).toBeGreaterThan(60);
+  });
+
+  // play-fixes C26 (AC 20): o carro passa por cima de 400 pedestres do seed 1337 a 8 e a 20 m/s
+  it('walkers are never inside the car box', () => {
+    const spawns = props.walkers.slice(0, 400);
+    expect(spawns.length).toBe(400);
+    let near = 0;
+    for (const speed of [8, 20]) {
+      spawns.forEach((spawn, i) => {
+        const w = createWalker(spawn, i);
+        const heading = (i * 2.399) % (2 * Math.PI);
+        const f = { x: Math.sin(heading), z: Math.cos(heading) };
+        const car = { x: w.x - f.x * 20, z: w.z - f.z * 20, heading };
+        for (let step = 0; step * speed * DT < 40; step++) {
+          car.x += f.x * speed * DT;
+          car.z += f.z * speed * DT;
+          stepWalker(w, DT, car, interiors);
+          if (Math.hypot(w.x - car.x, w.z - car.z) >= 8) continue;
+          near++;
+          const l = carBoxLocal(w.x, w.z, car);
+          if (Math.abs(l.along) < CAR_BOX_ALONG && Math.abs(l.side) < CAR_BOX_SIDE) {
+            expect.fail(`pedestre ${i} a ${speed} m/s, passo ${step}: along ${l.along.toFixed(2)} side ${l.side.toFixed(2)}`);
+          }
+        }
+      });
+    }
+    expect(near).toBeGreaterThan(1000);
+  });
+
+  // play-fixes C27 (AC 21)
+  it('cornered walker leaves the flee', () => {
+    // zona de 40 × 40 m com água na moldura; o pedestre no canto e o carro na diagonal, para dentro
+    const size = 16;
+    const origin = -30;
+    const heights = new Float32Array(size * size);
+    for (let iz = 0; iz < size; iz++) {
+      for (let ix = 0; ix < size; ix++) if (ix < 2 || iz < 2 || ix >= size - 2 || iz >= size - 2) heights[iz * size + ix] = -10;
+    }
+    const small = findBlockInteriors({ size, spacing: 4, origin, heights }, { roads: [] }, []);
+    expect(small.zones.length).toBe(1);
+    const corner = origin + 4 * (size - 3);
+    const w = createWalker({ zoneId: 0, x: corner, z: corner }, 3);
+    const car = { x: corner - 3.5, z: corner - 3.5, heading: Math.PI / 4 };
+    stepWalker(w, DT, car, small);
+    expect(w.fleeing).toBe(true);
+    // foge até a borda da zona, fica sem direção e sai da fuga em até 1 s parado
+    let left = -1;
+    let stuck = 0;
+    let maxStuck = 0;
+    for (let step = 1; step <= 60 * 5 && left < 0; step++) {
+      const bx = w.x;
+      const bz = w.z;
+      stepWalker(w, DT, car, small);
+      if (!w.fleeing) left = step;
+      else stuck = bx === w.x && bz === w.z ? stuck + 1 : 0;
+      maxStuck = Math.max(maxStuck, stuck);
+    }
+    expect(left).toBeGreaterThan(0);
+    expect(maxStuck).toBeGreaterThan(0);
+    expect(maxStuck * DT).toBeLessThanOrEqual(1 + 1e-9);
+    // anda num trecho novo
+    const at = { x: w.x, z: w.z };
+    for (let step = 0; step < 30; step++) stepWalker(w, DT, car, small);
+    expect(Math.hypot(w.x - at.x, w.z - at.z)).toBeGreaterThan(0.1);
+
+    // 400 pedestres do seed 1337 com o carro parado a 3 m: ninguém em fuga parado por mais de 2 s
+    let worst = 0;
+    props.walkers.slice(0, 400).forEach((spawn, i) => {
+      const p = createWalker(spawn, i);
+      const parked = { x: p.x + 3, z: p.z, heading: 0 };
+      let still = 0;
+      for (let step = 0; step < 60 * 5; step++) {
+        const bx = p.x;
+        const bz = p.z;
+        stepWalker(p, DT, parked, interiors);
+        still = p.fleeing && bx === p.x && bz === p.z ? still + 1 : 0;
+        worst = Math.max(worst, still);
+      }
+    });
+    expect(worst * DT).toBeLessThanOrEqual(2);
+  });
+
+  // play-fixes C28 (AC 22) - parte pura
+  it('extra color follows its identity', () => {
+    const palette = ['#a', '#b', '#c', '#d'];
+    const colorOf = (active: number[], spawn: number) => extraColors(active, palette)[active.indexOf(spawn)];
+    for (const spawn of [0, 5, 9, 14]) {
+      const alone = colorOf([spawn], spawn);
+      expect(palette).toContain(alone);
+      expect(colorOf([3, spawn, 21], spawn)).toBe(alone);
+      expect(colorOf([spawn, 1, 2, 7, 8], spawn)).toBe(alone);
+      expect(colorOf([40, 41, spawn], spawn)).toBe(alone);
+    }
+    // cores distintas entre vizinhos de índice
+    expect(new Set(extraColors([0, 1, 2, 3], palette)).size).toBe(4);
   });
 });

@@ -308,6 +308,57 @@ export function activeWalkerSpawns(
   return near.slice(0, budget).map((n) => n.i);
 }
 
+/**
+ * Caixa do chassi com folga (play-fixes AC 19, AC 20): meia medida 0.9 × 2.1 m mais 0.3 m.
+ * Gato e pedestre nunca ficam dentro dela.
+ */
+export const CAR_BOX_SIDE = 1.2;
+export const CAR_BOX_ALONG = 2.4;
+
+/** Posição e heading do carro (rad, 0 = +z); sem heading, 0. */
+export interface CarPose {
+  x: number;
+  z: number;
+  heading?: number;
+}
+
+/** (x, z) no referencial do carro: `along` para a frente, `side` para a direita. */
+export function carBoxLocal(x: number, z: number, car: CarPose): { along: number; side: number } {
+  const h = car.heading ?? 0;
+  const dx = x - car.x;
+  const dz = z - car.z;
+  // frente (sin h, cos h); direita (−cos h, sin h)
+  return { along: dx * Math.sin(h) + dz * Math.cos(h), side: -dx * Math.cos(h) + dz * Math.sin(h) };
+}
+
+export function insideCarBox(x: number, z: number, car: CarPose): boolean {
+  const l = carBoxLocal(x, z, car);
+  return Math.abs(l.along) < CAR_BOX_ALONG && Math.abs(l.side) < CAR_BOX_SIDE;
+}
+
+/**
+ * Pontos logo fora da caixa, na ordem de preferência: o lado mais perto na mesma altura do
+ * carro, o outro lado, depois a frente ou a traseira mais perto e a outra.
+ */
+export function carBoxExits(x: number, z: number, car: CarPose): Array<[number, number]> {
+  const h = car.heading ?? 0;
+  const l = carBoxLocal(x, z, car);
+  const s = l.side >= 0 ? 1 : -1;
+  const a = l.along >= 0 ? 1 : -1;
+  const side = CAR_BOX_SIDE + 0.01;
+  const along = CAR_BOX_ALONG + 0.01;
+  const at = (u: number, v: number): [number, number] => [car.x + Math.sin(h) * u - Math.cos(h) * v, car.z + Math.cos(h) * u + Math.sin(h) * v];
+  return [at(l.along, s * side), at(l.along, -s * side), at(a * along, l.side), at(-a * along, l.side)];
+}
+
+/**
+ * Cor de cada extra ativo pela identidade dele (índice do ponto de partida), não pela vaga na
+ * malha instanciada: a cor não muda quando outro extra entra ou sai (play-fixes AC 22).
+ */
+export function extraColors(active: ReadonlyArray<number>, palette: ReadonlyArray<string>): string[] {
+  return active.map((spawn) => palette[spawn % palette.length]!);
+}
+
 export interface Walker {
   zoneId: number;
   x: number;
@@ -319,6 +370,10 @@ export interface Walker {
   toZ: number;
   speed: number;
   fleeing: boolean;
+  /** s seguidos em fuga sem conseguir andar (play-fixes AC 21) */
+  fleeStuck: number;
+  /** s até poder fugir de novo, depois de desistir de uma fuga sem saída */
+  fleeCooldown: number;
   /** fase do balanço do corpo (s) */
   phase: number;
   /** estado do PRNG próprio (mulberry32) */
@@ -359,6 +414,8 @@ export function createWalker(spawn: WalkerSpawn, index: number): Walker {
     toZ: spawn.z,
     speed: WALKER_SPEED_MIN,
     fleeing: false,
+    fleeStuck: 0,
+    fleeCooldown: 0,
     phase: 0,
     rng: (Math.imul(index + 1, 0x9e3779b1) ^ 0x5eed) >>> 0,
   };
@@ -413,22 +470,50 @@ function pointOnSegmentAt(px: number, pz: number, r: number, w: Walker): [number
   return [w.fromX + dx * t, w.fromZ + dz * t];
 }
 
+/** fuga sem saída por este tempo (s) vira caminhada num trecho novo (play-fixes AC 21) */
+export const FLEE_STUCK_S = 1;
+/** depois de desistir, o pedestre só foge de novo passado este tempo (s) */
+export const FLEE_COOLDOWN_S = 2;
+
 /**
  * Um passo de `dt` do pedestre. Andando, segue o trecho a `speed` (1.25 a
  * 1.55 m/s); ao chegar ao fim, sorteia o próximo e continua de modo que o
  * deslocamento do passo tenha sempre `speed · dt`. Com o carro a menos de 8 m,
- * foge a 3 m/s (para longe do carro, só por vértices da zona) até ficar a 15 m.
+ * foge a 3 m/s (para longe do carro, só por vértices da zona) até ficar a 15 m;
+ * encurralado por 1 s, desiste e anda num trecho novo. Nunca fica dentro da
+ * caixa do carro: é empurrado para fora pelo lado.
  */
-export function stepWalker(w: Walker, dt: number, car: { x: number; z: number }, bi: BlockInteriors): void {
+export function stepWalker(w: Walker, dt: number, car: CarPose, bi: BlockInteriors): void {
+  walkerMove(w, dt, car, bi);
+  if (insideCarBox(w.x, w.z, car)) {
+    const exits = carBoxExits(w.x, w.z, car);
+    const [nx, nz] = exits.find(([x, z]) => inZone(bi, w.zoneId, x, z)) ?? exits[0]!;
+    w.x = w.fromX = w.toX = nx;
+    w.z = w.fromZ = w.toZ = nz;
+  }
+}
+
+function walkerMove(w: Walker, dt: number, car: CarPose, bi: BlockInteriors): void {
   const toCar = Math.hypot(w.x - car.x, w.z - car.z);
-  if (!w.fleeing && toCar < FLEE_START) w.fleeing = true;
+  w.fleeCooldown = Math.max(0, w.fleeCooldown - dt);
+  if (!w.fleeing && toCar < FLEE_START && w.fleeCooldown === 0) {
+    w.fleeing = true;
+    w.fleeStuck = 0;
+  }
   if (w.fleeing) {
     if (toCar >= FLEE_STOP) {
       w.fleeing = false;
       restartAtNearestVertex(w, bi);
     } else {
-      fleeStep(w, FLEE_SPEED * dt, car, bi);
-      return;
+      const moved = fleeStep(w, FLEE_SPEED * dt, car, bi);
+      w.fleeStuck = moved ? 0 : w.fleeStuck + dt;
+      if (w.fleeStuck < FLEE_STUCK_S - 1e-9) return;
+      // sem saída: volta a andar num trecho novo e não foge de novo por 2 s
+      w.fleeing = false;
+      w.fleeStuck = 0;
+      w.fleeCooldown = FLEE_COOLDOWN_S;
+      restartAtNearestVertex(w, bi);
+      pickSegment(w, bi);
     }
   }
   advance(w, w.speed * dt, bi);
@@ -443,8 +528,8 @@ function restartAtNearestVertex(w: Walker, bi: BlockInteriors): void {
   w.toZ = bi.origin + Math.floor(v / bi.size) * bi.spacing;
 }
 
-/** Um passo de `step` m para longe do carro, só por pontos da zona (desvia até ±75° se preciso). */
-function fleeStep(w: Walker, step: number, car: { x: number; z: number }, bi: BlockInteriors): void {
+/** Um passo de `step` m para longe do carro, só por pontos da zona (desvia até ±75° se preciso); false sem saída. */
+function fleeStep(w: Walker, step: number, car: { x: number; z: number }, bi: BlockInteriors): boolean {
   const toCar = Math.hypot(w.x - car.x, w.z - car.z);
   const base = toCar > 1e-6 ? Math.atan2(w.x - car.x, w.z - car.z) : nextRand(w) * Math.PI * 2;
   for (const turn of [0, 15, -15, 30, -30, 45, -45, 60, -60, 75, -75]) {
@@ -454,8 +539,9 @@ function fleeStep(w: Walker, step: number, car: { x: number; z: number }, bi: Bl
     if (!inZone(bi, w.zoneId, nx, nz)) continue;
     w.x = nx;
     w.z = nz;
-    break;
+    return true;
   }
+  return false;
 }
 
 /** Um passo de `step` m ao longo do trecho; ao chegar ao fim, sorteia o próximo e continua com o resto. */
@@ -521,8 +607,6 @@ export const CAT_CROUCH = 0.3;
 export const CAT_FLEE_START = 6;
 export const CAT_FLEE_STOP = 12;
 export const CAT_FLEE_SPEED = 4;
-/** a menos disto do centro do carro o gato é empurrado para fora ou some */
-export const CAT_CLEAR = 1.5;
 export const CAT_GONE_S = 10;
 export const CAT_GONE_CAR = 30;
 
@@ -564,11 +648,11 @@ export function createCat(spawn: CatSpawn, index: number): Cat {
 /**
  * Um passo de `dt` do gato. Anda a 0.5-0.9 m/s por trechos da zona (como o
  * pedestre) e a cada 6-12 m senta por 2-5 s; com o carro a menos de 6 m foge a
- * 4 m/s até 12 m. A menos de 1.5 m do centro do carro é empurrado para fora
- * (dentro da zona) ou some por 10 s, voltando ao ponto de partida com o carro
- * a mais de 30 m: nunca fica debaixo do carro.
+ * 4 m/s até 12 m. Dentro da caixa do chassi com folga é empurrado para o lado
+ * mais perto (dentro da zona) ou some por 10 s, voltando ao ponto de partida com
+ * o carro a mais de 30 m: nunca fica debaixo do carro (play-fixes AC 19).
  */
-export function stepCat(c: Cat, dt: number, car: { x: number; z: number }, bi: BlockInteriors): void {
+export function stepCat(c: Cat, dt: number, car: CarPose, bi: BlockInteriors): void {
   if (c.state === 'gone') {
     c.goneLeft -= dt;
     if (c.goneLeft <= 0 && Math.hypot(c.spawnX - car.x, c.spawnZ - car.z) > CAT_GONE_CAR) {
@@ -613,14 +697,9 @@ export function stepCat(c: Cat, dt: number, car: { x: number; z: number }, bi: B
       c.sitLeft = CAT_SIT_MIN + nextRand(c) * (CAT_SIT_MAX - CAT_SIT_MIN);
     }
   }
-  // nunca debaixo do carro: empurra para fora ou some
-  const dx = c.x - car.x;
-  const dz = c.z - car.z;
-  const d = Math.hypot(dx, dz);
-  if (d < CAT_CLEAR) {
-    const a = d > 1e-6 ? Math.atan2(dx, dz) : nextRand(c) * Math.PI * 2;
-    const nx = car.x + Math.sin(a) * CAT_CLEAR;
-    const nz = car.z + Math.cos(a) * CAT_CLEAR;
+  // nunca dentro da caixa do carro: empurra para o lado mais perto ou some
+  if (insideCarBox(c.x, c.z, car)) {
+    const [nx, nz] = carBoxExits(c.x, c.z, car)[0]!;
     if (inZone(bi, c.zoneId, nx, nz)) {
       c.x = c.fromX = c.toX = nx;
       c.z = c.fromZ = c.toZ = nz;
