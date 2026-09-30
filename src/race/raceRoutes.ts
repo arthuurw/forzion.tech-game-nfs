@@ -207,15 +207,18 @@ function buildRace(
 
   // linha de largada: s = 0 no circuito (é também a chegada), 30 m no sprint
   const startS = closed ? 0 : SPRINT_START_S;
-  // no sprint a chegada fica 200 m antes do fim: o resto da estrada é a área de frenagem
-  const endS = closed ? total : total - SPRINT_RUNOFF;
-  const n = Math.max(1, Math.ceil((endS - startS) / GATE_SPACING));
-  const step = (endS - startS) / n;
+  const n = Math.max(1, Math.ceil((total - startS) / GATE_SPACING));
+  const step = (total - startS) / n;
+  const gate = (s: number, at = routeAt(route, s)): RaceGate => ({ ...at, halfWidth: widthAt(network, at.x, at.z) / 2 + GATE_MARGIN, s });
   const gates: RaceGate[] = [];
-  for (let k = 1; k <= n; k++) {
-    const s = startS + step * k;
-    const at = routeAt(route, closed && k === n ? 0 : s);
-    gates.push({ ...at, halfWidth: widthAt(network, at.x, at.z) / 2 + GATE_MARGIN, s });
+  if (closed) {
+    for (let k = 1; k <= n; k++) gates.push(k === n ? gate(startS + step * k, routeAt(route, 0)) : gate(startS + step * k));
+  } else {
+    // no sprint a chegada fica 200 m antes do fim (o resto da estrada é a área de frenagem); os
+    // portões do meio ficam onde estavam, menos os que cairiam a menos de 50 m antes da chegada
+    const endS = total - SPRINT_RUNOFF;
+    for (let k = 1; k < n && startS + step * k < endS - GATE_SPACING / 4; k++) gates.push(gate(startS + step * k));
+    gates.push(gate(endS));
   }
 
   const grid: GridSlot[] = [0, 1, 2, 3].map((slot) => gridSlotAt(route, startS, slot));
