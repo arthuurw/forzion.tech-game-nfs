@@ -739,6 +739,35 @@ export class Game {
          * colunas do meio (10 %), `top` é a luminância média das 10 % de linhas de cima da imagem e
          * `band` a maior média de linha nos 25 % de baixo da faixa de céu (do horizonte para cima).
          */
+        /**
+         * só DEV/testes (play-fixes C24): um quadro só com a chuva, sobre preto e sem pós, pela
+         * câmera atual. Devolve quantos pixels têm luminância > 0.01.
+         */
+        rainPixels: () => {
+          const hidden: THREE.Object3D[] = game.scene.children.filter((o) => o !== game.rain.points);
+          const was = hidden.map((o) => o.visible);
+          hidden.forEach((o) => (o.visible = false));
+          const bg = game.scene.background;
+          game.scene.background = null;
+          const clear = game.renderer.getClearColor(new THREE.Color());
+          const alpha = game.renderer.getClearAlpha();
+          game.renderer.setClearColor(0x000000, 1);
+          game.renderer.setRenderTarget(null);
+          game.renderer.render(game.scene, game.chase.camera);
+          const gl = game.renderer.getContext();
+          const w = gl.drawingBufferWidth;
+          const h = gl.drawingBufferHeight;
+          const px = new Uint8Array(w * h * 4);
+          gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+          game.renderer.setClearColor(clear, alpha);
+          game.scene.background = bg;
+          hidden.forEach((o, i) => (o.visible = was[i]!));
+          let n = 0;
+          for (let k = 0; k < px.length; k += 4) {
+            if ((0.2126 * px[k]! + 0.7152 * px[k + 1]! + 0.0722 * px[k + 2]!) / 255 > 0.01) n++;
+          }
+          return n;
+        },
         skyProfile: () => {
           const hidden: THREE.Object3D[] = game.scene.children.filter((o) => o !== game.sky);
           const was = hidden.map((o) => o.visible);

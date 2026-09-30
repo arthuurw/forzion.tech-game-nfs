@@ -130,6 +130,30 @@ test.describe('visual - S3 movimento', () => {
     expect(Math.hypot(s.c.x - s.p.x, s.c.y - s.p.y, s.c.z - s.p.z)).toBeLessThan(1);
   });
 
+  // play-fixes C24 (AC 18): a chuva acompanha o carro no morro
+  test('rain falls on the hill roads', async ({ page }) => {
+    await open(page);
+    const pick = await page.evaluate(() => {
+      const races = (window as any).__game.race.races as Array<{ id: string; gates: Array<{ x: number; y: number; z: number; heading: number }> }>;
+      const hill = races.find((r) => r.id === 'sprint-morro')!.gates.reduce((a, b) => (b.y > a.y ? b : a));
+      const low = races.find((r) => r.id === 'circuito-centro')!.gates.reduce((a, b) => (Math.abs(b.y - 2) < Math.abs(a.y - 2) ? b : a));
+      return { hill, low };
+    });
+    expect(pick.hill.y).toBeGreaterThanOrEqual(60);
+    expect(Math.abs(pick.low.y - 2)).toBeLessThanOrEqual(1.5);
+    const countAt = async (g: { x: number; y: number; z: number; heading: number }) => {
+      await teleport(page, g.x, g.y + 1.2, g.z, g.heading);
+      // a câmera de perseguição volta para trás do carro
+      await advanceSim(page, 1.5);
+      return page.evaluate(() => (window as any).__game.render.rainPixels() as number);
+    };
+    const low = await countAt(pick.low);
+    const high = await countAt(pick.hill);
+    expect(low).toBeGreaterThan(0);
+    expect(high).toBeGreaterThan(0);
+    expect(high).toBeGreaterThanOrEqual(0.5 * low);
+  });
+
   // C11 (AC 11) - parte browser
   test('neon signs flicker', async ({ page }) => {
     await open(page);
