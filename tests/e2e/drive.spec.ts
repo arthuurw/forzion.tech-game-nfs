@@ -195,9 +195,12 @@ test.describe('drive', () => {
     const h0 = await heading(page);
     // de cabeça para baixo (rolagem de 180°) com o heading do spawn: yaw(h0) · roll(π)
     await page.evaluate((h) => (window as any).__game.car.setRotation({ x: Math.sin(h / 2), y: 0, z: Math.cos(h / 2), w: 0 }), h0);
-    await advanceSim(page, 0.2);
-    const before = await position(page);
-    const hBefore = await heading(page);
+    // assenta de cabeça para baixo; posição e heading lidos juntos, logo antes do R
+    await advanceSim(page, 1);
+    const { before, hBefore } = await page.evaluate(() => {
+      const c = (window as any).__game.car;
+      return { before: c.position as { x: number; y: number; z: number }, hBefore: c.heading as number };
+    });
     await page.keyboard.press('KeyR');
     await page.waitForFunction(() => (window as any).__game.car.lastReset !== null);
     const snap = await page.evaluate(() => (window as any).__game.car.lastReset);

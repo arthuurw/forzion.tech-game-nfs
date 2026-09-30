@@ -124,6 +124,8 @@ export class Game {
   readonly race: RaceController;
   readonly audio = new AudioEngine();
   /** o `DriveInput` que chegou ao carro do jogador no último passo */
+  /** devicePixelRatio que o último `handleResize` aplicou */
+  private dpr = window.devicePixelRatio;
   /** só DEV (play-fixes C11): mensagem do throw forçado no próximo passo */
   private failNext: string | null = null;
   private driveInput: DriveInput = { throttle: false, brake: false, steer: 0, handbrake: false };
@@ -294,7 +296,6 @@ export class Game {
     this.input.onPress('KeyM', () => this.audio.toggleMute());
 
     window.addEventListener('resize', this.handleResize);
-    this.watchPixelRatio();
 
     this.loop = new GameLoop(this.fixedUpdate, this.render);
   }
@@ -364,6 +365,8 @@ export class Game {
   };
 
   private readonly render = (dt: number): void => {
+    // a troca de devicePixelRatio (outro monitor, zoom) nem sempre dispara `resize`
+    if (window.devicePixelRatio !== this.dpr) this.handleResize();
     this.car.sync();
     const state = this.car.state();
     this.chase.update(dt, state, this.car.yawRate(), this.car.bodyRoll);
@@ -406,6 +409,7 @@ export class Game {
     const w = window.innerWidth;
     const h = window.innerHeight;
     const pr = pixelRatio();
+    this.dpr = window.devicePixelRatio;
     this.renderer.setPixelRatio(pr);
     this.renderer.setSize(w, h, false);
     this.composer.setPixelRatio(pr);
@@ -415,18 +419,6 @@ export class Game {
     this.city.resizeMirror(w, h);
   };
 
-  /** A troca de devicePixelRatio (monitor, zoom) não dispara `resize`: uma media query por valor. */
-  private watchPixelRatio(): void {
-    const query = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
-    query.addEventListener(
-      'change',
-      () => {
-        this.handleResize();
-        this.watchPixelRatio();
-      },
-      { once: true },
-    );
-  }
 
   /** Objeto lido por `window.__game` nos testes Playwright (só em DEV). */
   debugHandle(): unknown {

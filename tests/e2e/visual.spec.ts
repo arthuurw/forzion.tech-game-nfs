@@ -139,16 +139,19 @@ test.describe('visual - S3 movimento', () => {
       const low = races.find((r) => r.id === 'circuito-centro')!.gates.reduce((a, b) => (Math.abs(b.y - 2) < Math.abs(a.y - 2) ? b : a));
       return { hill, low };
     });
-    expect(pick.hill.y).toBeGreaterThanOrEqual(60);
-    expect(Math.abs(pick.low.y - 2)).toBeLessThanOrEqual(1.5);
     const countAt = async (g: { x: number; y: number; z: number; heading: number }) => {
       await teleport(page, g.x, g.y + 1.2, g.z, g.heading);
       // a câmera de perseguição volta para trás do carro
       await advanceSim(page, 1.5);
-      return page.evaluate(() => (window as any).__game.render.rainPixels() as number);
+      return page.evaluate(() => ({ n: (window as any).__game.render.rainPixels() as number, y: (window as any).__game.car.position.y as number }));
     };
-    const low = await countAt(pick.low);
-    const high = await countAt(pick.hill);
+    const lowAt = await countAt(pick.low);
+    const highAt = await countAt(pick.hill);
+    // o carro a y ≈ 2 m e depois no morro, a y ≥ 60 m
+    expect(Math.abs(lowAt.y - 2)).toBeLessThanOrEqual(1.5);
+    expect(highAt.y).toBeGreaterThanOrEqual(60);
+    const low = lowAt.n;
+    const high = highAt.n;
     expect(low).toBeGreaterThan(0);
     expect(high).toBeGreaterThan(0);
     expect(high).toBeGreaterThanOrEqual(0.5 * low);
@@ -605,11 +608,13 @@ test.describe('residuals - reflexo da rua e tijolo', () => {
     expect(a.dpr).toBe(1);
     expect(a.post.pixelRatio).toEqual({ renderer: 1, composer: 1 });
     const cdp = await page.context().newCDPSession(page);
+    // só o devicePixelRatio muda (mesmo tamanho CSS): nenhum `resize` garante a troca
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 640, height: 360, deviceScaleFactor: 2, mobile: false });
     await page.waitForFunction(() => window.devicePixelRatio === 2, null, { timeout: 5_000 });
-    await page.setViewportSize({ width: 800, height: 450 });
+    await page.waitForFunction(() => (window as any).__game.post.pixelRatio.renderer === 2, null, { timeout: 5_000 });
+    // e um resize depois disso mantém o pixelRatio e leva o GTAO junto
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 800, height: 450, deviceScaleFactor: 2, mobile: false });
-    await page.waitForFunction(() => (window as any).__game.post.pixelRatio.renderer === 2 && window.innerWidth === 800, null, { timeout: 5_000 });
+    await page.waitForFunction(() => window.innerWidth === 800 && (window as any).__game.post.gtao.width === 800, null, { timeout: 5_000 });
     const b = await read();
     expect(b.post.pixelRatio).toEqual({ renderer: Math.min(b.dpr, 2), composer: Math.min(b.dpr, 2) });
     expect(b.post.gtao.width).toBe(Math.floor((b.w * 2) / 2));
