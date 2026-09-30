@@ -36,6 +36,8 @@ import {
   cranePeriod,
   createCat,
   createWalker,
+  extraColors,
+  type CarPose,
   floodSweep,
   jibAngle,
   searchlightHeading,
@@ -53,6 +55,8 @@ import { FLOOD_REACH, YARD_LAMP_HEIGHT } from './InteriorProps';
 
 /** gatos: cores por instância e olhos */
 const CAT_PALETTE = ['#111114', '#5a5a60', '#c97a2e', '#e6e6e0'];
+/** pedestres: cores escuras por identidade */
+const WALKER_PALETTE = ['#2b2f3a', '#3a2f2b', '#2f3a30', '#3b3b44', '#40302f', '#262a33', '#4a4440'];
 /** vapor: cor, opacidade máxima e tamanho base do ponto (px a 1 m) */
 const STEAM_COLOR = '#dfe6ee';
 const STEAM_ALPHA = 0.16;
@@ -140,7 +144,8 @@ export class InteriorScene {
   private walkerPlanAt = -Infinity;
   private walkerPlanCar = { x: Infinity, z: Infinity };
   // block-life-extras: estacionados, vapor, gatos e holofotes
-  readonly parkedMesh: THREE.InstancedMesh;
+  /** `null` num miolo sem estacionados: sem instância, o shader da pintura não tem `vColor` (play-fixes AC 23) */
+  readonly parkedMesh: THREE.InstancedMesh | null;
   /** carros estacionados montados com caixas (sem `car.glb`) */
   readonly parkedPlaceholder: boolean;
   readonly steam: THREE.Points;
@@ -219,7 +224,7 @@ export class InteriorScene {
     this.walkerMesh = this.buildWalkers();
     // --- block-life-extras: estacionados, vapor, gatos e holofotes ---
     this.parkedPlaceholder = !assets.carModel;
-    this.parkedMesh = this.buildParkedCars(assets.carModel);
+    this.parkedMesh = this.props.parking.length > 0 ? this.buildParkedCars(assets.carModel) : null;
     this.steamPerVent = quality.level === 'low' ? STEAM_PER_VENT_LOW : STEAM_PER_VENT_HIGH;
     this.steamMaterial = steamMaterial();
     this.steam = this.buildSteam();
@@ -238,7 +243,7 @@ export class InteriorScene {
       this.beacons,
       this.floodHeads,
       this.walkerMesh,
-      this.parkedMesh,
+      ...(this.parkedMesh ? [this.parkedMesh] : []),
       this.steam,
       this.catMesh,
       this.searchlightMesh,
@@ -292,7 +297,7 @@ export class InteriorScene {
       geometry = mergeGeometries([body, cabin])!;
       material = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.4, metalness: 0.5 });
     }
-    const mesh = new THREE.InstancedMesh(geometry, material, Math.max(1, cars.length));
+    const mesh = new THREE.InstancedMesh(geometry, material, cars.length);
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0);
@@ -354,8 +359,9 @@ export class InteriorScene {
     const material = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9, metalness: 0, emissive: '#ffe27a', emissiveIntensity: 2 });
     glowOnly(material, 'cat');
     const mesh = new THREE.InstancedMesh(geometry, material, this.catCap);
+    // cria o atributo de cor; a cor de cada vaga vem do gato que a ocupa (`updateCatMesh`)
     const c = new THREE.Color();
-    for (let i = 0; i < this.catCap; i++) mesh.setColorAt(i, c.set(CAT_PALETTE[i % CAT_PALETTE.length]!));
+    for (let i = 0; i < this.catCap; i++) mesh.setColorAt(i, c.set(CAT_PALETTE[0]!));
     mesh.count = 0;
     mesh.name = 'cats';
     mesh.frustumCulled = false;
@@ -400,7 +406,7 @@ export class InteriorScene {
   }
 
   /** Passo fixo dos gatos (AC 23-25): mesma escolha por alcance dos pedestres, com o teto por qualidade. */
-  private stepCats(dt: number, car: { x: number; z: number }, time: number): void {
+  private stepCats(dt: number, car: CarPose, time: number): void {
     const moved = Math.hypot(car.x - this.catPlanCar.x, car.z - this.catPlanCar.z);
     if (time - this.catPlanAt >= 0.5 || moved > 20) {
       this.catPlanAt = time;
@@ -423,17 +429,29 @@ export class InteriorScene {
     const up = new THREE.Vector3(0, 1, 0);
     const scale = new THREE.Vector3();
     const p = new THREE.Vector3();
-    let k = 0;
-    for (const c of this.activeCats.values()) {
-      if (c.state === 'gone' || k >= mesh.instanceMatrix.count) continue;
+    const shown = [...this.activeCats].filter(([, c]) => c.state !== 'gone').slice(0, mesh.instanceMatrix.count);
+    this.catSlots = shown.map(([i]) => i);
+    const colors = extraColors(
+      shown.map(([i]) => i),
+      CAT_PALETTE,
+    );
+    const color = new THREE.Color();
+    shown.forEach(([, c], k) => {
       const yaw = Math.atan2(c.toX - c.fromX, c.toZ - c.fromZ) || 0;
       q.setFromAxisAngle(up, yaw);
       p.set(c.x, heightAt(this.carved, c.x, c.z), c.z);
-      mesh.setMatrixAt(k++, m.compose(p, q, scale.set(1, 1 - c.crouch, 1)));
-    }
-    mesh.count = k;
+      mesh.setMatrixAt(k, m.compose(p, q, scale.set(1, 1 - c.crouch, 1)));
+      mesh.setColorAt(k, color.set(colors[k]!));
+    });
+    mesh.count = shown.length;
     mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }
+
+  /** ponto de partida do gato em cada vaga da malha, no último quadro (para as provas) */
+  catSlots: number[] = [];
+  /** ponto de partida do pedestre em cada vaga da malha, no último quadro (para as provas) */
+  walkerSlots: number[] = [];
 
   /** Gatos ativos (para as provas). */
   get cats(): Cat[] {
@@ -513,9 +531,9 @@ export class InteriorScene {
     const cap = this.quality.level === 'low' ? WALKER_CAP_LOW : WALKER_CAP_HIGH;
     const material = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.85, metalness: 0 });
     const mesh = new THREE.InstancedMesh(geometry, material, cap);
-    const palette = ['#2b2f3a', '#3a2f2b', '#2f3a30', '#3b3b44', '#40302f', '#262a33', '#4a4440'];
+    // cria o atributo de cor; a cor de cada vaga vem do pedestre que a ocupa (`updateWalkerMesh`)
     const c = new THREE.Color();
-    for (let i = 0; i < cap; i++) mesh.setColorAt(i, c.set(palette[i % palette.length]!));
+    for (let i = 0; i < cap; i++) mesh.setColorAt(i, c.set(WALKER_PALETTE[0]!));
     mesh.count = 0;
     mesh.name = 'walkers';
     // os pedestres ficam sempre perto do carro: sem culling pela esfera (ela muda a cada quadro)
@@ -528,7 +546,7 @@ export class InteriorScene {
    * de carro, escolhe quais ficam ativos (`activeWalkerSpawns`); cada ativo anda
    * ou foge do carro (`stepWalker`); quem passa de 300 m do carro sai.
    */
-  stepWalkers(dt: number, car: { x: number; z: number }, time: number): void {
+  stepWalkers(dt: number, car: CarPose, time: number): void {
     const moved = Math.hypot(car.x - this.walkerPlanCar.x, car.z - this.walkerPlanCar.z);
     if (time - this.walkerPlanAt >= 0.5 || moved > 20) {
       this.walkerPlanAt = time;
@@ -552,16 +570,23 @@ export class InteriorScene {
     const up = new THREE.Vector3(0, 1, 0);
     const one = new THREE.Vector3(1, 1, 1);
     const p = new THREE.Vector3();
-    let k = 0;
-    for (const w of this.active.values()) {
-      if (k >= mesh.instanceMatrix.count) break;
+    const shown = [...this.active].slice(0, mesh.instanceMatrix.count);
+    this.walkerSlots = shown.map(([i]) => i);
+    const colors = extraColors(
+      shown.map(([i]) => i),
+      WALKER_PALETTE,
+    );
+    const color = new THREE.Color();
+    shown.forEach(([, w], k) => {
       const yaw = Math.atan2(w.toX - w.fromX, w.toZ - w.fromZ) || 0;
       q.setFromAxisAngle(up, yaw);
       p.set(w.x, heightAt(this.carved, w.x, w.z) + walkerBob(time + w.phase), w.z);
-      mesh.setMatrixAt(k++, m.compose(p, q, one));
-    }
-    mesh.count = k;
+      mesh.setMatrixAt(k, m.compose(p, q, one));
+      mesh.setColorAt(k, color.set(colors[k]!));
+    });
+    mesh.count = shown.length;
     mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }
 
   /** Pedestres ativos (para as provas). */

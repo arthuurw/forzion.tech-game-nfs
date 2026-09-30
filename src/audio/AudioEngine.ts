@@ -12,7 +12,8 @@ import {
   tremoloDepth,
 } from './audioMap';
 
-export type AudioState = 'idle' | 'running';
+/** `idle` antes de existir contexto; depois, o `state` real do `AudioContext`. */
+export type AudioState = 'idle' | AudioContextState;
 
 /**
  * Som sintetizado com Web Audio (door 8 da free-roam-city): nenhum arquivo.
@@ -26,9 +27,11 @@ export type AudioState = 'idle' | 'running';
  *
  * Cada `connect` passa por `link()`, que registra a aresta; `graph()` devolve
  * essa lista, então os testes veem a topologia real e não a ordem de campos.
+ *
+ * Sem Web Audio (`new AudioContext()` lança), o jogo segue mudo: um aviso no
+ * console e nenhuma tentativa nova.
  */
 export class AudioEngine {
-  state: AudioState = 'idle';
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private compressor: DynamicsCompressorNode | null = null;
@@ -48,9 +51,27 @@ export class AudioEngine {
   private readonly sourceNodes: AudioNode[] = [];
   private readonly edgeNodes: Array<[AudioNode, AudioNode | AudioParam]> = [];
 
+  private unavailable = false;
+
+  /** `idle` sem contexto; senão o `ctx.state` real (`running`, `suspended`, `closed`). */
+  get state(): AudioState {
+    return this.ctx?.state ?? 'idle';
+  }
+
   start(): void {
-    if (this.state === 'running') return;
-    const ctx = new AudioContext();
+    if (this.ctx) {
+      this.resume();
+      return;
+    }
+    if (this.unavailable) return;
+    let ctx: AudioContext;
+    try {
+      ctx = new AudioContext();
+    } catch (error) {
+      this.unavailable = true;
+      console.warn(`Áudio indisponível: ${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
     this.ctx = ctx;
     this.roles.set(ctx.destination, 'out');
 
@@ -122,7 +143,16 @@ export class AudioEngine {
     noise.start();
 
     void ctx.resume();
-    this.state = 'running';
+  }
+
+  /** Aba oculta: para o som no ponto em que está. */
+  suspend(): void {
+    if (this.ctx?.state === 'running') void this.ctx.suspend();
+  }
+
+  /** Aba visível de novo ou gesto do jogador: retoma um contexto que não está tocando. */
+  resume(): void {
+    if (this.ctx && this.ctx.state === 'suspended') void this.ctx.resume();
   }
 
   /** Chamado a cada frame com o RPM atual e se o acelerador está pressionado. */

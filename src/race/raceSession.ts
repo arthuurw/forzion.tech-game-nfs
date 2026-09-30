@@ -5,7 +5,7 @@
  */
 import type { DriveInput } from '../vehicle/drivetrain';
 import { clockAfter } from './raceProgress';
-import { PLAYER_SLOT, type RaceDef } from './raceRoutes';
+import { PLAYER_SLOT, gridSlotAt, type RaceDef } from './raceRoutes';
 
 export type SessionState = 'free' | 'countdown' | 'racing' | 'finished';
 
@@ -89,13 +89,30 @@ export function inputFor(s: Session, input: DriveInput): DriveInput {
   return s.state === 'countdown' ? { ...HOLD_INPUT } : input;
 }
 
-/** Para onde vai o reset na corrida: o último portão cruzado ou, sem nenhum, o lugar do grid. */
+/**
+ * Para onde vai o reset na corrida: sem portão cruzado, o lugar do grid; senão o mesmo lugar do
+ * grid montado atrás do último portão cruzado, para dois carros no mesmo portão não nascerem no
+ * mesmo ponto (play-fixes AC 12).
+ */
 export function resetTarget(
   race: RaceDef,
   lastGate: number,
   slot: number = PLAYER_SLOT,
 ): { x: number; y: number; z: number; heading: number } {
   if (lastGate < 0) return { ...race.grid[slot]! };
-  const g = race.gates[lastGate]!;
-  return { x: g.x, y: g.y, z: g.z, heading: g.heading };
+  return gridSlotAt(race.route, race.gates[lastGate]!.s, slot);
+}
+
+/** abaixo desta velocidade (km/h) o carro que parou fica no freio de mão */
+export const STOP_KMH = 5;
+
+/**
+ * Depois da chegada (play-fixes AC 9): segue o esterço da IA e freia até parar. Para a frente,
+ * freio de serviço; para trás, acelerador (o freio de serviço parado engata a ré); abaixo de
+ * 5 km/h, `HOLD_INPUT`.
+ */
+export function stopInput(ai: DriveInput, speedKmh: number): DriveInput {
+  if (speedKmh > STOP_KMH) return { throttle: false, brake: true, steer: ai.steer, handbrake: false };
+  if (speedKmh < -STOP_KMH) return { throttle: true, brake: false, steer: ai.steer, handbrake: false };
+  return { ...HOLD_INPUT };
 }

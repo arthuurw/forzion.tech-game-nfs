@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createProgress, stepProgress } from '../../src/race/raceProgress';
-import type { RaceDef, RaceGate } from '../../src/race/raceRoutes';
+import { generateRaces, widthAt, type RaceDef, type RaceGate } from '../../src/race/raceRoutes';
+import { generateRoads } from '../../src/world/roads/RoadGenerator';
+import { generateTerrain } from '../../src/world/terrain/TerrainGenerator';
 import {
   countdownText,
   createSession,
@@ -10,6 +12,8 @@ import {
   promptFor,
   raceClock,
   resetTarget,
+  STOP_KMH,
+  stopInput,
   tickSession,
   type Session,
 } from '../../src/race/raceSession';
@@ -93,7 +97,12 @@ describe('race session', () => {
   it('reset target is last gate or grid slot', () => {
     expect(resetTarget(race, -1)).toEqual({ x: 18, y: 2, z: -10, heading: 0.1 });
     expect(resetTarget(race, -1, 1)).toEqual({ x: 6, y: 2, z: -10, heading: 0.1 });
-    expect(resetTarget(race, 1)).toEqual({ x: 0, y: 1, z: 200, heading: 0.2 });
+    // play-fixes AC 12: com portão, o lugar do grid montado atrás dele (slot 3 = fileira 16 m, à direita)
+    const t = resetTarget(race, 1);
+    expect(t.x).toBeCloseTo(-3, 9);
+    expect(t.y).toBeCloseTo(0, 9);
+    expect(t.z).toBeCloseTo(184, 9);
+    expect(t.heading).toBeCloseTo(0, 9);
   });
 
   // C32
@@ -113,5 +122,88 @@ describe('race session', () => {
     expect(onEscape(countdown)).toEqual(createSession());
     expect(onEscape(racing)).toEqual(createSession());
     expect(onEscape(finished)).toEqual(finished);
+  });
+
+  // play-fixes C13 (AC 9)
+  it('stop input after the finish', () => {
+    const ai = { throttle: true, brake: false, steer: -1, handbrake: false };
+    const forward = { throttle: false, brake: true, steer: -1, handbrake: false };
+    const backward = { throttle: true, brake: false, steer: -1, handbrake: false };
+    const hold = { throttle: false, brake: false, steer: 0, handbrake: true };
+    expect(STOP_KMH).toBe(5);
+    const rows: Array<[number, typeof hold]> = [
+      [120, forward],
+      [5.01, forward],
+      [4.99, hold],
+      [0, hold],
+      [-4.99, hold],
+      [-5.01, backward],
+      [-20, backward],
+    ];
+    for (const [kmh, want] of rows) expect(stopInput(ai, kmh), `${kmh} km/h`).toEqual(want);
+  });
+
+  // play-fixes C17 (AC 12)
+  it('gate reset spreads the four slots like the grid', () => {
+    const raw = generateTerrain(1337);
+    const network = generateRoads(1337, raw);
+    const races = generateRaces(network);
+    expect(races.map((r) => r.id)).toEqual(['circuito-centro', 'circuito-anel', 'sprint-cruzada', 'sprint-morro']);
+    /** cantos da caixa do chassi (meia medida 0.9 × 2.1 m) orientada pelo heading */
+    const corners = (p: { x: number; z: number; heading: number }) => {
+      const f = { x: Math.sin(p.heading), z: Math.cos(p.heading) };
+      const r = { x: -Math.cos(p.heading), z: Math.sin(p.heading) };
+      return [
+        [1, 1],
+        [1, -1],
+        [-1, -1],
+        [-1, 1],
+      ].map(([a, b]) => ({ x: p.x + f.x * 2.1 * a! + r.x * 0.9 * b!, z: p.z + f.z * 2.1 * a! + r.z * 0.9 * b! }));
+    };
+    /** separação por eixos (SAT) entre duas caixas orientadas */
+    const overlap = (a: ReturnType<typeof corners>, b: ReturnType<typeof corners>) => {
+      for (const poly of [a, b]) {
+        for (let i = 0; i < 4; i++) {
+          const e = { x: poly[(i + 1) % 4]!.x - poly[i]!.x, z: poly[(i + 1) % 4]!.z - poly[i]!.z };
+          const n = { x: -e.z, z: e.x };
+          const pa = a.map((c) => c.x * n.x + c.z * n.z);
+          const pb = b.map((c) => c.x * n.x + c.z * n.z);
+          if (Math.max(...pa) < Math.min(...pb) || Math.max(...pb) < Math.min(...pa)) return false;
+        }
+      }
+      return true;
+    };
+    const distToRoute = (r: RaceDef, x: number, z: number) => {
+      const p = r.route.points;
+      const n = p.length / 3;
+      let best = Infinity;
+      for (let i = 0; i < (r.route.closed ? n : n - 1); i++) {
+        const j = (i + 1) % n;
+        const dx = p[j * 3]! - p[i * 3]!;
+        const dz = p[j * 3 + 2]! - p[i * 3 + 2]!;
+        const l2 = dx * dx + dz * dz;
+        const t = l2 > 0 ? Math.min(1, Math.max(0, ((x - p[i * 3]!) * dx + (z - p[i * 3 + 2]!) * dz) / l2)) : 0;
+        best = Math.min(best, Math.hypot(x - p[i * 3]! - dx * t, z - p[i * 3 + 2]! - dz * t));
+      }
+      return best;
+    };
+    let checked = 0;
+    for (const r of races) {
+      for (let g = 0; g < r.gates.length; g++) {
+        const targets = [0, 1, 2, 3].map((slot) => resetTarget(r, g, slot));
+        const boxes = targets.map(corners);
+        for (let a = 0; a < 4; a++) {
+          const t = targets[a]!;
+          const label = `${r.id} portão ${g} slot ${a}`;
+          expect(distToRoute(r, t.x, t.z), label).toBeLessThanOrEqual(widthAt(network, t.x, t.z) / 2 - 1);
+          for (let b = a + 1; b < 4; b++) {
+            expect(Math.hypot(t.x - targets[b]!.x, t.z - targets[b]!.z), `${label} x ${b}`).toBeGreaterThan(0);
+            expect(overlap(boxes[a]!, boxes[b]!), `${label} x ${b}`).toBe(false);
+          }
+          checked++;
+        }
+      }
+    }
+    expect(checked).toBe(4 * races.reduce((n, r) => n + r.gates.length, 0));
   });
 });

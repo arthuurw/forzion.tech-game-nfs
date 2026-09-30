@@ -55,6 +55,11 @@ const GATE_SPACING = 200;
 const GATE_MARGIN = 4;
 /** no sprint, a linha de largada fica a 30 m do começo do traçado; o grid fica antes dela */
 const SPRINT_START_S = 30;
+/**
+ * no sprint, a chegada fica esta distância antes do fim do traçado (m): quem chega a 190 km/h
+ * para no asfalto do próprio traçado (play-fixes AC 10), e não atravessa o fim da estrada
+ */
+export const SPRINT_RUNOFF = 200;
 /** filas do grid: distância antes da linha de largada (m) */
 const GRID_ROWS = [8, 16];
 /** deslocamento lateral de cada coluna do grid (m) */
@@ -153,8 +158,22 @@ export function routeAt(
   throw new Error('route needs at least 2 points');
 }
 
+/**
+ * Lugar `slot` (0-3) do grid montado atrás da distância `s` do traçado: fileiras 8 e 16 m
+ * antes, colunas a ±3 m do eixo. O grid da largada usa a linha de largada; o reset da corrida,
+ * o último portão cruzado (play-fixes AC 12), para os 4 carros não nascerem no mesmo ponto.
+ */
+export function gridSlotAt(route: RaceDef['route'], s: number, slot: number): GridSlot {
+  const at = routeAt(route, s - GRID_ROWS[Math.floor(slot / 2)]!);
+  const side = slot % 2 === 0 ? -1 : 1;
+  // direita do carro = (−cos h, sin h)
+  const rx = -Math.cos(at.heading);
+  const rz = Math.sin(at.heading);
+  return { x: at.x + rx * side * GRID_LATERAL, y: at.y, z: at.z + rz * side * GRID_LATERAL, heading: at.heading };
+}
+
 /** Largura da estrada cujo ponto fica mais perto de (x, z). */
-function widthAt(network: RoadNetwork, x: number, z: number): number {
+export function widthAt(network: RoadNetwork, x: number, z: number): number {
   let best = Infinity;
   let width = 10;
   for (const road of network.roads) {
@@ -190,23 +209,19 @@ function buildRace(
   const startS = closed ? 0 : SPRINT_START_S;
   const n = Math.max(1, Math.ceil((total - startS) / GATE_SPACING));
   const step = (total - startS) / n;
+  const gate = (s: number, at = routeAt(route, s)): RaceGate => ({ ...at, halfWidth: widthAt(network, at.x, at.z) / 2 + GATE_MARGIN, s });
   const gates: RaceGate[] = [];
-  for (let k = 1; k <= n; k++) {
-    const s = startS + step * k;
-    const at = routeAt(route, closed && k === n ? 0 : s);
-    gates.push({ ...at, halfWidth: widthAt(network, at.x, at.z) / 2 + GATE_MARGIN, s });
+  if (closed) {
+    for (let k = 1; k <= n; k++) gates.push(k === n ? gate(startS + step * k, routeAt(route, 0)) : gate(startS + step * k));
+  } else {
+    // no sprint a chegada fica 200 m antes do fim (o resto da estrada é a área de frenagem); os
+    // portões do meio ficam onde estavam, menos os que cairiam a menos de 50 m antes da chegada
+    const endS = total - SPRINT_RUNOFF;
+    for (let k = 1; k < n && startS + step * k < endS - GATE_SPACING / 4; k++) gates.push(gate(startS + step * k));
+    gates.push(gate(endS));
   }
 
-  const grid: GridSlot[] = [];
-  for (const back of GRID_ROWS) {
-    const at = routeAt(route, startS - back);
-    // direita do carro = (−cos h, sin h)
-    const rx = -Math.cos(at.heading);
-    const rz = Math.sin(at.heading);
-    for (const side of [-1, 1]) {
-      grid.push({ x: at.x + rx * side * GRID_LATERAL, y: at.y, z: at.z + rz * side * GRID_LATERAL, heading: at.heading });
-    }
-  }
+  const grid: GridSlot[] = [0, 1, 2, 3].map((slot) => gridSlotAt(route, startS, slot));
 
   const start = routeAt(route, startS);
   return { id, name, kind, laps, route, gates, grid, marker: { x: start.x, z: start.z, radius: MARKER_RADIUS } };

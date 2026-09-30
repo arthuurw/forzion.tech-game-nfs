@@ -51,6 +51,20 @@ test.describe('drive', () => {
     expect(gear).toEqual({ label: 'R', value: -1 });
   });
 
+  // play-fixes C3 (AC 1): o keyup de W iria para outra janela
+  test('window blur releases the throttle', async ({ page }) => {
+    await page.keyboard.down('KeyW');
+    await advanceSim(page, 1);
+    await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+    await advanceSim(page, 0.5);
+    const a = await speedKmh(page);
+    await advanceSim(page, 1);
+    const b = await speedKmh(page);
+    await page.keyboard.up('KeyW');
+    expect(a).toBeGreaterThan(5);
+    expect(b - a).toBeLessThanOrEqual(0.5);
+  });
+
   // extra: sinal da direção (A vira à esquerda = heading cresce)
   test('A turns left', async ({ page }) => {
     const h0 = await heading(page);
@@ -176,25 +190,32 @@ test.describe('drive', () => {
     expect(live).toEqual(expected);
   });
 
-  // C11 (AC 9)
-  test('reset puts car upright', { tag: '@smoke' }, async ({ page }) => {
-    await page.evaluate(() => (window as any).__game.car.setRotation({ x: 0, y: 0, z: 1, w: 0 }));
-    await advanceSim(page, 0.2);
-    const before = await position(page);
+  // C11 (AC 9); play-fixes C22 (AC 16): em pé e com o heading de antes, não mais a rotação identidade
+  test('reset puts car upright and keeps the heading', { tag: '@smoke' }, async ({ page }) => {
+    const h0 = await heading(page);
+    // de cabeça para baixo (rolagem de 180°) com o heading do spawn: yaw(h0) · roll(π)
+    await page.evaluate((h) => (window as any).__game.car.setRotation({ x: Math.sin(h / 2), y: 0, z: Math.cos(h / 2), w: 0 }), h0);
+    // assenta de cabeça para baixo; posição e heading lidos juntos, logo antes do R
+    await advanceSim(page, 1);
+    const { before, hBefore } = await page.evaluate(() => {
+      const c = (window as any).__game.car;
+      return { before: c.position as { x: number; y: number; z: number }, hBefore: c.heading as number };
+    });
     await page.keyboard.press('KeyR');
     await page.waitForFunction(() => (window as any).__game.car.lastReset !== null);
     const snap = await page.evaluate(() => (window as any).__game.car.lastReset);
-    expect(Math.abs(snap.rotation.x)).toBeLessThan(0.01);
-    expect(Math.abs(snap.rotation.y)).toBeLessThan(0.01);
-    expect(Math.abs(snap.rotation.z)).toBeLessThan(0.01);
-    expect(snap.rotation.w).toBeGreaterThan(0.99);
+    const { x, y, z, w } = snap.rotation;
+    // +Y do chassi no mundo e +Z (frente) no plano
+    const upY = 1 - 2 * (x * x + z * z);
+    const hAfter = Math.atan2(2 * (x * z + w * y), 1 - 2 * (x * x + y * y));
+    expect(upY).toBeGreaterThanOrEqual(0.999);
+    expect(Math.abs(Math.atan2(Math.sin(hAfter - hBefore), Math.cos(hAfter - hBefore)))).toBeLessThanOrEqual(0.01);
     expect(snap.position.y).toBeCloseTo(before.y + 1, 1);
     expect(Math.hypot(snap.linvel.x, snap.linvel.y, snap.linvel.z)).toBeLessThan(0.01);
     expect(Math.hypot(snap.angvel.x, snap.angvel.y, snap.angvel.z)).toBeLessThan(0.01);
 
     // e o corpo vivo continua em pé logo depois
     const live = await page.evaluate(() => (window as any).__game.car.rotation);
-    expect(Math.abs(live.z)).toBeLessThan(0.1);
-    expect(live.w).toBeGreaterThan(0.95);
+    expect(1 - 2 * (live.x * live.x + live.z * live.z)).toBeGreaterThan(0.95);
   });
 });

@@ -130,6 +130,33 @@ test.describe('visual - S3 movimento', () => {
     expect(Math.hypot(s.c.x - s.p.x, s.c.y - s.p.y, s.c.z - s.p.z)).toBeLessThan(1);
   });
 
+  // play-fixes C24 (AC 18): a chuva acompanha o carro no morro
+  test('rain falls on the hill roads', async ({ page }) => {
+    await open(page);
+    const pick = await page.evaluate(() => {
+      const races = (window as any).__game.race.races as Array<{ id: string; gates: Array<{ x: number; y: number; z: number; heading: number }> }>;
+      const hill = races.find((r) => r.id === 'sprint-morro')!.gates.reduce((a, b) => (b.y > a.y ? b : a));
+      const low = races.find((r) => r.id === 'circuito-centro')!.gates.reduce((a, b) => (Math.abs(b.y - 2) < Math.abs(a.y - 2) ? b : a));
+      return { hill, low };
+    });
+    const countAt = async (g: { x: number; y: number; z: number; heading: number }) => {
+      await teleport(page, g.x, g.y + 1.2, g.z, g.heading);
+      // a câmera de perseguição volta para trás do carro
+      await advanceSim(page, 1.5);
+      return page.evaluate(() => ({ n: (window as any).__game.render.rainPixels() as number, y: (window as any).__game.car.position.y as number }));
+    };
+    const lowAt = await countAt(pick.low);
+    const highAt = await countAt(pick.hill);
+    // o carro a y ≈ 2 m e depois no morro, a y ≥ 60 m
+    expect(Math.abs(lowAt.y - 2)).toBeLessThanOrEqual(1.5);
+    expect(highAt.y).toBeGreaterThanOrEqual(60);
+    const low = lowAt.n;
+    const high = highAt.n;
+    expect(low).toBeGreaterThan(0);
+    expect(high).toBeGreaterThan(0);
+    expect(high).toBeGreaterThanOrEqual(0.5 * low);
+  });
+
   // C11 (AC 11) - parte browser
   test('neon signs flicker', async ({ page }) => {
     await open(page);
@@ -552,6 +579,57 @@ test.describe('residuals - reflexo da rua e tijolo', () => {
     expect(s.r.texel[0]).toBeCloseTo(1 / size[0]!, 9);
     expect(s.r.texel[1]).toBeCloseTo(1 / size[1]!, 9);
     expect(s.r.blur).toBeGreaterThan(0);
+  });
+
+  // play-fixes C32 (AC 26): o alvo do espelho segue a janela
+  test('reflection target follows a window resize', async ({ page }) => {
+    await page.setViewportSize({ width: 640, height: 360 });
+    await open(page);
+    const read = () => page.evaluate(() => ({ r: (window as any).__game.scene.reflector, w: window.innerWidth, h: window.innerHeight }));
+    const a = await read();
+    expect([a.w, a.h]).toEqual([640, 360]);
+    expect(a.r.size).toEqual([320, 180]);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.waitForFunction(() => (window as any).__game.scene.reflector.size[0] === 640, null, { timeout: 5_000 });
+    const b = await read();
+    expect([b.w, b.h]).toEqual([1280, 720]);
+    expect(b.r.size).toEqual([Math.floor(b.w * 0.5), Math.floor(b.h * 0.5)]);
+    expect(b.r.size).toEqual([640, 360]);
+    expect(b.r.texel[0]).toBeCloseTo(1 / 640, 9);
+    expect(b.r.texel[1]).toBeCloseTo(1 / 360, 9);
+  });
+
+  // play-fixes C33 (AC 27): pixelRatio e GTAO seguem o devicePixelRatio
+  test('pixel ratio and gtao follow the device', async ({ page }) => {
+    await page.setViewportSize({ width: 640, height: 360 });
+    await open(page);
+    const read = () => page.evaluate(() => ({ post: (window as any).__game.post, w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio }));
+    const a = await read();
+    expect(a.dpr).toBe(1);
+    expect(a.post.pixelRatio).toEqual({ renderer: 1, composer: 1 });
+    const cdp = await page.context().newCDPSession(page);
+    // só o devicePixelRatio muda (mesmo tamanho CSS): nenhum `resize` garante a troca
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 640, height: 360, deviceScaleFactor: 2, mobile: false });
+    await page.waitForFunction(() => window.devicePixelRatio === 2, null, { timeout: 5_000 });
+    await page.waitForFunction(() => (window as any).__game.post.pixelRatio.renderer === 2, null, { timeout: 5_000 });
+    // e um resize depois disso mantém o pixelRatio e leva o GTAO junto
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 800, height: 450, deviceScaleFactor: 2, mobile: false });
+    await page.waitForFunction(() => window.innerWidth === 800 && (window as any).__game.post.gtao.width === 800, null, { timeout: 5_000 });
+    const b = await read();
+    expect(b.post.pixelRatio).toEqual({ renderer: Math.min(b.dpr, 2), composer: Math.min(b.dpr, 2) });
+    expect(b.post.gtao.width).toBe(Math.floor((b.w * 2) / 2));
+    expect(b.post.gtao.height).toBe(Math.floor((b.h * 2) / 2));
+  });
+
+  // play-fixes C34 (AC 28): sem MSAA no canvas; o SMAA do composer fica
+  test('renderer without msaa keeps smaa', async ({ page }) => {
+    await open(page);
+    const r = await page.evaluate(() => ({
+      antialias: (document.querySelector('#game') as HTMLCanvasElement).getContext('webgl2')!.getContextAttributes()!.antialias,
+      passes: (window as any).__game.composer.passes as string[],
+    }));
+    expect(r.antialias).toBe(false);
+    expect(r.passes).toContain('SMAAPass');
   });
 
   // C4 (AC 3): o blur não apaga o reflexo - ganho ≥ 0.6 × o do shader de uma amostra

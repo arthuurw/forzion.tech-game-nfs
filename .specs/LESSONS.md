@@ -8,6 +8,12 @@
 
 Corroborated across multiple features. Safe to apply as guidance.
 
+### L-003 - Declare every tolerance in the check text itself, never only in the test body
+- signal: `spec_precision_gap` · recurrence: 2 feature(s) · scope: `checks` · harmful: 0
+- features: free-roam-city, play-fixes
+- evidence: verification.md round 1 finding C26 - tests/e2e/hud.spec.ts:17 (tolerancia so no teste) (checks) (+1 more)
+- last seen: 2026-09-30T00:59:44Z
+
 ### L-012 - A force defined as against the direction of motion owes a case in each direction; a single-direction case cannot tell a sign from a constant.
 - signal: `surviving_mutant` · recurrence: 2 feature(s) · scope: `vehicle` · harmful: 0
 - features: car-handling, corner-assist
@@ -28,12 +34,6 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - signal: `ac_gap` · recurrence: 1 feature(s) · scope: `hud` · harmful: 0
 - features: free-roam-city
 - evidence: verification.md round 1 gap 2 - src/hud/Minimap.ts:27-43 (desenho sem prova) (hud)
-- last seen: 2026-09-25T22:27:36Z
-
-### L-003 - Declare every tolerance in the check text itself, never only in the test body
-- signal: `spec_precision_gap` · recurrence: 1 feature(s) · scope: `checks` · harmful: 0
-- features: free-roam-city
-- evidence: verification.md round 1 finding C26 - tests/e2e/hud.spec.ts:17 (tolerancia so no teste) (checks)
 - last seen: 2026-09-25T22:27:36Z
 
 ### L-004 - A Landing door with literal attributes owes a proof that asserts those literals, not only the class name
@@ -179,6 +179,18 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - features: test-hardening
 - evidence: test-hardening r3 R3-F2 - package.json:15 test:quick -> vitest run survived tests/tooling/suite-split.mjs:14-16 and list-has.mjs:14 (C3, C4) (test-tooling)
 - last seen: 2026-09-29T20:45:22Z
+
+### L-029 - Prove a mode decision through the component that selects it, not only by calling the selected mode directly on the callee.
+- signal: `surviving_mutant` · recurrence: 1 feature(s) · scope: `race` · harmful: 0
+- features: play-fixes
+- evidence: verification.md round 1 F1 - src/race/RaceController.ts:159 (finished opponent stop mode dropped, C14/C16 green) (race)
+- last seen: 2026-09-30T00:59:44Z
+
+### L-030 - A threshold rule owes one synthetic case just inside and one just outside the limit, not only a sweep or a seeded invariant.
+- signal: `ac_gap` · recurrence: 1 feature(s) · scope: `world` · harmful: 0
+- features: play-fixes
+- evidence: verification.md round 1 Test policy row Regra pura - interiorMotion.ts insideCarBox, trainLine.ts COLUMN_ROAD_GAP (world)
+- last seen: 2026-09-30T00:59:44Z
 
 ## Quarantined (failed when applied - ignore)
 

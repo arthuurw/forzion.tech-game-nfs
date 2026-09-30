@@ -120,4 +120,26 @@ describe('race progress', () => {
       { position: 4, name: 'Bia', time: '--:--.--' },
     ]);
   });
+
+  // play-fixes C18 (AC 13)
+  it('tie on the same step goes to the earlier crossing', () => {
+    const r = race('sprint', 1);
+    const atFinish = (): RacerProgress => ({ ...createProgress(), nextGate: 2, lastGate: 1 });
+    for (const order of [
+      [0, 1],
+      [1, 0],
+    ]) {
+      const p = [atFinish(), atFinish()];
+      // racer 0 cruza z = 300 a 20 % do passo; racer 1 a 70 %
+      const seg = [
+        { prev: { x: 0, z: 299.8 }, cur: { x: 0, z: 300.8 } },
+        { prev: { x: 0, z: 299.3 }, cur: { x: 0, z: 300.3 } },
+      ];
+      for (const k of order) expect(stepProgress(p[k]!, r, seg[k]!.prev, seg[k]!.cur, 61.25)).toBe(true);
+      expect(p[0]!.finishTime).toBe(61.25);
+      expect(p[1]!.finishTime).toBe(61.25);
+      const list: Standing[] = order.map((k) => ({ racer: k, progress: p[k]!, distance: 0 }));
+      expect(standings(list).map((s) => s.racer), `ordem ${order}`).toEqual([0, 1]);
+    }
+  });
 });

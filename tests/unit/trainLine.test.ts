@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DECK_THICKNESS, buildTrainLine, frameColumns, lineCumulative, type TrainLine } from '../../src/world/rail/trainLine';
+import { COLUMN_HALF, DECK_THICKNESS, buildTrainLine, frameColumns, lineCumulative, type TrainFrame, type TrainLine } from '../../src/world/rail/trainLine';
 import { generateRoads, type Road, type RoadNetwork } from '../../src/world/roads/RoadGenerator';
 import { generateTerrain } from '../../src/world/terrain/TerrainGenerator';
 
@@ -136,5 +136,80 @@ describe('train line of seed 1337', () => {
       const n = nearestOn(avenues, p.x, p.z);
       expect(p.y - DECK_THICKNESS / 2 - n.y, `point ${i}`).toBeGreaterThanOrEqual(6.5);
     }
+  });
+
+  // play-fixes C31 (AC 25): coluna de portal longe do asfalto de toda estrada que não é a do portal
+  it('portal columns stay off other roads', () => {
+    expect(COLUMN_HALF).toBe(0.25);
+    /** distância horizontal de (x, z) à polilinha da estrada (segmentos, não só os pontos) */
+    const segDist = (road: Road, x: number, z: number) => {
+      const p = road.points;
+      const n = p.length / 3;
+      let best = Infinity;
+      for (let i = 0; i < (road.closed ? n : n - 1); i++) {
+        const j = (i + 1) % n;
+        const dx = p[j * 3]! - p[i * 3]!;
+        const dz = p[j * 3 + 2]! - p[i * 3 + 2]!;
+        const l2 = dx * dx + dz * dz;
+        const t = l2 > 0 ? Math.min(1, Math.max(0, ((x - p[i * 3]!) * dx + (z - p[i * 3 + 2]!) * dz) / l2)) : 0;
+        best = Math.min(best, Math.hypot(x - p[i * 3]! - dx * t, z - p[i * 3 + 2]! - dz * t));
+      }
+      return best;
+    };
+    const avenues = squareAvenues(network);
+    let checked = 0;
+    for (const [i, f] of line.frames.entries()) {
+      const under = nearestOn(avenues, f.x, f.z).road;
+      for (const c of frameColumns(f)) {
+        for (const road of network.roads) {
+          if (road === under) continue;
+          const d = segDist(road, c.x, c.z);
+          expect(d, `frame ${i} column vs road ${road.id}`).toBeGreaterThanOrEqual(road.width / 2 + 0.25 + 0.5);
+          checked++;
+        }
+      }
+    }
+    expect(checked).toBe(line.frames.length * 2 * (network.roads.length - 1));
+  });
+
+  // play-fixes C31 (AC 25): a borda da regra, numa rede mínima (as 4 avenidas retas do quadrado)
+  // mais uma rua paralela à avenida leste. A coluna fica a w/2 + 2.6 m da linha central da avenida
+  // (block-life-extras door 2); o limite até a linha central da rua é largura / 2 + 0.25 + 0.5 m
+  it('portal column just past the road gap is kept and just short is skipped', () => {
+    const AV_W = 14;
+    const ST_W = 8;
+    /** estrada reta a cada 2 m, com `fixed` constante = `at` e o outro eixo de `from` a `to` */
+    const straight = (id: number, kind: Road['kind'], width: number, fixed: 'x' | 'z', at: number, from: number, to: number): Road => {
+      const n = Math.round((to - from) / 2) + 1;
+      const points = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) points.set(fixed === 'x' ? [at, 0, from + 2 * i] : [from + 2 * i, 0, at], i * 3);
+      return { id, kind, lanes: kind === 'avenue' ? 4 : 2, width, closed: false, points, bridges: [] };
+    };
+    const square = [
+      straight(0, 'avenue', AV_W, 'z', -300, -400, 400),
+      straight(1, 'avenue', AV_W, 'z', 300, -400, 400),
+      straight(2, 'avenue', AV_W, 'x', -300, -400, 400),
+      straight(3, 'avenue', AV_W, 'x', 300, -400, 400),
+    ];
+    const colX = 300 + AV_W / 2 + 2.6;
+    const limit = ST_W / 2 + 0.25 + 0.5;
+    const street = (dx: number) => straight(4, 'street', ST_W, 'x', colX + limit + dx, -100, 100);
+    /** portal da avenida leste com a coluna ao lado da rua (z em −100..100) */
+    const beside = (f: TrainFrame) => Math.abs(f.x - 300) < 1e-3 && Math.abs(f.z) <= 100;
+    /** portal longe da ponta da rua o bastante para a regra não pegar pela ponta */
+    const away = (f: TrainFrame) => !(Math.abs(f.x - 300) < 1e-3 && Math.abs(f.z) < 101);
+
+    const base = buildTrainLine({ roads: square })!;
+    const stretch = base.frames.filter(beside);
+    expect(stretch.length).toBeGreaterThan(0);
+    for (const f of stretch) expect(frameColumns(f).some((c) => Math.abs(c.x - colX) < 1e-3)).toBe(true);
+
+    // coluna 0.01 m além do limite: o portal fica, nada muda
+    const kept = buildTrainLine({ roads: [...square, street(0.01)] })!;
+    expect(kept.frames).toEqual(base.frames);
+    // coluna 0.01 m aquém do limite: os portais ao lado da rua somem, os outros ficam
+    const skipped = buildTrainLine({ roads: [...square, street(-0.01)] })!;
+    expect(skipped.frames.filter(beside)).toEqual([]);
+    expect(skipped.frames.filter(away)).toEqual(base.frames.filter(away));
   });
 });

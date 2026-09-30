@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { generateRaces, type RaceDef } from '../../src/race/raceRoutes';
+import { generateRaces, routeAt, SPRINT_RUNOFF, type RaceDef } from '../../src/race/raceRoutes';
 import { generateRoads, type Road, type RoadNetwork } from '../../src/world/roads/RoadGenerator';
 import { generateTerrain } from '../../src/world/terrain/TerrainGenerator';
 
@@ -184,7 +184,9 @@ describe('races of seed 1337', () => {
       }
       const p = pts(r);
       const last = r.gates[r.gates.length - 1]!;
-      const target = r.kind === 'sprint' ? p[p.length - 1]! : p[0]!;
+      // play-fixes AC 10 (renegocia a races AC 4): a chegada do sprint fica 200 m antes do fim do traçado
+      const target = r.kind === 'sprint' ? routeAt(r.route, r.route.length - 200) : p[0]!;
+      expect(SPRINT_RUNOFF).toBe(200);
       expect(Math.hypot(last.x - target.x, last.z - target.z), r.id).toBeLessThanOrEqual(4);
     }
   });

@@ -17,6 +17,11 @@ function showError(message: string): void {
   errorBox.style.display = 'flex';
 }
 
+/** Resolve depois do próximo quadro pintado: o rAF roda antes da pintura, o timeout depois. */
+function nextPaint(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+}
+
 async function boot(): Promise<void> {
   if (!hasWebGL2()) {
     showError('Seu navegador não suporta WebGL2');
@@ -29,6 +34,9 @@ async function boot(): Promise<void> {
       loadingText.textContent = msg;
     });
     const quality = qualityPreset(parseQuality(window.location.search));
+    // gerar o mundo trava a thread por segundos: o texto novo precisa ser pintado antes
+    loadingText.textContent = 'Gerando cidade...';
+    await nextPaint();
     game = new Game(canvas, hudRoot, assets, quality, () => {
       loading.style.display = 'none';
       hudRoot.style.display = 'block';
@@ -40,6 +48,10 @@ async function boot(): Promise<void> {
   }
 
   exposeDebug(import.meta.env, game.debugHandle(), window as unknown as Record<string, unknown>);
+  game.loop.onError = (error) => {
+    console.error(error);
+    showError(`Erro no jogo: ${error instanceof Error ? error.message : String(error)}`);
+  };
   game.start();
 }
 

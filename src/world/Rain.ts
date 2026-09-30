@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { mulberry32 } from './CityGenerator';
-import { RAIN_BOX, RAIN_SPEED_MS } from './rainMath';
+import { RAIN_BELOW, RAIN_BOX, RAIN_SPEED_MS } from './rainMath';
 
 /**
  * Chuva na GPU (door 4 do visual-upgrade): um `Points` com N gotas. Cada gota
  * guarda só uma semente de posição; o vertex shader calcula a queda
- * (`rainY` de rainMath.ts, a mesma conta) e enrola a posição horizontal numa
- * caixa de 60 × 60 m que segue o carro, então as gotas ficam paradas no mundo
+ * (`rainY` de rainMath.ts, a mesma conta) e enrola a posição numa caixa de
+ * 60 × 40 × 60 m que segue o carro (12 m dela abaixo dele), então as gotas ficam paradas no mundo
  * enquanto a caixa anda. O fragment desenha um risco vertical fino.
  */
 export class Rain {
@@ -44,8 +44,9 @@ export class Rain {
         uniform float uSize;
         varying float vFade;
         void main() {
-          // queda: mesma conta de rainY() em rainMath.ts
-          float y = mod(position.y - uSpeed * uTime, uBox.y);
+          // queda: mesma conta de rainY() em rainMath.ts, na caixa que acompanha a altura do carro
+          float bottom = uCenter.y - ${RAIN_BELOW.toFixed(1)};
+          float y = bottom + mod(position.y - uSpeed * uTime - bottom, uBox.y);
           // horizontal: posição fixa no mundo, enrolada na caixa centrada no carro
           vec2 halfBox = uBox.xz * 0.5;
           vec2 rel = mod(position.xz - uCenter.xz + halfBox, uBox.xz) - halfBox;
@@ -54,7 +55,7 @@ export class Rain {
           gl_Position = projectionMatrix * mv;
           gl_PointSize = uSize / max(1.0, -mv.z);
           // some perto das bordas da caixa para não "piscar" ao enrolar
-          vFade = (1.0 - smoothstep(0.7, 1.0, length(rel / halfBox))) * smoothstep(0.0, 2.0, y);
+          vFade = (1.0 - smoothstep(0.7, 1.0, length(rel / halfBox))) * smoothstep(0.0, 2.0, y - bottom);
         }
       `,
       fragmentShader: /* glsl */ `

@@ -32,6 +32,7 @@ import { WorldPhysics } from '../world/WorldPhysics';
 import { findBlockInteriors } from '../world/interiors/BlockInteriors';
 import { FLOOD_REACH, placeInteriorProps } from '../world/interiors/InteriorProps';
 import { SEARCHLIGHT_TILT } from '../world/interiors/interiorMotion';
+import { InteriorScene } from '../world/interiors/InteriorScene';
 import { buildTrainLine, type TrainLine } from '../world/rail/trainLine';
 import { TrainScene } from '../world/rail/TrainScene';
 import { WORLD_HALF, nearestRoadPoint, needsWaterReset } from '../world/worldMath';
@@ -39,6 +40,7 @@ import { addNightLights, createNightEnvironment, createSky } from '../world/Envi
 import { GameLoop } from './GameLoop';
 import { InputManager } from './InputManager';
 import type { Assets } from './Loader';
+import type { DriveInput } from '../vehicle/drivetrain';
 
 /**
  * Ponto de spawn: na avenida que passa mais perto da origem, 6 pontos (12 m)
@@ -121,6 +123,12 @@ export class Game {
   /** corridas (races): marcadores, sessão, oponentes e HUD de corrida */
   readonly race: RaceController;
   readonly audio = new AudioEngine();
+  /** o `DriveInput` que chegou ao carro do jogador no último passo */
+  /** devicePixelRatio que o último `handleResize` aplicou */
+  private dpr = window.devicePixelRatio;
+  /** só DEV (play-fixes C11): mensagem do throw forçado no próximo passo */
+  private failNext: string | null = null;
+  private driveInput: DriveInput = { throttle: false, brake: false, steer: 0, handbrake: false };
   readonly input = new InputManager();
   readonly loop: GameLoop;
   ready = false;
@@ -140,8 +148,9 @@ export class Game {
     this.onFirstFrame = onFirstFrame;
     this.quality = quality;
 
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // sem MSAA: o composer desenha em alvos próprios e suaviza com o SMAA (play-fixes AC 28)
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+    this.renderer.setPixelRatio(pixelRatio());
     this.renderer.setSize(window.innerWidth, window.innerHeight, false);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.95;
@@ -244,14 +253,13 @@ export class Game {
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.chase.camera));
     if (quality.gtao) {
-      const halfW = Math.floor(window.innerWidth / 2);
-      const halfH = Math.floor(window.innerHeight / 2);
-      const gtao = new GTAOPass(this.scene, this.chase.camera, halfW, halfH);
+      const pr = pixelRatio();
+      const gtao = new GTAOPass(this.scene, this.chase.camera, Math.floor((window.innerWidth * pr) / 2), Math.floor((window.innerHeight * pr) / 2));
       gtao.output = GTAOPass.OUTPUT.Default;
       gtao.blendIntensity = 0.7;
-      // o composer redimensiona todo passo para a tela cheia; o GTAO fica em meia resolução
+      // o composer passa o tamanho do buffer (CSS × pixelRatio) a cada passo; o GTAO fica na metade dele
       const baseSetSize = gtao.setSize.bind(gtao);
-      gtao.setSize = () => baseSetSize(Math.floor(window.innerWidth / 2), Math.floor(window.innerHeight / 2));
+      gtao.setSize = (w: number, h: number) => baseSetSize(Math.floor(w / 2), Math.floor(h / 2));
       this.gtaoClipBox.set(
         new THREE.Vector3(-WORLD_HALF, -10, -WORLD_HALF),
         new THREE.Vector3(WORLD_HALF, 200, WORLD_HALF),
@@ -276,6 +284,9 @@ export class Game {
     this.race = new RaceController(this.world, this.scene, assets, network, hudRoot);
 
     this.input.setFirstKeyHandler(() => this.audio.start());
+    // um contexto suspenso (autoplay, aba oculta) volta no próximo gesto; a aba oculta suspende o som
+    this.input.setGestureHandler(() => this.audio.resume());
+    document.addEventListener('visibilitychange', this.handleVisibility);
     // na corrida, R volta ao último portão (races AC 27); no free roam desvira no lugar
     this.input.onPress('KeyR', () => {
       if (!this.race.resetPlayer(this.car)) this.car.reset();
@@ -294,20 +305,24 @@ export class Game {
   }
 
   private readonly fixedUpdate = (dt: number): void => {
+    if (this.failNext !== null) {
+      const message = this.failNext;
+      this.failNext = null;
+      throw new Error(message);
+    }
     const s = this.input.state;
     // sentido do movimento antes do passo: a batida zera a velocidade, então o lado do impacto vem daqui
     const movingDir = this.car.speedMs() >= 0 ? 1 : -1;
-    this.car.fixedUpdate(
-      this.race.playerInput({ throttle: s.throttle, brake: s.brake, steer: steerAxis(s), handbrake: s.handbrake }),
-      dt,
-    );
+    this.driveInput = this.race.playerInput({ throttle: s.throttle, brake: s.brake, steer: steerAxis(s), handbrake: s.handbrake });
+    this.car.fixedUpdate(this.driveInput, dt);
     this.race.beforeStep(dt);
     this.world.step(this.eventQueue);
     this.simTime += dt;
     this.race.afterStep(dt, this.car);
     // pedestres do miolo (block-fill): sem collider, só leem a posição do carro
     const carNow = this.car.body.translation();
-    this.city.interiors.stepWalkers(dt, { x: carNow.x, z: carNow.z }, this.simTime);
+    // com o heading: gato e pedestre ficam fora da caixa do chassi (play-fixes AC 19, AC 20)
+    this.city.interiors.stepWalkers(dt, { x: carNow.x, z: carNow.z, heading: this.car.heading() }, this.simTime);
 
     // caiu na água (door 9): volta em pé, parado, 1 m acima do ponto de estrada mais próximo
     const pos = this.car.body.translation();
@@ -350,6 +365,8 @@ export class Game {
   };
 
   private readonly render = (dt: number): void => {
+    // a troca de devicePixelRatio (outro monitor, zoom) nem sempre dispara `resize`
+    if (window.devicePixelRatio !== this.dpr) this.handleResize();
     this.car.sync();
     const state = this.car.state();
     this.chase.update(dt, state, this.car.yawRate(), this.car.bodyRoll);
@@ -367,7 +384,8 @@ export class Game {
     (this.grade.uniforms.uBlur as { value: number }).value = blurFor(state.speedKmh);
     this.hud.update(state);
     this.minimap.update(state, this.race.render(state));
-    this.audio.update(state.rpm, this.input.state.throttle);
+    // o acelerador que chegou ao carro: na contagem, o segurado (play-fixes AC 6)
+    this.audio.update(state.rpm, this.driveInput.throttle);
 
     this.sky.position.copy(this.chase.camera.position);
     this.renderer.info.reset();
@@ -381,14 +399,26 @@ export class Game {
     }
   };
 
+  private readonly handleVisibility = (): void => {
+    if (document.visibilityState === 'hidden') this.audio.suspend();
+    else this.audio.resume();
+  };
+
+  /** Janela ou devicePixelRatio mudaram: buffer, pós, GTAO, câmera e espelho seguem (play-fixes AC 26, AC 27). */
   private readonly handleResize = (): void => {
     const w = window.innerWidth;
     const h = window.innerHeight;
+    const pr = pixelRatio();
+    this.dpr = window.devicePixelRatio;
+    this.renderer.setPixelRatio(pr);
     this.renderer.setSize(w, h, false);
+    this.composer.setPixelRatio(pr);
     this.composer.setSize(w, h);
     this.grade.setSize(w, h);
     this.chase.resize(w / h);
+    this.city.resizeMirror(w, h);
   };
+
 
   /** Objeto lido por `window.__game` nos testes Playwright (só em DEV). */
   debugHandle(): unknown {
@@ -396,6 +426,10 @@ export class Game {
     return {
       get ready() {
         return game.ready;
+      },
+      /** só DEV (play-fixes C11): o próximo `fixedUpdate` lança `Error(message)` */
+      failNextStep: (message: string) => {
+        game.failNext = message;
       },
       /** só DEV (races): corridas, sessão, oponentes, portão e sondas das provas */
       race: {
@@ -442,6 +476,7 @@ export class Game {
               resets: o.resets,
               progress: { ...o.progress },
               prev: { ...o.prev },
+              lastInput: { ...o.lastInput },
             };
           });
         },
@@ -605,6 +640,10 @@ export class Game {
             uGain: v3(u.uGain!.value),
           };
         },
+        /** play-fixes C33: pixelRatio aplicado ao renderer e ao composer */
+        get pixelRatio() {
+          return { renderer: game.renderer.getPixelRatio(), composer: (game.composer as unknown as { _pixelRatio: number })._pixelRatio };
+        },
         get gtao() {
           const g = game.gtao;
           return g ? { width: g.width, height: g.height, blendIntensity: g.blendIntensity, output: g.output } : null;
@@ -717,6 +756,35 @@ export class Game {
          * colunas do meio (10 %), `top` é a luminância média das 10 % de linhas de cima da imagem e
          * `band` a maior média de linha nos 25 % de baixo da faixa de céu (do horizonte para cima).
          */
+        /**
+         * só DEV/testes (play-fixes C24): um quadro só com a chuva, sobre preto e sem pós, pela
+         * câmera atual. Devolve quantos pixels têm luminância > 0.01.
+         */
+        rainPixels: () => {
+          const hidden: THREE.Object3D[] = game.scene.children.filter((o) => o !== game.rain.points);
+          const was = hidden.map((o) => o.visible);
+          hidden.forEach((o) => (o.visible = false));
+          const bg = game.scene.background;
+          game.scene.background = null;
+          const clear = game.renderer.getClearColor(new THREE.Color());
+          const alpha = game.renderer.getClearAlpha();
+          game.renderer.setClearColor(0x000000, 1);
+          game.renderer.setRenderTarget(null);
+          game.renderer.render(game.scene, game.chase.camera);
+          const gl = game.renderer.getContext();
+          const w = gl.drawingBufferWidth;
+          const h = gl.drawingBufferHeight;
+          const px = new Uint8Array(w * h * 4);
+          gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+          game.renderer.setClearColor(clear, alpha);
+          game.scene.background = bg;
+          hidden.forEach((o, i) => (o.visible = was[i]!));
+          let n = 0;
+          for (let k = 0; k < px.length; k += 4) {
+            if ((0.2126 * px[k]! + 0.7152 * px[k + 1]! + 0.0722 * px[k + 2]!) / 255 > 0.01) n++;
+          }
+          return n;
+        },
         skyProfile: () => {
           const hidden: THREE.Object3D[] = game.scene.children.filter((o) => o !== game.sky);
           const was = hidden.map((o) => o.visible);
@@ -1210,6 +1278,8 @@ export class Game {
         get throttling() {
           return game.audio.isThrottling();
         },
+        /** só DEV (play-fixes C5): suspende o contexto como a aba oculta faz */
+        suspend: () => game.audio.suspend(),
       },
     };
   }
@@ -1482,17 +1552,31 @@ export class Game {
         get count() {
           return it.props.parking.length;
         },
-        meshName: it.parkedMesh.name,
+        meshName: it.parkedMesh?.name ?? null,
         get instanceCount() {
-          return it.parkedMesh.count;
+          return it.parkedMesh?.count ?? 0;
         },
         placeholder: it.parkedPlaceholder,
         colorAt: (i: number) => {
+          if (!it.parkedMesh) return null;
           const c = new THREE.Color();
           it.parkedMesh.getColorAt(i, c);
           return `#${c.getHexString()}`;
         },
         list: () => it.props.parking.map((p) => ({ ...p })),
+        /**
+         * só DEV (play-fixes C29): monta o miolo do mundo com 0 estacionados numa cena à parte e
+         * renderiza um quadro dela pela câmera atual; diz se criou a malha de estacionados
+         */
+        probeEmpty: () => {
+          const d = game.city.data;
+          const empty = new InteriorScene(d.interiors, { ...d.props, parking: [] }, d.seed, game.quality, d.carved, game.assets);
+          const scene = new THREE.Scene();
+          scene.add(empty.group);
+          game.renderer.setRenderTarget(null);
+          game.renderer.render(scene, game.chase.camera);
+          return { parkedMesh: empty.parkedMesh !== null, named: empty.group.getObjectByName('parked-cars') !== undefined };
+        },
       },
       steam: {
         name: it.steam.name,
@@ -1513,6 +1597,8 @@ export class Game {
         },
         cap: it.catCap,
         spawns: () => it.props.cats.map((c) => ({ ...c })),
+        /** play-fixes C28: ponto de partida e cor de instância de cada vaga da malha */
+        slots: () => slotColors(it.catMesh, it.catSlots),
       },
       searchlights: {
         name: it.searchlightMesh.name,
@@ -1630,6 +1716,8 @@ export class Game {
       beamProbe: (siteIndex: number) => game.probeBeam(siteIndex),
       /** pedestres ativos: posição, zona e se está fugindo do carro */
       walkers: () => scene.walkers.map((w) => ({ x: w.x, z: w.z, zoneId: w.zoneId, fleeing: w.fleeing })),
+      /** play-fixes C28: ponto de partida e cor de instância de cada vaga da malha de pedestres */
+      walkerSlots: () => slotColors(scene.walkerMesh, scene.walkerSlots),
       /** colliders do mundo no Rapier, e o que cada parte do mundo criou */
       colliders: () => ({
         total: game.world.colliders.len(),
@@ -2062,4 +2150,18 @@ export class Game {
     for (let i = 1; i < centers.length; i++) result.spacing.push(centers[i]! - centers[i - 1]!);
     return result;
   }
+}
+
+/** Cor de instância de cada vaga ocupada de uma malha de extras, com o ponto de partida de quem a ocupa. */
+function slotColors(mesh: THREE.InstancedMesh, spawns: number[]): Array<{ spawn: number; color: string }> {
+  const c = new THREE.Color();
+  return spawns.map((spawn, k) => {
+    mesh.getColorAt(k, c);
+    return { spawn, color: `#${c.getHexString()}` };
+  });
+}
+
+/** pixelRatio do render: o da tela, no máximo 2 */
+function pixelRatio(): number {
+  return Math.min(window.devicePixelRatio, 2);
 }

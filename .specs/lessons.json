@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 29,
+  "next_id": 31,
   "lessons": [
     {
       "id": "L-001",
@@ -47,17 +47,19 @@
       "text": "Declare every tolerance in the check text itself, never only in the test body",
       "signal": "spec_precision_gap",
       "scope": "checks",
-      "status": "candidate",
+      "status": "confirmed",
       "features": [
-        "free-roam-city"
+        "free-roam-city",
+        "play-fixes"
       ],
-      "recurrence": 1,
+      "recurrence": 2,
       "harmful": 0,
       "evidence": [
-        "verification.md round 1 finding C26 - tests/e2e/hud.spec.ts:17 (tolerancia so no teste) (checks)"
+        "verification.md round 1 finding C26 - tests/e2e/hud.spec.ts:17 (tolerancia so no teste) (checks)",
+        "verification.md round 1 C22 - tests/e2e/drive.spec.ts:213 (tolerancia so no teste) (checks)"
       ],
       "created": "2026-09-25T22:27:36Z",
-      "last_seen": "2026-09-25T22:27:36Z"
+      "last_seen": "2026-09-30T00:59:44Z"
     },
     {
       "id": "L-004",
@@ -511,6 +513,42 @@
       ],
       "created": "2026-09-29T20:45:22Z",
       "last_seen": "2026-09-29T20:45:22Z"
+    },
+    {
+      "id": "L-029",
+      "key": "surviving_mutant::prove a mode decision through the component that selects it not only by calling the selected mode directly on the callee",
+      "text": "Prove a mode decision through the component that selects it, not only by calling the selected mode directly on the callee.",
+      "signal": "surviving_mutant",
+      "scope": "race",
+      "status": "candidate",
+      "features": [
+        "play-fixes"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "verification.md round 1 F1 - src/race/RaceController.ts:159 (finished opponent stop mode dropped, C14/C16 green) (race)"
+      ],
+      "created": "2026-09-30T00:59:44Z",
+      "last_seen": "2026-09-30T00:59:44Z"
+    },
+    {
+      "id": "L-030",
+      "key": "ac_gap::a threshold rule owes one synthetic case just inside and one just outside the limit not only a sweep or a seeded invariant",
+      "text": "A threshold rule owes one synthetic case just inside and one just outside the limit, not only a sweep or a seeded invariant.",
+      "signal": "ac_gap",
+      "scope": "world",
+      "status": "candidate",
+      "features": [
+        "play-fixes"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "verification.md round 1 Test policy row Regra pura - interiorMotion.ts insideCarBox, trainLine.ts COLUMN_ROAD_GAP (world)"
+      ],
+      "created": "2026-09-30T00:59:44Z",
+      "last_seen": "2026-09-30T00:59:44Z"
     }
   ]
 }
