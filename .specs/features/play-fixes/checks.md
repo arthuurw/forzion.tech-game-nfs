@@ -84,7 +84,7 @@ Proof: `npx vitest run tests/physics/reset.test.ts -t "zero to 60 after a telepo
 **C21** - Com o `Car` real virado de lado num heading h ∈ {0, 1, −2.5} rad, `reset()` sobe o chassi 1 m ± 0.01, deixa o eixo +Y do chassi com y ≥ 0.999 e o heading = h ± 0.01 rad (AC 16)
 Proof: `npx vitest run tests/physics/reset.test.ts -t "reset stands the car up and keeps the heading"`
 
-**C22** - No browser, R no free roam com o carro de cabeça para baixo: `lastReset` sobe 1 m, o eixo +Y do chassi tem y ≥ 0.999, o heading é o de antes ± 0.01 rad e as velocidades < 0.01 (substitui a rotação identidade da free-roam-city C11) (AC 16)
+**C22** - No browser, R no free roam com o carro de cabeça para baixo: `lastReset` sobe 1 m ± 0.05, o eixo +Y do chassi tem y ≥ 0.999, o heading é o de antes ± 0.01 rad e as velocidades < 0.01 (substitui a rotação identidade da free-roam-city C11) (AC 16)
 Proof: `npx playwright test tests/e2e/drive.spec.ts -g "reset puts car upright and keeps the heading"`
 
 ### S6 - chuva em qualquer altura · 4 files · 35 KB · ~9k
@@ -156,7 +156,7 @@ Proof: `npx playwright test tests/e2e/visual.spec.ts -g "renderer without msaa k
 | extras dentro da caixa do carro (2) | gato C25 · pedestre C26 | - |
 | velocidades do carro nas provas do miolo (2) | 8 m/s C25, C26 · 20 m/s C25, C26 | - |
 | tamanhos que seguem a janela (3) | alvo do espelho C32 · pixelRatio C33 · GTAO C33 | - |
-| checks de outras features renegociados (4) | free-roam-city C11 → C22 · block-life-extras C25 → C25 · races hold da contagem → C9 e `race.spec` "countdown holds every car" · visual-upgrade C4 → C32 | - |
+| checks de outras features renegociados (6) | free-roam-city C11 → C22 · block-life-extras C25 → C25 · races, hold depois da chegada → C13, C14, C15, C16, e a contagem segue `HOLD_INPUT` → C9 e `race.spec` "countdown holds every car" · races AC 4/C6, chegada do sprint 200 m antes do fim (`SPRINT_RUNOFF`) → `raceRoutes.test.ts` "gates spaced and sized" · races C29 e o caso de portão de `aiDriver.test.ts` → C17 ("reset target is last gate or grid slot") e `aiDriver.test.ts` "stuck detector thresholds and target" · visual-upgrade C4 → C32 | - |
 | Observable (4) | `#error` C11 · `#loading` C12 · miolo vazio C29 · ordem do resultado C18 | - |
 
 - Nenhum check afirma mais do que o caso que a própria prova exercita. C3 mede o efeito no carro; C1 e C2 medem os 5 campos.
@@ -203,3 +203,5 @@ Cost: 3 arquivos novos (`tests/unit/gameLoop.test.ts`, `tests/physics/reset.test
 - **Settled mid-build:** no Chromium headless a troca de `deviceScaleFactor` pelo CDP não dispara o `change` da media query `(resolution: Ndppx)`. O `Game` confere `devicePixelRatio` a cada quadro e chama o mesmo `handleResize`. C33 prova as duas trocas (só o DPR, depois o tamanho)
 - **Settled mid-build:** C22 e C24 ganharam assentamento no setup (1 s de cabeça para baixo antes do R; a altura medida é a do carro, não a do portão)
 - **Settled at verify:** a verificação 1 achou o mutante F1 vivo (`RaceController.beforeStep` sem o `stop` do oponente que terminou). C14 ganha uma segunda prova que passa pelo controlador ("race controller stops an opponent that finished while the race goes on"), e o Test policy ganha a linha da fiação da corrida, que nenhuma linha classificava. O texto da C14 não muda. Decisão delegada pelo usuário
+- **Settled at verify:** a C22 dizia "`lastReset` sobe 1 m" sem tolerância, e a prova (`drive.spec.ts`) aceita ± 0.05 m. O texto passa a "sobe 1 m ± 0.05"; o teste não muda. Decisão delegada pelo usuário
+- **Settled at verify:** a linha "checks de outras features renegociados" do Coverage contava 4 membros, e a `Impact` do plan nomeia 6. Passa a (6), com a races AC 4/C6 (`SPRINT_RUNOFF`) e a races C29 com o caso de portão de `aiDriver.test.ts`, cada um com a prova. Decisão delegada pelo usuário
