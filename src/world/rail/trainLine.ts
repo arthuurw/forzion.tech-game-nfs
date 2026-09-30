@@ -41,6 +41,8 @@ export const FRAME_SPACING = 24;
 export const FRAME_SIDE = 2.6;
 export const FRAME_ROAD_CLEAR = 12;
 export const COLUMN_HALF = 0.25;
+/** folga entre a face da coluna e a borda do asfalto de outra estrada (m) */
+export const COLUMN_ROAD_GAP = 0.5;
 /** ponto de avenida a cada 2 m: 10 pontos = 20 m de canto */
 const CORNER_POINTS = CORNER_RADIUS / 2;
 /** controle da Bézier que aproxima um quarto de círculo: 0.5523 · raio */
@@ -206,9 +208,31 @@ function placeFrames(line: TrainLine, cum: Float32Array, network: RoadNetwork, a
       }
     }
     if (!clear) continue;
-    frames.push({ x: p.x, z: p.z, y, heading: p.heading, halfWidth: under.width / 2 });
+    const frame = { x: p.x, z: p.z, y, heading: p.heading, halfWidth: under.width / 2 };
+    // a coluna tem collider: nenhuma entra no asfalto de outra estrada (play-fixes AC 25)
+    const offRoads = frameColumns(frame).every((c) =>
+      network.roads.every((road) => road === under || distToRoad(road, c.x, c.z) >= road.width / 2 + COLUMN_HALF + COLUMN_ROAD_GAP),
+    );
+    if (!offRoads) continue;
+    frames.push(frame);
   }
   return frames;
+}
+
+/** Distância horizontal de (x, z) à polilinha da estrada, pelos segmentos. */
+function distToRoad(road: Road, x: number, z: number): number {
+  const p = road.points;
+  const n = p.length / 3;
+  let best = Infinity;
+  for (let i = 0; i < (road.closed ? n : n - 1); i++) {
+    const j = (i + 1) % n;
+    const dx = p[j * 3]! - p[i * 3]!;
+    const dz = p[j * 3 + 2]! - p[i * 3 + 2]!;
+    const l2 = dx * dx + dz * dz;
+    const t = l2 > 0 ? Math.min(1, Math.max(0, ((x - p[i * 3]!) * dx + (z - p[i * 3 + 2]!) * dz) / l2)) : 0;
+    best = Math.min(best, Math.hypot(x - p[i * 3]! - dx * t, z - p[i * 3 + 2]! - dz * t));
+  }
+  return best;
 }
 
 /** Posições das duas colunas de um portal: à direita e à esquerda da linha, a `w/2 + FRAME_SIDE`. */

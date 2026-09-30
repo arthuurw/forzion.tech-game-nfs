@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DECK_THICKNESS, buildTrainLine, frameColumns, lineCumulative, type TrainLine } from '../../src/world/rail/trainLine';
+import { COLUMN_HALF, DECK_THICKNESS, buildTrainLine, frameColumns, lineCumulative, type TrainLine } from '../../src/world/rail/trainLine';
 import { generateRoads, type Road, type RoadNetwork } from '../../src/world/roads/RoadGenerator';
 import { generateTerrain } from '../../src/world/terrain/TerrainGenerator';
 
@@ -136,5 +136,39 @@ describe('train line of seed 1337', () => {
       const n = nearestOn(avenues, p.x, p.z);
       expect(p.y - DECK_THICKNESS / 2 - n.y, `point ${i}`).toBeGreaterThanOrEqual(6.5);
     }
+  });
+
+  // play-fixes C31 (AC 25): coluna de portal longe do asfalto de toda estrada que não é a do portal
+  it('portal columns stay off other roads', () => {
+    expect(COLUMN_HALF).toBe(0.25);
+    /** distância horizontal de (x, z) à polilinha da estrada (segmentos, não só os pontos) */
+    const segDist = (road: Road, x: number, z: number) => {
+      const p = road.points;
+      const n = p.length / 3;
+      let best = Infinity;
+      for (let i = 0; i < (road.closed ? n : n - 1); i++) {
+        const j = (i + 1) % n;
+        const dx = p[j * 3]! - p[i * 3]!;
+        const dz = p[j * 3 + 2]! - p[i * 3 + 2]!;
+        const l2 = dx * dx + dz * dz;
+        const t = l2 > 0 ? Math.min(1, Math.max(0, ((x - p[i * 3]!) * dx + (z - p[i * 3 + 2]!) * dz) / l2)) : 0;
+        best = Math.min(best, Math.hypot(x - p[i * 3]! - dx * t, z - p[i * 3 + 2]! - dz * t));
+      }
+      return best;
+    };
+    const avenues = squareAvenues(network);
+    let checked = 0;
+    for (const [i, f] of line.frames.entries()) {
+      const under = nearestOn(avenues, f.x, f.z).road;
+      for (const c of frameColumns(f)) {
+        for (const road of network.roads) {
+          if (road === under) continue;
+          const d = segDist(road, c.x, c.z);
+          expect(d, `frame ${i} column vs road ${road.id}`).toBeGreaterThanOrEqual(road.width / 2 + 0.25 + 0.5);
+          checked++;
+        }
+      }
+    }
+    expect(checked).toBe(line.frames.length * 2 * (network.roads.length - 1));
   });
 });
