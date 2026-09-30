@@ -450,6 +450,11 @@ export class Game {
             grid: r.grid.map((g) => ({ ...g })),
           }));
         },
+        /** traçado da corrida `id` com os pontos em array comum (o Float32Array não atravessa o `evaluate`) */
+        routeOf: (id: string) => {
+          const r = game.race.races.find((x) => x.id === id);
+          return r ? { points: Array.from(r.route.points), closed: r.route.closed, length: r.route.length } : null;
+        },
         get markers() {
           const visible = game.race.objects()[0]!.visible;
           return game.race.races.map((r) => ({ ...r.marker, visible }));

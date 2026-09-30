@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { formatRaceTime } from '../../src/race/raceProgress';
+import { PLAYER_SLOT, type RaceDef } from '../../src/race/raceRoutes';
+import { resetTarget } from '../../src/race/raceSession';
 import { advanceSim, gotoGame, holdKeySim, position, sampleCountdown, speedKmh, waitSimUntil } from './helpers';
 
 // races: provas no browser (checks C9-C14, C16-C19, C21, C24, C25, C27-C32, C34, C36)
@@ -25,6 +27,19 @@ async function nearMarker(page: Page, id: string, back = 0, side = 0): Promise<P
 async function place(page: Page, p: Pose): Promise<void> {
   await page.evaluate((p) => (window as any).__game.car.teleport(p.x, p.y, p.z, p.heading), p);
   await advanceSim(page, 0.1);
+}
+
+/**
+ * Onde o R e a água põem o jogador depois de cruzar o portão `gate` da corrida `id`: o lugar dele
+ * no grid montado atrás do portão (play-fixes AC 12, que renegociou a races C29 e C30).
+ */
+async function playerReset(page: Page, id: string, gate: number): Promise<Pose> {
+  const def = await page.evaluate((id) => {
+    const g = (window as any).__game.race;
+    return { ...g.races.find((x: any) => x.id === id), route: g.routeOf(id) };
+  }, id);
+  def.route.points = Float32Array.from(def.route.points);
+  return resetTarget(def as RaceDef, gate, PLAYER_SLOT);
 }
 
 const race = (page: Page) => page.evaluate(() => (window as any).__game.race);
@@ -322,10 +337,10 @@ test.describe('races', () => {
     await page.keyboard.press('KeyR');
     await advanceSim(page, 0.05);
     p = await position(page);
-    const gate = def.gates[0];
-    expect(Math.hypot(p.x - gate.x, p.z - gate.z)).toBeLessThanOrEqual(0.5);
+    const target = await playerReset(page, 'circuito-centro', 0);
+    expect(Math.hypot(p.x - target.x, p.z - target.z)).toBeLessThanOrEqual(0.5);
     const h = await page.evaluate(() => (window as any).__game.car.heading as number);
-    expect(Math.abs(Math.atan2(Math.sin(h - gate.heading), Math.cos(h - gate.heading)))).toBeLessThanOrEqual((5 * Math.PI) / 180);
+    expect(Math.abs(Math.atan2(Math.sin(h - target.heading), Math.cos(h - target.heading)))).toBeLessThanOrEqual((5 * Math.PI) / 180);
     expect((await race(page)).time).toBeGreaterThanOrEqual(t0);
   });
 
@@ -342,7 +357,8 @@ test.describe('races', () => {
     await page.evaluate((g) => (window as any).__game.car.teleport(g.x + 30, -5, g.z, 0), gate);
     await advanceSim(page, 0.1);
     const p = await position(page);
-    expect(Math.hypot(p.x - gate.x, p.z - gate.z)).toBeLessThanOrEqual(0.5);
+    const target = await playerReset(page, 'circuito-centro', 0);
+    expect(Math.hypot(p.x - target.x, p.z - target.z)).toBeLessThanOrEqual(0.5);
     expect(await page.evaluate(() => (window as any).__game.world.waterResets as number)).toBe(before);
   });
 
