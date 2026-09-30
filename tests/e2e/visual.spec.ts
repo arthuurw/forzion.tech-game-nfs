@@ -578,6 +578,55 @@ test.describe('residuals - reflexo da rua e tijolo', () => {
     expect(s.r.blur).toBeGreaterThan(0);
   });
 
+  // play-fixes C32 (AC 26): o alvo do espelho segue a janela
+  test('reflection target follows a window resize', async ({ page }) => {
+    await page.setViewportSize({ width: 640, height: 360 });
+    await open(page);
+    const read = () => page.evaluate(() => ({ r: (window as any).__game.scene.reflector, w: window.innerWidth, h: window.innerHeight }));
+    const a = await read();
+    expect([a.w, a.h]).toEqual([640, 360]);
+    expect(a.r.size).toEqual([320, 180]);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.waitForFunction(() => (window as any).__game.scene.reflector.size[0] === 640, null, { timeout: 5_000 });
+    const b = await read();
+    expect([b.w, b.h]).toEqual([1280, 720]);
+    expect(b.r.size).toEqual([Math.floor(b.w * 0.5), Math.floor(b.h * 0.5)]);
+    expect(b.r.size).toEqual([640, 360]);
+    expect(b.r.texel[0]).toBeCloseTo(1 / 640, 9);
+    expect(b.r.texel[1]).toBeCloseTo(1 / 360, 9);
+  });
+
+  // play-fixes C33 (AC 27): pixelRatio e GTAO seguem o devicePixelRatio
+  test('pixel ratio and gtao follow the device', async ({ page }) => {
+    await page.setViewportSize({ width: 640, height: 360 });
+    await open(page);
+    const read = () => page.evaluate(() => ({ post: (window as any).__game.post, w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio }));
+    const a = await read();
+    expect(a.dpr).toBe(1);
+    expect(a.post.pixelRatio).toEqual({ renderer: 1, composer: 1 });
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 640, height: 360, deviceScaleFactor: 2, mobile: false });
+    await page.waitForFunction(() => window.devicePixelRatio === 2, null, { timeout: 5_000 });
+    await page.setViewportSize({ width: 800, height: 450 });
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 800, height: 450, deviceScaleFactor: 2, mobile: false });
+    await page.waitForFunction(() => (window as any).__game.post.pixelRatio.renderer === 2 && window.innerWidth === 800, null, { timeout: 5_000 });
+    const b = await read();
+    expect(b.post.pixelRatio).toEqual({ renderer: Math.min(b.dpr, 2), composer: Math.min(b.dpr, 2) });
+    expect(b.post.gtao.width).toBe(Math.floor((b.w * 2) / 2));
+    expect(b.post.gtao.height).toBe(Math.floor((b.h * 2) / 2));
+  });
+
+  // play-fixes C34 (AC 28): sem MSAA no canvas; o SMAA do composer fica
+  test('renderer without msaa keeps smaa', async ({ page }) => {
+    await open(page);
+    const r = await page.evaluate(() => ({
+      antialias: (document.querySelector('#game') as HTMLCanvasElement).getContext('webgl2')!.getContextAttributes()!.antialias,
+      passes: (window as any).__game.composer.passes as string[],
+    }));
+    expect(r.antialias).toBe(false);
+    expect(r.passes).toContain('SMAAPass');
+  });
+
   // C4 (AC 3): o blur não apaga o reflexo - ganho ≥ 0.6 × o do shader de uma amostra
   test('blurred reflection keeps most of its brightness', async ({ page }) => {
     await open(page);

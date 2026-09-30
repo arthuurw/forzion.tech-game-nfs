@@ -146,8 +146,9 @@ export class Game {
     this.onFirstFrame = onFirstFrame;
     this.quality = quality;
 
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // sem MSAA: o composer desenha em alvos próprios e suaviza com o SMAA (play-fixes AC 28)
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+    this.renderer.setPixelRatio(pixelRatio());
     this.renderer.setSize(window.innerWidth, window.innerHeight, false);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.95;
@@ -250,14 +251,13 @@ export class Game {
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.chase.camera));
     if (quality.gtao) {
-      const halfW = Math.floor(window.innerWidth / 2);
-      const halfH = Math.floor(window.innerHeight / 2);
-      const gtao = new GTAOPass(this.scene, this.chase.camera, halfW, halfH);
+      const pr = pixelRatio();
+      const gtao = new GTAOPass(this.scene, this.chase.camera, Math.floor((window.innerWidth * pr) / 2), Math.floor((window.innerHeight * pr) / 2));
       gtao.output = GTAOPass.OUTPUT.Default;
       gtao.blendIntensity = 0.7;
-      // o composer redimensiona todo passo para a tela cheia; o GTAO fica em meia resolução
+      // o composer passa o tamanho do buffer (CSS × pixelRatio) a cada passo; o GTAO fica na metade dele
       const baseSetSize = gtao.setSize.bind(gtao);
-      gtao.setSize = () => baseSetSize(Math.floor(window.innerWidth / 2), Math.floor(window.innerHeight / 2));
+      gtao.setSize = (w: number, h: number) => baseSetSize(Math.floor(w / 2), Math.floor(h / 2));
       this.gtaoClipBox.set(
         new THREE.Vector3(-WORLD_HALF, -10, -WORLD_HALF),
         new THREE.Vector3(WORLD_HALF, 200, WORLD_HALF),
@@ -294,6 +294,7 @@ export class Game {
     this.input.onPress('KeyM', () => this.audio.toggleMute());
 
     window.addEventListener('resize', this.handleResize);
+    this.watchPixelRatio();
 
     this.loop = new GameLoop(this.fixedUpdate, this.render);
   }
@@ -400,14 +401,32 @@ export class Game {
     else this.audio.resume();
   };
 
+  /** Janela ou devicePixelRatio mudaram: buffer, pós, GTAO, câmera e espelho seguem (play-fixes AC 26, AC 27). */
   private readonly handleResize = (): void => {
     const w = window.innerWidth;
     const h = window.innerHeight;
+    const pr = pixelRatio();
+    this.renderer.setPixelRatio(pr);
     this.renderer.setSize(w, h, false);
+    this.composer.setPixelRatio(pr);
     this.composer.setSize(w, h);
     this.grade.setSize(w, h);
     this.chase.resize(w / h);
+    this.city.resizeMirror(w, h);
   };
+
+  /** A troca de devicePixelRatio (monitor, zoom) não dispara `resize`: uma media query por valor. */
+  private watchPixelRatio(): void {
+    const query = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+    query.addEventListener(
+      'change',
+      () => {
+        this.handleResize();
+        this.watchPixelRatio();
+      },
+      { once: true },
+    );
+  }
 
   /** Objeto lido por `window.__game` nos testes Playwright (só em DEV). */
   debugHandle(): unknown {
@@ -628,6 +647,10 @@ export class Game {
             uLift: v3(u.uLift!.value),
             uGain: v3(u.uGain!.value),
           };
+        },
+        /** play-fixes C33: pixelRatio aplicado ao renderer e ao composer */
+        get pixelRatio() {
+          return { renderer: game.renderer.getPixelRatio(), composer: (game.composer as unknown as { _pixelRatio: number })._pixelRatio };
         },
         get gtao() {
           const g = game.gtao;
@@ -2082,4 +2105,9 @@ function slotColors(mesh: THREE.InstancedMesh, spawns: number[]): Array<{ spawn:
     mesh.getColorAt(k, c);
     return { spawn, color: `#${c.getHexString()}` };
   });
+}
+
+/** pixelRatio do render: o da tela, no máximo 2 */
+function pixelRatio(): number {
+  return Math.min(window.devicePixelRatio, 2);
 }

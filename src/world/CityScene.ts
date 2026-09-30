@@ -300,6 +300,18 @@ export class CityScene {
   }
 
   /**
+   * O alvo do espelho segue a janela (play-fixes AC 26): metade da viewport em pixels CSS, sem
+   * devicePixelRatio (door 3 da visual-upgrade), e o `uTexel` da faixa é o inverso do tamanho.
+   */
+  resizeMirror(cssWidth: number, cssHeight: number): void {
+    if (!this.reflector) return;
+    const w = Math.floor(cssWidth * 0.5);
+    const h = Math.floor(cssHeight * 0.5);
+    this.reflector.getRenderTarget().setSize(w, h);
+    ((this.reflector.material as THREE.ShaderMaterial).uniforms.uTexel!.value as THREE.Vector2).set(1 / w, 1 / h);
+  }
+
+  /**
    * Um InstancedMesh por cor da paleta: o emissive (e o respiro) é por material. Cada letreiro é
    * uma caixa de 12 cm com moldura escura; só os tubos do padrão dele brilham, na face da frente
    * e na de trás (night-city AC 16, AC 17).
