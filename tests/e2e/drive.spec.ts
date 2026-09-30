@@ -190,25 +190,29 @@ test.describe('drive', () => {
     expect(live).toEqual(expected);
   });
 
-  // C11 (AC 9)
-  test('reset puts car upright', { tag: '@smoke' }, async ({ page }) => {
-    await page.evaluate(() => (window as any).__game.car.setRotation({ x: 0, y: 0, z: 1, w: 0 }));
+  // C11 (AC 9); play-fixes C22 (AC 16): em pé e com o heading de antes, não mais a rotação identidade
+  test('reset puts car upright and keeps the heading', { tag: '@smoke' }, async ({ page }) => {
+    const h0 = await heading(page);
+    // de cabeça para baixo (rolagem de 180°) com o heading do spawn: yaw(h0) · roll(π)
+    await page.evaluate((h) => (window as any).__game.car.setRotation({ x: Math.sin(h / 2), y: 0, z: Math.cos(h / 2), w: 0 }), h0);
     await advanceSim(page, 0.2);
     const before = await position(page);
+    const hBefore = await heading(page);
     await page.keyboard.press('KeyR');
     await page.waitForFunction(() => (window as any).__game.car.lastReset !== null);
     const snap = await page.evaluate(() => (window as any).__game.car.lastReset);
-    expect(Math.abs(snap.rotation.x)).toBeLessThan(0.01);
-    expect(Math.abs(snap.rotation.y)).toBeLessThan(0.01);
-    expect(Math.abs(snap.rotation.z)).toBeLessThan(0.01);
-    expect(snap.rotation.w).toBeGreaterThan(0.99);
+    const { x, y, z, w } = snap.rotation;
+    // +Y do chassi no mundo e +Z (frente) no plano
+    const upY = 1 - 2 * (x * x + z * z);
+    const hAfter = Math.atan2(2 * (x * z + w * y), 1 - 2 * (x * x + y * y));
+    expect(upY).toBeGreaterThanOrEqual(0.999);
+    expect(Math.abs(Math.atan2(Math.sin(hAfter - hBefore), Math.cos(hAfter - hBefore)))).toBeLessThanOrEqual(0.01);
     expect(snap.position.y).toBeCloseTo(before.y + 1, 1);
     expect(Math.hypot(snap.linvel.x, snap.linvel.y, snap.linvel.z)).toBeLessThan(0.01);
     expect(Math.hypot(snap.angvel.x, snap.angvel.y, snap.angvel.z)).toBeLessThan(0.01);
 
     // e o corpo vivo continua em pé logo depois
     const live = await page.evaluate(() => (window as any).__game.car.rotation);
-    expect(Math.abs(live.z)).toBeLessThan(0.1);
-    expect(live.w).toBeGreaterThan(0.95);
+    expect(1 - 2 * (live.x * live.x + live.z * live.z)).toBeGreaterThan(0.95);
   });
 });

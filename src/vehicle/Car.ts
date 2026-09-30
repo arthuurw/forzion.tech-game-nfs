@@ -314,13 +314,15 @@ export class Car {
     return Math.atan2(f.x, f.z);
   }
 
-  /** Levanta o carro 1 m, em pé, parado (AC 9). */
+  /** Levanta o carro 1 m, em pé, parado, virado para onde já apontava (AC 9; play-fixes AC 16). */
   reset(): void {
     const t = this.body.translation();
+    const h = this.heading();
     this.body.setTranslation({ x: t.x, y: t.y + 1, z: t.z }, true);
-    this.body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+    this.body.setRotation({ x: 0, y: Math.sin(h / 2), z: 0, w: Math.cos(h / 2) }, true);
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    this.rest();
     this.controller.updateVehicle(0); // re-sincroniza as rodas antes do próximo passo
     this.lastReset = {
       position: { ...this.body.translation() },
@@ -340,7 +342,17 @@ export class Car {
     this.body.setRotation({ x: 0, y: Math.sin(heading / 2), z: 0, w: Math.cos(heading / 2) }, true);
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    this.rest();
     this.sync();
+  }
+
+  /** Câmbio, volante e derrapagem como os de um carro novo (play-fixes AC 14): parado, o carro sai em 1ª. */
+  private rest(): void {
+    this.drive = initialDrivetrain(this.spec);
+    for (const i of FRONT) this.controller.setWheelSteering(i, 0);
+    this.lateralSamples.length = 0;
+    this.lateralG = 0;
+    this.skidding = false;
   }
 
   setRotation(q: { x: number; y: number; z: number; w: number }): void {
