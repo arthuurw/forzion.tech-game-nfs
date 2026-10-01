@@ -55,12 +55,17 @@ test.describe('city-terrain - mundo', () => {
     expect(Math.abs(bank.h - 8)).toBeLessThan(2);
     for (const [name, p] of Object.entries(points)) {
       await page.evaluate(({ x, z, h }) => (window as any).__game.car.teleport(x, h + 3, z, 0), p);
-      let min = Infinity;
-      const start = await simTime(page);
-      while ((await simTime(page)) < start + 2) {
-        await advanceSim(page, 0.1);
-        min = Math.min(min, (await position(page)).y);
-      }
+      // 2 s de simulação, a altura mais baixa lida a cada passo
+      const min = await page.evaluate(() => {
+        const g = (window as any).__game;
+        const end = g.simTime + 2;
+        let min = Infinity;
+        while (g.simTime < end && g.running) {
+          g.stepSim(1 / 60);
+          min = Math.min(min, g.car.position.y as number);
+        }
+        return min;
+      });
       const end = await position(page);
       expect(min, `${name} dipped below the terrain`).toBeGreaterThanOrEqual(p.h - 1.2);
       expect(Math.abs(end.y - p.h), `${name} rest height`).toBeLessThanOrEqual(1.2);

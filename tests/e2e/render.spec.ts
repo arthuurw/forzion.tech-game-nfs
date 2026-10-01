@@ -47,7 +47,8 @@ test.describe('render', () => {
     });
     for (const [name, p] of Object.entries(places)) {
       await page.evaluate((p) => (window as any).__game.car.teleport(p.x, p.y + 1.2, p.z, p.h), p);
-      await advanceSim(page, 3);
+      // os chunks entram 1 por quadro: sem os quadros, menos chunks e menos draw calls do que o jogador veria
+      await advanceSim(page, 3, { realtime: true });
       const calls = await page.evaluate(() => (window as any).__game.render.calls as number);
       expect(calls, name).toBeGreaterThan(0);
       expect(calls, name).toBeLessThanOrEqual(220);

@@ -48,7 +48,10 @@ export async function advanceSim(page: Page, seconds: number, opts: SimOptions =
   if (!opts.realtime) {
     const frames = await page.evaluate((s) => {
       const g = (window as any).__game;
+      const target = g.simTime + s;
       g.stepSim(s);
+      // a soma de passos de 1/60 pode ficar uns ulps abaixo do alvo: mais um passo, como o laço de quadros faria
+      while (g.simTime < target && g.running) g.stepSim(1 / 60);
       return g.frames as number;
     }, seconds);
     await frameAfter(page, frames);
@@ -80,8 +83,9 @@ export async function waitSimUntil(page: Page, predicate: string, seconds: numbe
         const g = (window as any).__game;
         // eslint-disable-next-line no-new-func
         const holds = new Function('g', `return (${predicate});`) as (g: unknown) => unknown;
+        const deadline = g.simTime + seconds;
         let ok = Boolean(holds(g));
-        for (let i = 0, n = Math.round(seconds * 60); !ok && i < n && g.running; i++) {
+        while (!ok && g.simTime < deadline && g.running) {
           g.stepSim(1 / 60);
           ok = Boolean(holds(g));
         }

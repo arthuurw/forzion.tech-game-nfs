@@ -99,7 +99,7 @@ test.describe('harness - helpers', () => {
     const t0 = (await clock(page)).simTime;
     expect(await waitSimUntil(page, 'false', 0.5)).toBe(false);
     const dt = (await clock(page)).simTime - t0;
-    expect(dt).toBeGreaterThanOrEqual(0.5 - 1e-9);
+    expect(dt).toBeGreaterThanOrEqual(0.5);
     expect(dt).toBeLessThanOrEqual(0.75);
   });
 });

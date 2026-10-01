@@ -186,7 +186,8 @@ test.describe('block-fill - chão', () => {
       const w = (window as any).__game.world;
       (window as any).__game.car.teleport(x, w.heightAt(x, z) + 1.2, z, 0);
     }, v);
-    await advanceSim(page, 2);
+    // o chunk entra pelo streaming, 1 por quadro
+    await advanceSim(page, 2, { realtime: true });
     const lum = await page.evaluate(({ ix, iz, x, z }) => {
       const it = (window as any).__game.world.interiors;
       return { loaded: it.terrainVertex(ix, iz) !== null, on: it.groundProbe(x, z, { bounce: true }), off: it.groundProbe(x, z, { bounce: false }) };

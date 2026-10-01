@@ -138,8 +138,8 @@ test.describe('visual - S3 movimento', () => {
     });
     const countAt = async (g: { x: number; y: number; z: number; heading: number }) => {
       await teleport(page, g.x, g.y + 1.2, g.z, g.heading);
-      // a câmera de perseguição volta para trás do carro
-      await advanceSim(page, 1.5);
+      // a câmera de perseguição volta para trás do carro, quadro a quadro
+      await advanceSim(page, 1.5, { realtime: true });
       return page.evaluate(() => ({ n: (window as any).__game.render.rainPixels() as number, y: (window as any).__game.car.position.y as number }));
     };
     const lowAt = await countAt(pick.low);
