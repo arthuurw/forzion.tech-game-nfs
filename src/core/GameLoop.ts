@@ -31,6 +31,22 @@ export class GameLoop {
     cancelAnimationFrame(this.handle);
   }
 
+  /**
+   * Avanço rápido só para testes (AD-019): `n` passos fixos seguidos, sem
+   * render entre eles, no mesmo tratamento de erro do quadro.
+   */
+  runSteps(n: number): void {
+    try {
+      for (let i = 0; i < n; i++) this.fixedUpdate(this.stepper.step);
+    } catch (error) {
+      this.stop();
+      this.onError?.(error);
+    }
+    // o tempo gasto aqui já virou passos: o próximo quadro não cobra ele de novo
+    this.last = performance.now();
+    this.stepper.accumulator = 0;
+  }
+
   private readonly frame = (now: number): void => {
     if (!this.running) return;
     const dt = Math.min(0.25, (now - this.last) / 1000);

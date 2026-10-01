@@ -520,6 +520,15 @@ export class Game {
       get frames() {
         return game.frames;
       },
+      /** o laço de quadros ainda roda (para depois de um erro no passo ou no render) */
+      get running() {
+        return game.loop.running;
+      },
+      /** só DEV (e2e-speed, AD-019): roda `seconds` de passos fixos agora, sem render; devolve `simTime` */
+      stepSim: (seconds: number): number => {
+        game.loop.runSteps(Math.round(seconds * 60));
+        return game.simTime;
+      },
       city: {
         seed: game.city.data.seed,
         /** Por malha de fachada, por instância: [y mínimo, y máximo, x, z] da caixa depois da matriz (C33). */

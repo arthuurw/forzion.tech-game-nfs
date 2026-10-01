@@ -53,4 +53,44 @@ describe('GameLoop', () => {
       expect(frame()).toBe(false);
     }
   });
+
+  // e2e-speed C1 (AC 1)
+  it('runSteps calls fixedUpdate n times without render', () => {
+    harness();
+    const dts: number[] = [];
+    let renders = 0;
+    const loop = new GameLoop(
+      (dt) => dts.push(dt),
+      () => renders++,
+    );
+    loop.start();
+    loop.runSteps(5);
+    expect(dts).toEqual([1 / 60, 1 / 60, 1 / 60, 1 / 60, 1 / 60]);
+    expect(renders).toBe(0);
+    loop.runSteps(0);
+    expect(dts).toHaveLength(5);
+    expect(renders).toBe(0);
+  });
+
+  // e2e-speed C2 (AC 2)
+  it('runSteps stops on a throw and reports it once', () => {
+    harness();
+    const boom = new Error('boom in runSteps');
+    let calls = 0;
+    const loop = new GameLoop(
+      () => {
+        calls++;
+        if (calls === 3) throw boom;
+      },
+      () => {},
+    );
+    const reported: unknown[] = [];
+    loop.onError = (e) => reported.push(e);
+    loop.start();
+    expect(loop.running).toBe(true);
+    expect(() => loop.runSteps(5)).not.toThrow();
+    expect(calls).toBe(3);
+    expect(loop.running).toBe(false);
+    expect(reported).toEqual([boom]);
+  });
 });
