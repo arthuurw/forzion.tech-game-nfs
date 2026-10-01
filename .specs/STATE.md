@@ -18,7 +18,7 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
    - 1.7 `block-fill` - miolo das quadras: mapa em zonas, grama nova, luz rebatida, quintais, árvores ao vento, vagalumes, obras com guindaste, pedestres (concluída, verificada round 2)
    - 1.7.1 `residuals` - reflexo da rua sem cintilar, guarda do tijolo, "R" da ré provado no browser, sondas do miolo com uma fonte só, custo da block-fill recontado (concluída, verificada rodada 1)
    - 1.8 `block-life-extras` - vapor de dutos, holofotes para o céu, estacionamentos, gatos, trem elevado; mais a pintura viva dos oponentes e as provas que faltaram na races (concluída, verificada rodada 3)
-   - 1.9 correções da validação de 2026-09-29 (`.specs/audits/2026-09-29-validation.md`), nesta ordem: `test-hardening` (suítes confiáveis, provas que faltam, CI, documento), `play-fixes` (bugs que o jogador vê), `smooth-world` (interpolação, junção do anel, chão caminhável, streaming em fatias), `pre-garage` (orçamento de draw calls, carro trocável e pintura, sondas fora do Game, dispose, bundle). `test-hardening` concluída (verificada rodada 4), `play-fixes` concluída (verificada rodada 2); as outras duas com plano escrito. Antes delas entrou `night-city` (visual da cidade à noite, concluída, verificada rodada 2), e depois delas `car-look`, `speed-feel` e `hud-look`, decisão do usuário em 2026-09-29
+   - 1.9 correções da validação de 2026-09-29 (`.specs/audits/2026-09-29-validation.md`), nesta ordem: `test-hardening` (suítes confiáveis, provas que faltam, CI, documento), `play-fixes` (bugs que o jogador vê), `smooth-world` (interpolação, junção do anel, chão caminhável, streaming em fatias), `pre-garage` (orçamento de draw calls, carro trocável e pintura, sondas fora do Game, dispose, bundle). `test-hardening` concluída (verificada rodada 4), `play-fixes` concluída (verificada rodada 2); as outras duas com plano e checks escritos; antes delas entra `e2e-speed` (suíte e2e mais rápida, plano e checks escritos). Antes delas entrou `night-city` (visual da cidade à noite, concluída, verificada rodada 2), e depois delas `car-look`, `speed-feel` e `hud-look`, decisão do usuário em 2026-09-29
 2. corridas - checkpoints, cronômetro, sprint/circuito, IA oponente por waypoints (`races`: concluída, verificada rodada 1)
 3. garagem + tuning visual - pintura, rodas, vinil, body kit, underglow
 4. tuning de performance - motor, turbo, pneus alterando parâmetros do Rapier
@@ -54,7 +54,7 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 **Feature**: `play-fixes` concluída (Verifier PASS rodada 2, 2026-09-29, 34 checks; a rodada 1 pegou o oponente que terminou com a sessão ainda `racing` sem prova pelo `RaceController` (mutante sobrevivente), as bordas da caixa do carro e do vão do portal sem caso, a tolerância da C22 só no teste e a cobertura dos renegociados com 4 de 6) juntada em `main`, sem push. `night-city` concluída antes (PASS rodada 2)
 **Where**: `main`; `npm test` 249; `npm run test:quick` e `npm run test:e2e:smoke` para iterar
 **In progress**: none
-**Next step**: `smooth-world` (checks escritos, sem commit), depois `pre-garage`, `car-look`, `speed-feel`, `hud-look`
+**Next step**: build da `e2e-speed` (plano, checks e AD-019 prontos; avanço rápido da simulação nos testes no browser, barateia as provas e2e das próximas), depois `smooth-world` e `pre-garage` (checks escritos), `car-look`, `speed-feel`, `hud-look`
 **Blockers**: none
 **Branch**: `main`
 
