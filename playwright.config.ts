@@ -7,7 +7,8 @@ export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 120_000,
   fullyParallel: false,
-  workers: 1,
+  // 2 por padrão (e2e-speed door 2); E2E_WORKERS=1 para rodar ao lado de outra suíte
+  workers: Number(process.env.E2E_WORKERS ?? 2),
   retries: 0,
   use: {
     baseURL: `http://localhost:${PORT}`,
