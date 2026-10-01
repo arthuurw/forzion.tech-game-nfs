@@ -45,7 +45,7 @@ npm run build      # checa os tipos e gera o build de produção em dist/
 npm run preview    # serve o build de produção
 npm test                # testes unitários e de física (vitest)
 npm run test:quick      # os mesmos, sem os testes lentos (segundos, para iterar)
-npm run test:e2e        # testes no navegador (Playwright + Chromium, ~1 h)
+npm run test:e2e        # testes no navegador (Playwright + Chromium, ~25 min)
 npm run test:e2e:smoke  # 2 testes de navegador por arquivo (minutos, para iterar)
 ```
 

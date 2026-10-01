@@ -52,9 +52,9 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 ## Handoff
 
 **Feature**: `play-fixes` concluída (Verifier PASS rodada 2, 2026-09-29, 34 checks; a rodada 1 pegou o oponente que terminou com a sessão ainda `racing` sem prova pelo `RaceController` (mutante sobrevivente), as bordas da caixa do carro e do vão do portal sem caso, a tolerância da C22 só no teste e a cobertura dos renegociados com 4 de 6) juntada em `main`, sem push. `night-city` concluída antes (PASS rodada 2)
-**Where**: `main`; `npm test` 249; `npm run test:quick` e `npm run test:e2e:smoke` para iterar
-**In progress**: none
-**Next step**: build da `e2e-speed` (plano, checks e AD-019 prontos; avanço rápido da simulação nos testes no browser, barateia as provas e2e das próximas), depois `smooth-world` e `pre-garage` (checks escritos), `car-look`, `speed-feel`, `hud-look`
+**Where**: `main`; `npm test` 253; `npm run test:e2e` 172 testes em 24.6 min (2 workers), smoke 22 em 2.4 min; `npm run test:quick` e `npm run test:e2e:smoke` para iterar
+**In progress**: `e2e-speed` construída (13 checks, commits 083a2cc..), aguardando o Verifier
+**Next step**: Verifier da `e2e-speed`; depois `smooth-world` e `pre-garage` (checks escritos), `car-look`, `speed-feel`, `hud-look`
 **Blockers**: none
 **Branch**: `main`
 
