@@ -41,7 +41,7 @@ test.describe('night-city - postes', () => {
     });
     expect(setup).not.toBeNull();
     await page.evaluate((c) => (window as any).__game.car.teleport(c.x, c.y, c.z, c.heading), setup!.car);
-    await advanceSim(page, 1.5);
+    await advanceSim(page, 1.5, { realtime: true });
     const [under, between] = await page.evaluate((pts) => (window as any).__game.render.lumAt(pts), setup!.points);
     expect(under).not.toBeNull();
     expect(between).not.toBeNull();

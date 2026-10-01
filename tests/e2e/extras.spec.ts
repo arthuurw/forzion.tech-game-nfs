@@ -99,7 +99,8 @@ test.describe('block-life-extras - extras do miolo e trem', () => {
       return { i: best, x: v.x - Math.sin(h) * 10, y: v.y + 1.2, z: v.z - Math.cos(h) * 10, h };
     });
     await page.evaluate((t) => (window as any).__game.car.teleport(t.x, t.y, t.z, t.h), target);
-    await advanceSim(page, 2);
+    // a câmera de perseguição alcança o carro teleportado só ao longo dos quadros
+    await advanceSim(page, 2, { realtime: true });
     const r = (await page.evaluate((i) => (window as any).__game.world.extras.steamProbe(i), target.i)) as { over: number; aside: number; onScreen: boolean };
     expect(r.onScreen).toBe(true);
     expect(r.over - r.aside).toBeGreaterThanOrEqual(0.01);

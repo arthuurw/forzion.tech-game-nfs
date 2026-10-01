@@ -350,7 +350,7 @@ test.describe('city-terrain - mundo', () => {
       const g = (window as any).__game;
       g.car.teleport(0, g.world.heightAt(0, -1300) + 1.5, -1300, 0);
     });
-    await advanceSim(page, 3);
+    await advanceSim(page, 3, { realtime: true });
     const r = await page.evaluate(() => ({ chunks: (window as any).__game.world.chunks, p: (window as any).__game.car.position }));
     const dist = (id: number) =>
       Math.hypot(-1536 + 256 + (id % 6) * 512 - r.p.x, -1536 + 256 + Math.floor(id / 6) * 512 - r.p.z);

@@ -38,7 +38,7 @@ test.describe('audio', () => {
   test('throttle raises engine gain', async ({ page }) => {
     await startAudio(page);
     await page.keyboard.down('KeyW');
-    await advanceSim(page, 1);
+    await advanceSim(page, 1, { realtime: true });
     const up = await page.evaluate(() => {
       const a = (window as any).__game.audio;
       return { target: a.gains.engineTarget as number, real: a.params.engineGain as number };
@@ -46,7 +46,7 @@ test.describe('audio', () => {
     expect(up.target).toBeCloseTo(0.12, 6);
     expect(up.real).toBeGreaterThan(0.1);
     await page.keyboard.up('KeyW');
-    await advanceSim(page, 1);
+    await advanceSim(page, 1, { realtime: true });
     const down = await page.evaluate(() => {
       const a = (window as any).__game.audio;
       return { target: a.gains.engineTarget as number, real: a.params.engineGain as number };
@@ -96,7 +96,7 @@ test.describe('audio', () => {
   test('lowpass cutoff follows rpm', async ({ page }) => {
     await startAudio(page);
     await page.keyboard.down('KeyW');
-    await advanceSim(page, 2);
+    await advanceSim(page, 2, { realtime: true });
     const sample = await page.evaluate(() => {
       const g = (window as any).__game;
       return { cutoff: g.audio.cutoffTarget as number, rpm: g.car.rpm as number, firingHz: g.audio.firingHz as number, params: g.audio.params };

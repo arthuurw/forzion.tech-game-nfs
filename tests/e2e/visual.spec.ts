@@ -263,7 +263,8 @@ test.describe('visual - S3 movimento', () => {
     expect(hit.c.impulse).toBeGreaterThanOrEqual(3000);
     expect(hit.n).toBe(40);
     expect(hit.shake).toBeGreaterThan(0);
-    await advanceSim(page, 1);
+    // o shake decai no render, quadro a quadro
+    await advanceSim(page, 1, { realtime: true });
     expect(await page.evaluate(() => (window as any).__game.camera.shake)).toBeLessThan(0.01);
     // o carro não atravessou o prédio (free-roam-city C9 segue valendo)
     const p = await position(page);
@@ -277,7 +278,7 @@ test.describe('visual - S4 câmera', () => {
     await open(page);
     expect(await page.evaluate(() => (window as any).__game.camera.fov)).toBeCloseTo(62, 2);
     await page.keyboard.down('KeyW');
-    await advanceSim(page, 3);
+    await advanceSim(page, 3, { realtime: true });
     const s = await page.evaluate(() => ({
       fov: (window as any).__game.camera.fov as number,
       kmh: (window as any).__game.car.speedKmh as number,
@@ -297,7 +298,7 @@ test.describe('visual - S4 câmera (rodada 2)', () => {
     await page.evaluate(() => (window as any).__game.car.setForwardSpeed(15));
     await page.keyboard.down('KeyW');
     await page.keyboard.down('KeyA');
-    await advanceSim(page, 1);
+    await advanceSim(page, 1, { realtime: true });
     const s = await page.evaluate(() => {
       const g = (window as any).__game;
       return {
@@ -329,7 +330,7 @@ test.describe('visual - S4 câmera (rodada 2)', () => {
     await page.evaluate(() => (window as any).__game.car.setForwardSpeed(60 / 3.6));
     await page.keyboard.down('KeyW');
     await page.keyboard.down('KeyA');
-    await advanceSim(page, 2);
+    await advanceSim(page, 2, { realtime: true });
     const s = await page.evaluate(() => {
       const g = (window as any).__game;
       return {
@@ -545,7 +546,7 @@ test.describe('residuals - reflexo da rua e tijolo', () => {
   // C1 (AC 1): com o espelho ligado, a câmera andando quase não soma cintilação ao "sem espelho"
   test('street reflection stays stable while the camera moves', async ({ page }) => {
     await open(page);
-    await advanceSim(page, 1);
+    await advanceSim(page, 1, { realtime: true });
     const moving = await shimmer(page, 0.05, { mirror: true });
     const noMirror = await shimmer(page, 0.05, { mirror: false });
     const still = await shimmer(page, 0, { mirror: true });
@@ -556,7 +557,7 @@ test.describe('residuals - reflexo da rua e tijolo', () => {
   // C2 (AC 1): sem o blur (shader de uma amostra), a mesma sonda enxerga o espelho cintilando
   test('probe detects reflection shimmer without blur', async ({ page }) => {
     await open(page);
-    await advanceSim(page, 1);
+    await advanceSim(page, 1, { realtime: true });
     const sharp = await shimmer(page, 0.05, { mirror: true, mirrorBlur: false });
     const noMirror = await shimmer(page, 0.05, { mirror: false });
     expect(sharp - noMirror).toBeGreaterThanOrEqual(0.003);

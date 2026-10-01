@@ -199,31 +199,24 @@ test.describe('block-fill - chão', () => {
 
   // C14 (AC 13) - parte browser
   test('ground light changes over time', async ({ page }) => {
-    // 60 s simulados no SwiftShader levam minutos de relógio
-    test.setTimeout(600_000);
     await gotoGame(page);
     const v = await downtownProbeVertex(page);
-    // o browser acompanha o nível que o shader recebe a cada quadro, de t0 até t0 + 60 s
-    const r = await page.evaluate(
-      (zone) =>
-        new Promise<{ first: number; last: number; changed: boolean; t0: number; t1: number }>((resolve) => {
-          const g = (window as any).__game;
-          const it = g.world.interiors;
-          const t0 = g.simTime;
-          const first = it.zoneLevel(zone);
-          let changed = false;
-          const tick = () => {
-            const level = it.zoneLevel(zone);
-            if (level !== first) changed = true;
-            if (g.simTime >= t0 + 60) resolve({ first, last: level, changed, t0, t1: g.simTime });
-            else requestAnimationFrame(tick);
-          };
-          requestAnimationFrame(tick);
-        }),
-      v.zone,
-    );
-    expect(r.t1 - r.t0).toBeGreaterThanOrEqual(60);
-    expect(r.changed || r.last !== r.first).toBe(true);
+    // o nível que o shader recebe é escrito no render: lido depois do quadro de cada segundo, de t0 até t0 + 60 s
+    const sample = () =>
+      page.evaluate((zone) => {
+        const g = (window as any).__game;
+        return { level: g.world.interiors.zoneLevel(zone) as number, t: g.simTime as number };
+      }, v.zone);
+    const start = await sample();
+    let last = start;
+    let changed = false;
+    for (let i = 0; i < 60; i++) {
+      await advanceSim(page, 1);
+      last = await sample();
+      if (last.level !== start.level) changed = true;
+    }
+    expect(last.t - start.t).toBeGreaterThanOrEqual(60);
+    expect(changed).toBe(true);
   });
 });
 

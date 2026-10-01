@@ -1,10 +1,12 @@
 import type { Page } from '@playwright/test';
 
 /**
- * Os checks falam em segundos de jogo. Em headless (SwiftShader) o frame rate
- * é baixo e o acumulador de física limita 5 passos por frame, então 1 s de
- * relógio pode ser bem menos de 1 s simulado. Por isso todo "segurar por N s"
- * espera `__game.simTime` avançar N segundos, com timeout de relógio folgado.
+ * Os checks falam em segundos de jogo. Em headless (SwiftShader) o quadro custa ~150 ms e o
+ * acumulador limita 5 passos por quadro, então a física anda a ~0.25 do tempo real. Por isso as
+ * esperas de simulação vão, por padrão, pelo avanço rápido (`__game.stepSim`, AD-019): os passos
+ * rodam na hora, sem render entre eles, e o helper espera 1 quadro para HUD, malhas e câmera lerem
+ * o último passo. Prova que mede algo atualizado só no render ao longo do tempo (suavização da
+ * câmera, áudio, amostragem por quadro) passa `{ realtime: true }` e espera o laço de quadros.
  */
 const SIM_TIMEOUT_MS = 90_000;
 
@@ -24,8 +26,34 @@ export function simTime(page: Page): Promise<number> {
   return page.evaluate(() => (window as any).__game.simTime as number);
 }
 
-/** Espera o relógio da física avançar `seconds`. */
-export async function advanceSim(page: Page, seconds: number): Promise<void> {
+export interface SimOptions {
+  /** espera o laço de quadros andar a simulação, em vez do avanço rápido */
+  realtime?: boolean;
+}
+
+/** Espera o próximo quadro depois de `frames` (ou o laço parado por erro). */
+async function frameAfter(page: Page, frames: number): Promise<void> {
+  await page.waitForFunction(
+    (frames) => {
+      const g = (window as any).__game;
+      return g.frames > frames || !g.running;
+    },
+    frames,
+    { timeout: SIM_TIMEOUT_MS },
+  );
+}
+
+/** Avança `seconds` de simulação: na hora pelo `stepSim` e 1 quadro, ou pelo laço com `realtime`. */
+export async function advanceSim(page: Page, seconds: number, opts: SimOptions = {}): Promise<void> {
+  if (!opts.realtime) {
+    const frames = await page.evaluate((s) => {
+      const g = (window as any).__game;
+      g.stepSim(s);
+      return g.frames as number;
+    }, seconds);
+    await frameAfter(page, frames);
+    return;
+  }
   const start = await simTime(page);
   await page.waitForFunction(
     (target) => (window as any).__game.simTime >= target,
@@ -35,14 +63,35 @@ export async function advanceSim(page: Page, seconds: number): Promise<void> {
 }
 
 /** Segura a tecla por `seconds` de simulação. */
-export async function holdKeySim(page: Page, code: string, seconds: number): Promise<void> {
+export async function holdKeySim(page: Page, code: string, seconds: number, opts: SimOptions = {}): Promise<void> {
   await page.keyboard.down(code);
-  await advanceSim(page, seconds);
+  await advanceSim(page, seconds, opts);
   await page.keyboard.up(code);
 }
 
-/** Espera até `predicate` valer ou `seconds` de simulação passarem; devolve se valeu. */
-export async function waitSimUntil(page: Page, predicate: string, seconds: number): Promise<boolean> {
+/**
+ * Espera até `predicate` valer ou `seconds` de simulação passarem; devolve se valeu. Sem
+ * `realtime`, anda um passo por vez pelo `stepSim` e para no primeiro em que o predicado vale.
+ */
+export async function waitSimUntil(page: Page, predicate: string, seconds: number, opts: SimOptions = {}): Promise<boolean> {
+  if (!opts.realtime) {
+    const r = await page.evaluate(
+      ({ predicate, seconds }) => {
+        const g = (window as any).__game;
+        // eslint-disable-next-line no-new-func
+        const holds = new Function('g', `return (${predicate});`) as (g: unknown) => unknown;
+        let ok = Boolean(holds(g));
+        for (let i = 0, n = Math.round(seconds * 60); !ok && i < n && g.running; i++) {
+          g.stepSim(1 / 60);
+          ok = Boolean(holds(g));
+        }
+        return ok;
+      },
+      { predicate, seconds },
+    );
+    // sem esperar quadro: um quadro de ~150 ms traria até 5 passos depois do que fez o predicado valer
+    return r;
+  }
   const start = await simTime(page);
   try {
     await page.waitForFunction(
