@@ -9,10 +9,10 @@
 Corroborated across multiple features. Safe to apply as guidance.
 
 ### L-003 - Declare every tolerance in the check text itself, never only in the test body
-- signal: `spec_precision_gap` · recurrence: 2 feature(s) · scope: `checks` · harmful: 0
-- features: free-roam-city, play-fixes
-- evidence: verification.md round 1 finding C26 - tests/e2e/hud.spec.ts:17 (tolerancia so no teste) (checks) (+1 more)
-- last seen: 2026-09-30T00:59:44Z
+- signal: `spec_precision_gap` · recurrence: 3 feature(s) · scope: `checks` · harmful: 0
+- features: free-roam-city, play-fixes, e2e-speed
+- evidence: verification.md round 1 finding C26 - tests/e2e/hud.spec.ts:17 (tolerancia so no teste) (checks) (+2 more)
+- last seen: 2026-10-01T17:13:40Z
 
 ### L-012 - A force defined as against the direction of motion owes a case in each direction; a single-direction case cannot tell a sign from a constant.
 - signal: `surviving_mutant` · recurrence: 2 feature(s) · scope: `vehicle` · harmful: 0
@@ -197,6 +197,18 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - features: play-fixes
 - evidence: tests/e2e/race.spec.ts:304,333 (races C29, C30) (race)
 - last seen: 2026-09-30T17:25:57Z
+
+### L-032 - A sim clock advanced by summed fixed steps lands a few ulps short; assert sim durations with a tolerance or as a step count, never an exact >= on the seconds.
+- signal: `ac_gap` · recurrence: 1 feature(s) · scope: `tests/e2e` · harmful: 0
+- features: e2e-speed
+- evidence: C11 - tests/e2e/extras.spec.ts:182 (tests/e2e)
+- last seen: 2026-10-01T17:13:40Z
+
+### L-033 - When sim waits move off the frame loop, sweep every test that reads render-smoothed state after a teleport or input, not only a hand-picked list; each such wait needs real frames.
+- signal: `ac_gap` · recurrence: 1 feature(s) · scope: `tests/e2e` · harmful: 0
+- features: e2e-speed
+- evidence: C9 set - tests/e2e/visual.spec.ts:142 (tests/e2e)
+- last seen: 2026-10-01T17:13:40Z
 
 ## Quarantined (failed when applied - ignore)
 
