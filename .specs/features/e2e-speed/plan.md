@@ -16,7 +16,7 @@ espera custa ~4 s de relógio, porque a física só anda dentro do quadro e o qu
 3 workers em paralelo deu só ~1.4× (a CPU já está ocupada pelo SwiftShader) e 7 falhas de prazo
 de relógio.
 
-Quando isto sair: a suíte completa roda em até 25 min e o gate completo volta a caber numa
+Quando isto sair: a suíte completa roda em até 30 min e o gate completo volta a caber numa
 feature.
 
 ## Flow
@@ -98,7 +98,7 @@ As esperas de simulação dos testes deixam de depender do quadro, com saída ex
 **Acceptance Criteria**
 
 10. The `playwright.config.ts` SHALL ler `workers` de `E2E_WORKERS`, com padrão 2
-11. WHEN `npm run test:e2e` roda numa máquina ociosa THEN a suíte SHALL terminar com todos os testes passando em até 25 min
+11. WHEN `npm run test:e2e` roda numa máquina ociosa THEN a suíte SHALL terminar com todos os testes passando em até 30 min
 12. WHEN `npm run test:e2e:smoke` roda numa máquina ociosa THEN a suíte SHALL terminar com todos os testes passando em até 3 min
 13. The `AGENTS.md` SHALL dar os tempos medidos da suíte completa e do smoke e citar `E2E_WORKERS`
 
@@ -117,7 +117,7 @@ As esperas de simulação dos testes deixam de depender do quadro, com saída ex
 | Assumption | Chosen default | Rationale | Confirmed? |
 | --- | --- | --- | --- |
 | Fazer o avanço rápido e depois paralelizar | as duas coisas nesta feature | o usuário aprovou o plano de 2026-09-30 ("siga") | y |
-| Meta de tempo | 25 min completo, 3 min smoke | estimativa de 60 → 15-20 min dada ao usuário, com folga para a máquina | n |
+| Meta de tempo | 30 min completo, 3 min smoke | renegociada no build (2026-10-01): medido 24.6 e 26.1 min com 2 workers; o custo fixo por teste (boot, esperas de quadro do setup, quadro de 150-400 ms) domina, e 25 min ficava na variação da máquina | y - user raised 25 → 30 min |
 | Qual prova fica em tempo real | decidida teste a teste no build, pelo critério do AC 9 | é posição de código, reversível, e o AC 9 dá a regra | y - user delegated |
 
 **Open questions:** none - all resolved or logged above.

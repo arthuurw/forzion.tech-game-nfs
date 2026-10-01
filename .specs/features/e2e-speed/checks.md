@@ -43,7 +43,7 @@ Proof: `npx playwright test tests/e2e/visual.spec.ts tests/e2e/audio.spec.ts tes
 **C10** - `playwright.config.ts` tem `workers: Number(process.env.E2E_WORKERS ?? 2)`; `npx playwright test --list` com `E2E_WORKERS=1` e sem a variável lista os mesmos testes, e o config importado com a variável ausente dá `workers` = 2 e com `E2E_WORKERS=1` dá 1 (AC 10)
 Proof: `npx vitest run tests/unit/e2eConfig.test.ts -t "workers come from E2E_WORKERS with default 2"`
 
-**C11** - `npm run test:e2e` numa máquina ociosa termina com exit 0, 0 falhas, todos os testes listados rodando, em até 25 min de relógio (AC 11)
+**C11** - `npm run test:e2e` numa máquina ociosa termina com exit 0, 0 falhas, todos os testes listados rodando, em até 30 min de relógio (AC 11; renegociado de 25 min pelo usuário em 2026-10-01)
 Proof: `npm run test:e2e` com `E2E_PORT` livre, tempo pelo `Measure-Command` ou pelo total que o Playwright imprime
 
 **C12** - `npm run test:e2e:smoke` numa máquina ociosa termina com exit 0 e 0 falhas em até 3 min (AC 12)
