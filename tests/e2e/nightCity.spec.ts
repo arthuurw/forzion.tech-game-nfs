@@ -128,7 +128,7 @@ test.describe('night-city - asfalto molhado', () => {
   // C9 (AC 6)
   test('reflections are vertical streaks', async ({ page }) => {
     await open(page);
-    await advanceSim(page, 1);
+    await advanceSim(page, 1, { realtime: true });
     const s = await streak(page, 20);
     expect(s.w).toBeGreaterThan(0);
     expect(s.h).toBeGreaterThanOrEqual(3 * s.w);
@@ -137,7 +137,7 @@ test.describe('night-city - asfalto molhado', () => {
   // C10 (AC 7): a sonda enxerga o reflexo nítido
   test('probe sees a sharp reflection without streaks', async ({ page }) => {
     await open(page);
-    await advanceSim(page, 1);
+    await advanceSim(page, 1, { realtime: true });
     const s = await streak(page, 20, { mirrorBlur: false });
     expect(s.w).toBeGreaterThan(0);
     expect(s.h).toBeLessThanOrEqual(1.5 * s.w);
@@ -146,7 +146,7 @@ test.describe('night-city - asfalto molhado', () => {
   // C11 (AC 8)
   test('streaks grow with distance', async ({ page }) => {
     await open(page);
-    await advanceSim(page, 1);
+    await advanceSim(page, 1, { realtime: true });
     const near = await streak(page, 20);
     const far = await streak(page, 60);
     expect(near.srcH).toBeGreaterThan(0);
@@ -159,7 +159,7 @@ test.describe('night-city - céu', () => {
   // C14 (AC 11)
   test('horizon glows above the skyline', async ({ page }) => {
     await open(page);
-    await advanceSim(page, 1);
+    await advanceSim(page, 1, { realtime: true });
     const p = await page.evaluate(() => (window as any).__game.render.skyProfile() as { top: number; band: number });
     expect(p.band).toBeGreaterThanOrEqual(1.5 * p.top);
   });
@@ -176,7 +176,7 @@ test.describe('night-city - céu', () => {
   // C17 (AC 14, door 3)
   test('sky dome follows the camera outside the mirror', async ({ page }) => {
     await open(page);
-    await advanceSim(page, 0.5);
+    await advanceSim(page, 0.5, { realtime: true });
     const s = await page.evaluate(() => (window as any).__game.world.sky);
     expect(s.inScene).toBe(true);
     for (const k of ['x', 'y', 'z'] as const) expect(Math.abs(s.position[k] - s.camera[k]), k).toBeLessThanOrEqual(0.001);

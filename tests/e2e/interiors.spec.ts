@@ -434,7 +434,7 @@ test.describe('block-fill - obras', () => {
   // C29 (AC 27) - parte browser
   test('construction floodlight lights the ground', async ({ page }) => {
     await gotoGame(page);
-    await advanceSim(page, 1);
+    await advanceSim(page, 1, { realtime: true });
     const r = await page.evaluate(() => (window as any).__game.world.interiors.beamProbe(0));
     console.log(`C29 beam ${r.beam.toFixed(4)} outside ${r.outside.toFixed(4)}`);
     expect(r.outside).toBeGreaterThan(0);

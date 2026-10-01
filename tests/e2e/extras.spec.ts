@@ -131,7 +131,7 @@ test.describe('block-life-extras - extras do miolo e trem', () => {
 
   // C22 (AC 22)
   test('a searchlight beam is brighter than the sky', async ({ page }) => {
-    await advanceSim(page, 0.5);
+    await advanceSim(page, 0.5, { realtime: true });
     // o facho clareia o próprio ponto: com os fachos escondidos o mesmo ponto lê pelo menos 0.02 a menos
     let seen = 0;
     for (let i = 0; i < 4; i++) {

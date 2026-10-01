@@ -377,7 +377,7 @@ test.describe('visual - S4 câmera (rodada 2)', () => {
   // C41 (AC 27): janelas acesas não cintilam com a câmera andando (reflexo da rua oculto: mede só as fachadas)
   test('lit windows stay stable while the camera moves', async ({ page }) => {
     await open(page);
-    await advanceSim(page, 1);
+    await advanceSim(page, 1, { realtime: true });
     const moving = await page.evaluate(() => (window as any).__game.render.shimmer(0.05, { mirror: false }) as number);
     const still = await page.evaluate(() => (window as any).__game.render.shimmer(0, { mirror: false }) as number);
     expect(still).toBe(0);
@@ -499,7 +499,7 @@ test.describe('facade-glint', () => {
   // C1: com farol e antialiasing, o especular da fachada não acrescenta cintilação em nenhum dos 4 tipos
   test('headlight adds no facade glint', async ({ page }) => {
     await open(page);
-    await advanceSim(page, 1);
+    await advanceSim(page, 1, { realtime: true });
     for (const type of FACADE_TYPES) {
       const spec = await headlightShimmer(page, type, { headlight: true, specularAA: true, specular: true });
       const flat = await headlightShimmer(page, type, { headlight: true, specularAA: true, specular: false });
@@ -510,7 +510,7 @@ test.describe('facade-glint', () => {
   // C2: sem o antialiasing e com os materiais de antes, a sonda enxerga o brilho em pelo menos um tipo
   test('probe detects glint without specular antialiasing', async ({ page }) => {
     await open(page);
-    await advanceSim(page, 1);
+    await advanceSim(page, 1, { realtime: true });
     const diffs: number[] = [];
     for (const type of FACADE_TYPES) {
       const before = { headlight: true, specularAA: false, legacyMaterials: true };
@@ -524,7 +524,7 @@ test.describe('facade-glint', () => {
   // C3: com antialiasing, o farol continua iluminando a fachada
   test('headlight still lights the facade', async ({ page }) => {
     await open(page);
-    await advanceSim(page, 1);
+    await advanceSim(page, 1, { realtime: true });
     for (const type of FACADE_TYPES) {
       const on = await headlightShimmer(page, type, { headlight: true, specularAA: true });
       const off = await headlightShimmer(page, type, { headlight: false, specularAA: true });
@@ -633,7 +633,7 @@ test.describe('residuals - reflexo da rua e tijolo', () => {
   // C4 (AC 3): o blur não apaga o reflexo - ganho ≥ 0.6 × o do shader de uma amostra
   test('blurred reflection keeps most of its brightness', async ({ page }) => {
     await open(page);
-    await advanceSim(page, 1);
+    await advanceSim(page, 1, { realtime: true });
     const blurred = await page.evaluate(() => (window as any).__game.render.mirrorGain({}) as number);
     const sharp = await page.evaluate(() => (window as any).__game.render.mirrorGain({ mirrorBlur: false }) as number);
     expect(sharp).toBeGreaterThan(0);
@@ -643,7 +643,7 @@ test.describe('residuals - reflexo da rua e tijolo', () => {
   // C5 (AC 4): guarda de regressão do tijolo (tipo 2) na C1 da facade-glint
   test('brick facade glint has margin', async ({ page }) => {
     await open(page);
-    await advanceSim(page, 1);
+    await advanceSim(page, 1, { realtime: true });
     const probe = (specular: boolean) =>
       page.evaluate(
         (specular) =>
