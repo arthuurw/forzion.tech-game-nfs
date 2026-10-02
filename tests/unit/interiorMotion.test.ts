@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findBlockInteriors } from '../../src/world/interiors/BlockInteriors';
+import { findBlockInteriors, walkable } from '../../src/world/interiors/BlockInteriors';
 import { placeInteriorProps } from '../../src/world/interiors/InteriorProps';
 import {
   beaconOn,
@@ -361,6 +361,38 @@ describe('interior motion', () => {
       }
     }
     expect(segments).toBeGreaterThan(20);
+  });
+
+  // smooth-world C13 (AC 9): todo trecho sorteado é chão caminhável a cada 0.25 m, das pontas inclusive
+  it('walker segments stay on walkable ground', () => {
+    const car = { x: 99_999, z: 99_999 };
+    const picks = Array.from({ length: 200 }, (_, i) => Math.floor((i * props.walkers.length) / 200));
+    let segments = 0;
+    let samples = 0;
+    for (const idx of picks) {
+      const w = createWalker(props.walkers[idx]!, idx);
+      let key = '';
+      for (let step = 0; step < 60 * 120 && segments < 2000; step++) {
+        stepWalker(w, DT, car, interiors);
+        const now = `${w.fromX},${w.fromZ},${w.toX},${w.toZ}`;
+        if (now === key) continue;
+        key = now;
+        if (w.fromX === w.toX && w.fromZ === w.toZ) continue;
+        segments++;
+        const len = Math.hypot(w.toX - w.fromX, w.toZ - w.fromZ);
+        const n = Math.ceil(len / 0.25);
+        for (let k = 0; k <= n; k++) {
+          const x = w.fromX + ((w.toX - w.fromX) * k) / n;
+          const z = w.fromZ + ((w.toZ - w.fromZ) * k) / n;
+          samples++;
+          if (!walkable(interiors, w.zoneId, x, z)) expect.fail(`pedestre ${idx}, trecho ${segments}: (${x.toFixed(2)}, ${z.toFixed(2)}) não é caminhável`);
+        }
+        if (segments >= 2000) break;
+      }
+      if (segments >= 2000) break;
+    }
+    expect(segments).toBe(2000);
+    expect(samples).toBeGreaterThan(2000 * 16);
   });
 
   // C33 (AC 31)

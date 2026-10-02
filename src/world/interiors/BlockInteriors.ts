@@ -31,6 +31,8 @@ export const EDGE_MARGIN = 8;
 export const MIN_ZONE_CELLS = 25;
 /** teto de `facadeDist` (m) */
 export const FACADE_DIST_MAX = 60;
+/** folga de quem anda no miolo além de `LOT_MARGIN` (m): ≥ o raio do corpo do pedestre, 0.22 (smooth-world door 2) */
+export const WALK_CLEARANCE = 0.25;
 
 export type ZoneKind = 'downtown' | 'outer';
 
@@ -197,4 +199,28 @@ export function nearestVertex(bi: Pick<BlockInteriors, 'spacing' | 'origin' | 's
 /** Zona do vértice mais próximo de (x, z), ou −1. */
 export function zoneAt(bi: BlockInteriors, x: number, z: number): number {
   return bi.zoneOf[nearestVertex(bi, x, z)]!;
+}
+
+/**
+ * Chão caminhável (smooth-world door 2, AD-021), para o que se move pelo miolo: verdadeiro só se
+ * os 4 vértices da célula de 4 m que contém (x, z) (floor, não o vértice mais perto) são da zona
+ * `zoneId` e a `facadeDist` interpolada (bilinear) no ponto é ≥ `LOT_MARGIN + WALK_CLEARANCE`.
+ * Fora da grade é falso. O conteúdo parado continua com `zoneAt`.
+ */
+export function walkable(bi: BlockInteriors, zoneId: number, x: number, z: number): boolean {
+  if (zoneId < 0) return false;
+  const n = bi.size;
+  const fx = (x - bi.origin) / bi.spacing;
+  const fz = (z - bi.origin) / bi.spacing;
+  const ix = Math.floor(fx);
+  const iz = Math.floor(fz);
+  if (!(ix >= 0 && iz >= 0 && ix < n - 1 && iz < n - 1)) return false;
+  const k = iz * n + ix;
+  const zo = bi.zoneOf;
+  if (zo[k] !== zoneId || zo[k + 1] !== zoneId || zo[k + n] !== zoneId || zo[k + n + 1] !== zoneId) return false;
+  const tx = fx - ix;
+  const tz = fz - iz;
+  const f = bi.facadeDist;
+  const d = (f[k]! * (1 - tx) + f[k + 1]! * tx) * (1 - tz) + (f[k + n]! * (1 - tx) + f[k + n + 1]! * tx) * tz;
+  return d >= LOT_MARGIN + WALK_CLEARANCE;
 }

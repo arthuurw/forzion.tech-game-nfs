@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { findBlockInteriors } from '../../src/world/interiors/BlockInteriors';
+import { LOT_MARGIN, WALK_CLEARANCE, findBlockInteriors, walkable, type BlockInteriors } from '../../src/world/interiors/BlockInteriors';
 import { placeInteriorProps } from '../../src/world/interiors/InteriorProps';
 import { generateLots, type Lot } from '../../src/world/lots/LotGenerator';
 import { generateRoads, type Road, type RoadNetwork } from '../../src/world/roads/RoadGenerator';
@@ -115,6 +115,58 @@ function lotGrid(lots: Lot[], reach: number) {
 }
 
 describe('block interiors', () => {
+  // smooth-world C10 (door 2): célula inteira (floor) na zona, folga da fachada interpolada, dentro da grade
+  it('walkable needs the whole cell and the facade gap', () => {
+    expect(WALK_CLEARANCE).toBe(0.25);
+    const limit = LOT_MARGIN + 0.25;
+    // grade 4 × 4 vértices a cada 4 m a partir de (0, 0); zona 0 em tudo, fachada a 3 m de todo vértice
+    const grid = (patch: (zoneOf: Int32Array, facade: Float32Array) => void = () => {}): BlockInteriors => {
+      const zoneOf = new Int32Array(16).fill(0);
+      const facadeDist = new Float32Array(16).fill(3);
+      patch(zoneOf, facadeDist);
+      return { spacing: 4, origin: 0, size: 4, zoneOf, facadeDist, zones: [] };
+    };
+    const v = (ix: number, iz: number) => iz * 4 + ix;
+    // célula (1, 1): vértices (1,1) (2,1) (1,2) (2,2); o ponto (6, 6) é o meio dela
+    const rows: Array<[string, BlockInteriors, number, number, boolean]> = [
+      ['célula inteira na zona e fachada longe', grid(), 6, 6, true],
+      ['vértice (1,1) fora da zona', grid((z) => (z[v(1, 1)] = -1)), 6, 6, false],
+      ['vértice (2,1) de outra zona', grid((z) => (z[v(2, 1)] = 1)), 6, 6, false],
+      ['vértice (1,2) fora da zona', grid((z) => (z[v(1, 2)] = -1)), 6, 6, false],
+      ['vértice (2,2) fora da zona', grid((z) => (z[v(2, 2)] = -1)), 6, 6, false],
+      // floor, não o vértice mais perto: a 0.1 m do vértice (2, 2), que é da célula seguinte e está fora
+      ['vértice mais perto fora, célula do floor inteira', grid((z) => (z[v(3, 2)] = -1)), 7.9, 6, true],
+      ['passou para a célula com o vértice fora', grid((z) => (z[v(3, 2)] = -1)), 8.1, 6, false],
+      // fachada interpolada no meio da célula = média dos 4 vértices; os vértices sozinhos passariam
+      [
+        'fachada interpolada 0.01 m abaixo do limite',
+        grid((_, f) => [v(1, 1), v(2, 1), v(1, 2), v(2, 2)].forEach((k, i) => (f[k] = i % 2 ? limit + 0.49 : limit + 0.49 - 1))),
+        6,
+        6,
+        false,
+      ],
+      [
+        'fachada interpolada no limite',
+        grid((_, f) => [v(1, 1), v(2, 1), v(1, 2), v(2, 2)].forEach((k, i) => (f[k] = i % 2 ? limit + 0.5 : limit - 0.5))),
+        6,
+        6,
+        true,
+      ],
+      ['fora da grade, x < origem', grid(), -0.1, 6, false],
+      ['fora da grade, z < origem', grid(), 6, -0.1, false],
+      ['fora da grade, x na última linha', grid(), 12, 6, false],
+      ['fora da grade, z além do fim', grid(), 6, 12.5, false],
+    ];
+    for (const [name, bi, x, z, want] of rows) expect(walkable(bi, 0, x, z), name).toBe(want);
+    // a fachada do caso "0.01 abaixo" interpola mesmo a 1.24 e a do "no limite" a 1.25
+    const below = rows[7]![1];
+    const at = rows[8]![1];
+    const mean = (bi: BlockInteriors) => [v(1, 1), v(2, 1), v(1, 2), v(2, 2)].reduce((s, k) => s + bi.facadeDist[k]!, 0) / 4;
+    expect(mean(below)).toBeCloseTo(limit - 0.01, 6);
+    expect(mean(at)).toBeCloseTo(limit, 6);
+    expect([v(1, 1), v(2, 1), v(1, 2), v(2, 2)].filter((k) => below.facadeDist[k]! >= limit)).toHaveLength(2);
+  });
+
   // C1 (AC 1, door 1)
   it('interior vertex rule', { timeout: 60_000 }, () => {
     // estrada avenue (w = 16) no eixo z e lote 10 × 10 sem rotação em (40, 0). A grade de 4 m é

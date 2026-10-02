@@ -9,7 +9,7 @@
  */
 import { mulberry32 } from '../CityGenerator';
 import { valueNoise } from '../terrain/noise';
-import { nearestVertex, type BlockInteriors, type InteriorZone } from './BlockInteriors';
+import { nearestVertex, walkable, type BlockInteriors, type InteriorZone } from './BlockInteriors';
 import type { WalkerSpawn, CatSpawn } from './InteriorProps';
 import { lineAt, type TrainLine } from '../rail/trainLine';
 
@@ -388,17 +388,17 @@ function nextRand(w: Walker): number {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
-function inZone(bi: BlockInteriors, zoneId: number, x: number, z: number): boolean {
-  return bi.zoneOf[nearestVertex(bi, x, z)] === zoneId;
-}
-
-/** Todo ponto do trecho, a cada 0.25 m (inclui os pontos a cada 1 m), cai num vértice da zona. */
-export function segmentInZone(bi: BlockInteriors, zoneId: number, ax: number, az: number, bx: number, bz: number): boolean {
+/**
+ * Todo ponto do trecho, a cada 0.25 m (inclui os pontos a cada 1 m), é chão caminhável da zona
+ * (`walkable`, smooth-world door 2): o pedestre não corta a quina do prédio. O ponto de partida,
+ * onde ele já está, não conta: de um vértice da borda da zona ele ainda sai para dentro.
+ */
+export function segmentWalkable(bi: BlockInteriors, zoneId: number, ax: number, az: number, bx: number, bz: number): boolean {
   const len = Math.hypot(bx - ax, bz - az);
   const steps = Math.max(1, Math.ceil(len / 0.25));
-  for (let i = 0; i <= steps; i++) {
+  for (let i = 1; i <= steps; i++) {
     const t = i / steps;
-    if (!inZone(bi, zoneId, ax + (bx - ax) * t, az + (bz - az) * t)) return false;
+    if (!walkable(bi, zoneId, ax + (bx - ax) * t, az + (bz - az) * t)) return false;
   }
   return true;
 }
@@ -434,22 +434,30 @@ function pickSegment(w: Walker, bi: BlockInteriors): void {
     const tx = bi.origin + (v % bi.size) * sp;
     const tz = bi.origin + Math.floor(v / bi.size) * sp;
     if ((tx === w.x && tz === w.z) || bi.zoneOf[v] !== w.zoneId) continue;
-    if (!segmentInZone(bi, w.zoneId, w.x, w.z, tx, tz)) continue;
+    if (!segmentWalkable(bi, w.zoneId, w.x, w.z, tx, tz)) continue;
     w.fromX = w.x;
     w.fromZ = w.z;
     w.toX = tx;
     w.toZ = tz;
     return;
   }
-  // um vizinho de 4 sempre existe numa zona de 25 vértices ou mais
+  // um vizinho de 4 caminhável, ou volta pelo trecho de onde veio (que era caminhável)
   const start = Math.floor(nextRand(w) * 4);
   for (let k = 0; k < 4; k++) {
     const [dx, dz] = [[sp, 0], [-sp, 0], [0, sp], [0, -sp]][(start + k) % 4]!;
-    if (!inZone(bi, w.zoneId, w.x + dx!, w.z + dz!)) continue;
+    if (!segmentWalkable(bi, w.zoneId, w.x, w.z, w.x + dx!, w.z + dz!)) continue;
     w.fromX = w.x;
     w.fromZ = w.z;
     w.toX = w.x + dx!;
     w.toZ = w.z + dz!;
+    return;
+  }
+  if ((w.fromX !== w.x || w.fromZ !== w.z) && segmentWalkable(bi, w.zoneId, w.x, w.z, w.fromX, w.fromZ)) {
+    const [bx, bz] = [w.fromX, w.fromZ];
+    w.fromX = w.x;
+    w.fromZ = w.z;
+    w.toX = bx;
+    w.toZ = bz;
     return;
   }
   w.fromX = w.toX = w.x;
@@ -479,7 +487,7 @@ export const FLEE_COOLDOWN_S = 2;
  * Um passo de `dt` do pedestre. Andando, segue o trecho a `speed` (1.25 a
  * 1.55 m/s); ao chegar ao fim, sorteia o próximo e continua de modo que o
  * deslocamento do passo tenha sempre `speed · dt`. Com o carro a menos de 8 m,
- * foge a 3 m/s (para longe do carro, só por vértices da zona) até ficar a 15 m;
+ * foge a 3 m/s (para longe do carro, só por chão caminhável) até ficar a 15 m;
  * encurralado por 1 s, desiste e anda num trecho novo. Nunca fica dentro da
  * caixa do carro: é empurrado para fora pelo lado.
  */
@@ -487,7 +495,7 @@ export function stepWalker(w: Walker, dt: number, car: CarPose, bi: BlockInterio
   walkerMove(w, dt, car, bi);
   if (insideCarBox(w.x, w.z, car)) {
     const exits = carBoxExits(w.x, w.z, car);
-    const [nx, nz] = exits.find(([x, z]) => inZone(bi, w.zoneId, x, z)) ?? exits[0]!;
+    const [nx, nz] = exits.find(([x, z]) => walkable(bi, w.zoneId, x, z)) ?? exits[0]!;
     w.x = w.fromX = w.toX = nx;
     w.z = w.fromZ = w.toZ = nz;
   }
@@ -519,16 +527,24 @@ function walkerMove(w: Walker, dt: number, car: CarPose, bi: BlockInteriors): vo
   advance(w, w.speed * dt, bi);
 }
 
-/** Volta a andar a partir do vértice da zona mais próximo. */
+/** Volta a andar até o vértice mais próximo, se o caminho é caminhável; senão sorteia um trecho dali. */
 function restartAtNearestVertex(w: Walker, bi: BlockInteriors): void {
   const v = nearestVertex(bi, w.x, w.z);
+  const tx = bi.origin + (v % bi.size) * bi.spacing;
+  const tz = bi.origin + Math.floor(v / bi.size) * bi.spacing;
   w.fromX = w.x;
   w.fromZ = w.z;
-  w.toX = bi.origin + (v % bi.size) * bi.spacing;
-  w.toZ = bi.origin + Math.floor(v / bi.size) * bi.spacing;
+  if (segmentWalkable(bi, w.zoneId, w.x, w.z, tx, tz)) {
+    w.toX = tx;
+    w.toZ = tz;
+    return;
+  }
+  w.toX = w.x;
+  w.toZ = w.z;
+  pickSegment(w, bi);
 }
 
-/** Um passo de `step` m para longe do carro, só por pontos da zona (desvia até ±75° se preciso); false sem saída. */
+/** Um passo de `step` m para longe do carro, só por chão caminhável (desvia até ±75° se preciso); false sem saída. */
 function fleeStep(w: Walker, step: number, car: { x: number; z: number }, bi: BlockInteriors): boolean {
   const toCar = Math.hypot(w.x - car.x, w.z - car.z);
   const base = toCar > 1e-6 ? Math.atan2(w.x - car.x, w.z - car.z) : nextRand(w) * Math.PI * 2;
@@ -536,7 +552,7 @@ function fleeStep(w: Walker, step: number, car: { x: number; z: number }, bi: Bl
     const a = base + (turn * Math.PI) / 180;
     const nx = w.x + Math.sin(a) * step;
     const nz = w.z + Math.cos(a) * step;
-    if (!inZone(bi, w.zoneId, nx, nz)) continue;
+    if (!walkable(bi, w.zoneId, nx, nz)) continue;
     w.x = nx;
     w.z = nz;
     return true;
@@ -649,7 +665,7 @@ export function createCat(spawn: CatSpawn, index: number): Cat {
  * Um passo de `dt` do gato. Anda a 0.5-0.9 m/s por trechos da zona (como o
  * pedestre) e a cada 6-12 m senta por 2-5 s; com o carro a menos de 6 m foge a
  * 4 m/s até 12 m. Dentro da caixa do chassi com folga é empurrado para o lado
- * mais perto (dentro da zona) ou some por 10 s, voltando ao ponto de partida com
+ * mais perto (em chão caminhável) ou some por 10 s, voltando ao ponto de partida com
  * o carro a mais de 30 m: nunca fica debaixo do carro (play-fixes AC 19).
  */
 export function stepCat(c: Cat, dt: number, car: CarPose, bi: BlockInteriors): void {
@@ -700,7 +716,7 @@ export function stepCat(c: Cat, dt: number, car: CarPose, bi: BlockInteriors): v
   // nunca dentro da caixa do carro: empurra para o lado mais perto ou some
   if (insideCarBox(c.x, c.z, car)) {
     const [nx, nz] = carBoxExits(c.x, c.z, car)[0]!;
-    if (inZone(bi, c.zoneId, nx, nz)) {
+    if (walkable(bi, c.zoneId, nx, nz)) {
       c.x = c.fromX = c.toX = nx;
       c.z = c.fromZ = c.toZ = nz;
     } else {

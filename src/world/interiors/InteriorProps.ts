@@ -16,7 +16,7 @@
 import { mulberry32 } from '../CityGenerator';
 import type { Lot } from '../lots/LotGenerator';
 import { heightAt, type Heightmap } from '../terrain/TerrainGenerator';
-import { nearestVertex, type BlockInteriors } from './BlockInteriors';
+import { nearestVertex, walkable, type BlockInteriors } from './BlockInteriors';
 
 export interface Point3 {
   x: number;
@@ -390,13 +390,18 @@ export function placeInteriorProps(seed: number, interiors: BlockInteriors, lots
     return { x, y, z, towerHeight, jibLength: JIB_LENGTH, floodlights, zoneId: zone.id };
   });
 
-  // --- pedestres: 3 por 1000 m² de zona, em vértices sorteados da zona ---
+  // --- pedestres: 3 por 1000 m² de zona, em vértices sorteados da zona que são chão caminhável
+  // (smooth-world door 2: de outro vértice ele não teria trecho para sair) ---
   const walkerRng = mulberry32(seed ^ 0x3a1c);
   const vertsOf: number[][] = bi.zones.map(() => []);
-  for (let k = 0; k < bi.zoneOf.length; k++) if (bi.zoneOf[k]! >= 0) vertsOf[bi.zoneOf[k]!]!.push(k);
+  for (let k = 0; k < bi.zoneOf.length; k++) {
+    const zone = bi.zoneOf[k]!;
+    if (zone >= 0 && walkable(bi, zone, ...vertexXZ(bi, k))) vertsOf[zone]!.push(k);
+  }
   const walkers: WalkerSpawn[] = [];
   for (const zone of bi.zones) {
     const verts = vertsOf[zone.id]!;
+    if (verts.length === 0) continue;
     const count = Math.floor((zone.areaM2 * 3) / 1000);
     for (let i = 0; i < count; i++) {
       const [x, z] = vertexXZ(bi, verts[Math.floor(walkerRng() * verts.length)]!);
@@ -503,6 +508,7 @@ export function placeInteriorProps(seed: number, interiors: BlockInteriors, lots
   for (const zone of bi.zones) {
     if (zone.kind !== 'outer') continue;
     const verts = vertsOf[zone.id]!;
+    if (verts.length === 0) continue;
     const count = Math.floor(zone.areaM2 / CAT_AREA);
     for (let i = 0; i < count; i++) {
       const [x, z] = vertexXZ(bi, verts[Math.floor(catRng() * verts.length)]!);

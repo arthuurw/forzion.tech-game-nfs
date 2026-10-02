@@ -40,16 +40,16 @@ Proof: `npx vitest run tests/unit/roads.test.ts -t "grade at most 10 percent"`
 
 ### S3 - ninguém entra em prédio · 5 files · 60 KB · ~15k
 
-**C10** - `walkable(bi, zoneId, x, z)`: verdadeiro com os 4 vértices da célula (floor) na zona e `facadeDist` interpolada ≥ `LOT_MARGIN + 0.25`; falso com 1 vértice fora da zona; falso com a `facadeDist` interpolada 0.01 m abaixo do limite; falso fora da grade. Uma linha por caso (door 2)
+**C10** - ✅ `walkable(bi, zoneId, x, z)`: verdadeiro com os 4 vértices da célula (floor) na zona e `facadeDist` interpolada ≥ `LOT_MARGIN + 0.25`; falso com 1 vértice fora da zona; falso com a `facadeDist` interpolada 0.01 m abaixo do limite; falso fora da grade. Uma linha por caso (door 2)
 Proof: `npx vitest run tests/unit/interiors.test.ts -t "walkable needs the whole cell and the facade gap"`
 
-**C11** - Com 400 pedestres do seed 1337, carro em 3 posições (parado longe, parado a 5 m, passando a 8 m/s) por 40 s cada, em todo passo o centro de cada pedestre fica a ≥ 0.25 m do footprint (retângulo girado) de todo lote (AC 7)
+**C11** - ✅ Com 400 pedestres do seed 1337, carro em 3 posições (parado longe, parado a 5 m, passando a 8 m/s) por 40 s cada, em todo passo o centro de cada pedestre fica a ≥ 0.25 m do footprint (retângulo girado) de todo lote (AC 7)
 Proof: `npx vitest run tests/physics/walkable.test.ts -t "walkers never enter a lot"`
 
-**C12** - Com 200 gatos do seed 1337 e o carro passando a 8 e a 20 m/s, em todo passo o centro de cada gato fora de `gone` fica a ≥ 0.25 m do footprint de todo lote (AC 8)
+**C12** - ✅ Com 200 gatos do seed 1337 e o carro passando a 8 e a 20 m/s, em todo passo o centro de cada gato fora de `gone` fica a ≥ 0.25 m do footprint de todo lote (AC 8)
 Proof: `npx vitest run tests/physics/walkable.test.ts -t "cats never enter a lot"`
 
-**C13** - Em 2 000 trechos novos sorteados por pedestres do seed 1337, toda amostra a cada 0.25 m do trecho é `walkable` (AC 9)
+**C13** - ✅ Em 2 000 trechos novos sorteados por pedestres do seed 1337, toda amostra a cada 0.25 m do trecho é `walkable` (AC 9)
 Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "walker segments stay on walkable ground"`
 
 ### S4 - streaming sem engasgo · 4 files · 60 KB · ~15k
@@ -97,7 +97,7 @@ Proof: `npx playwright test tests/e2e/drive.spec.ts -g "probes keep the physics 
 **C25** - Com a nova `heightAt`, a base de cada lote, cada carro estacionado e cada piscina do seed 1337 ficam a ≤ 0.01 m do chão da malha (raio vertical no heightfield do Rapier) sob o centro deles (Impact, mundo)
 Proof: `npx vitest run tests/physics/walkable.test.ts -t "props stand on the mesh ground"`
 
-**C26** - `interiorMotion.ts` e `BlockInteriors.ts` seguem puros e na lista da trava de pureza (door 2)
+**C26** - ✅ `interiorMotion.ts` e `BlockInteriors.ts` seguem puros e na lista da trava de pureza (door 2)
 Proof: `npx vitest run tests/unit/purity.test.ts -t "pure modules do not import three or rapier"`
 
 ## Coverage
