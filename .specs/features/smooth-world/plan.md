@@ -39,6 +39,7 @@ Reusa o `FixedStepper.accumulator`, que já existe e que ninguém lê, como fra�
 | decisões | a AD-006 (passo fixo) ganha a interpolação no render como regra, por uma AD nova que a estende (door 1) |
 | decisões | a AD-012 ganha a consulta de chão caminhável para o que se move, por uma AD nova que a estende (door 2) |
 | checks de outras features | block-fill C32 (pedestre arredonda para vértice da zona) continua; os pedestres passam a ter caminhos menores perto das fachadas |
+| checks de outras features | city-terrain C2 (`heightAt` no meio de 4 amostras = média bilinear): passa a ser o triângulo da malha (AC 14); o teste `769 x 769 samples every 4 m` troca a média pela média das pontas da diagonal |
 | checks de outras features | city-terrain `world.spec.ts:361` (`maxBuildsInOneFrame` ≤ 1): depois da test-hardening mede builds por quadro; aqui passa a contar fatias |
 | sondas DEV | `__game.car.x/y/z` e as posições dos oponentes continuam sendo a pose física. A pose desenhada entra como campo novo, para os testes de pixel não mudarem de referência |
 | mundo | bases de lote, colunas do trem, carros estacionados e piscinas mudam de altura até 0.19 m, com a nova `heightAt` |

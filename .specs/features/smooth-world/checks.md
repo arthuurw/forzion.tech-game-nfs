@@ -69,10 +69,10 @@ Proof: `npx vitest run tests/physics/streaming.test.ts -t "sliced build equals t
 
 ### S5 - uma altura de chão só · 3 files · 20 KB · ~5k
 
-**C18** - Em 20 000 pontos aleatórios do seed 1337, `heightAt(x, z)` difere ≤ 0.005 m do raio vertical no heightfield do Rapier (AC 14)
+**C18** - ✅ Em 20 000 pontos aleatórios do seed 1337, `heightAt(x, z)` difere ≤ 0.005 m do raio vertical no heightfield do Rapier (AC 14)
 Proof: `npx vitest run tests/physics/walkable.test.ts -t "heightAt matches the physics heightfield"`
 
-**C19** - Numa grade sintética com as 2 diagonais possíveis de uma célula, `heightAt` num ponto de cada triângulo é o plano daquele triângulo da malha (± 1e-9), inclusive sobre a diagonal (AC 14)
+**C19** - ✅ Numa grade sintética com as 2 diagonais possíveis de uma célula, `heightAt` num ponto de cada triângulo é o plano daquele triângulo da malha (± 1e-9), inclusive sobre a diagonal (AC 14)
 Proof: `npx vitest run tests/unit/terrain.test.ts -t "heightAt follows the mesh diagonal"`
 
 ### S6 - pontes e extrusões certas · 4 files · 40 KB · ~10k

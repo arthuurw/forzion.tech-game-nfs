@@ -54,7 +54,12 @@ export function sampleXZ(hm: Heightmap, ix: number, iz: number): [number, number
   return [hm.origin + ix * hm.spacing, hm.origin + iz * hm.spacing];
 }
 
-/** Altura bilinear em (x, z), com as coordenadas presas às bordas do mapa. */
+/**
+ * Altura em (x, z) no triângulo da malha de terreno que contém o ponto (smooth-world AC 14), com
+ * as coordenadas presas às bordas do mapa. Cada célula tem a diagonal de (ix+1, iz) a (ix, iz+1),
+ * como a malha do `ChunkManager` e o heightfield do Rapier: com `tx + tz ≤ 1` o triângulo de
+ * (ix, iz), senão o de (ix+1, iz+1).
+ */
 export function heightAt(hm: Heightmap, x: number, z: number): number {
   const max = hm.size - 1;
   const fx = Math.min(max, Math.max(0, (x - hm.origin) / hm.spacing));
@@ -68,7 +73,8 @@ export function heightAt(hm: Heightmap, x: number, z: number): number {
   const b = h[iz * hm.size + ix + 1]!;
   const c = h[(iz + 1) * hm.size + ix]!;
   const d = h[(iz + 1) * hm.size + ix + 1]!;
-  return a + (b - a) * tx + (c - a) * tz + (a - b - c + d) * tx * tz;
+  if (tx + tz <= 1) return a + (b - a) * tx + (c - a) * tz;
+  return d + (c - d) * (1 - tx) + (b - d) * (1 - tz);
 }
 
 /** Centro do rio em x para cada z: sempre entre 630 e 870 (a leste do centro). */
