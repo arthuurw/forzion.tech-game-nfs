@@ -76,6 +76,26 @@ describe('docs', () => {
     expect(section(readme, 'Como é feito')).toContain('## Intent');
   });
 
+  // smooth-world C7 (doors 1 e 2): interpolação no render estende a AD-006; chão caminhável estende a AD-012
+  it('interpolation and walkable ground are recorded decisions', () => {
+    const rows = adRows();
+    const ad20 = rows.find(([n]) => n === 20)?.[1] ?? '';
+    const ad21 = rows.find(([n]) => n === 21)?.[1] ?? '';
+    expect(ad20).toContain('| active |');
+    expect(ad20).toContain('Estende a AD-006');
+    expect(ad20).toContain('render(dt, alpha)');
+    expect(ad20).toContain('alpha = stepper.accumulator / stepper.step');
+    expect(ad20).toContain('lerp');
+    expect(ad20).toContain('slerp');
+    expect(ad20).toContain('`teleport` e `reset`');
+    expect(ad21).toContain('| active |');
+    expect(ad21).toContain('Estende a AD-012');
+    expect(ad21).toContain('walkable(bi, zoneId, x, z)');
+    expect(ad21).toContain('(floor)');
+    expect(ad21).toContain('`LOT_MARGIN + 0.25` m');
+    expect(ad21).toContain('`zoneAt`');
+  });
+
   // e2e-speed C13 (AC 13): os tempos medidos da suíte (C11: 28.9 min, C12: 2.4 min) e a variável dos workers
   it('agents gives the e2e times and workers', () => {
     const lines = agents.split('\n');

@@ -9,25 +9,25 @@ Plan: `.specs/features/smooth-world/plan.md`
 
 ### S1 - carro liso em qualquer taxa de quadros · 7 files · 80 KB · ~20k
 
-**C1** - `GameLoop` chama `render(dt, alpha)` em todo quadro com `alpha = stepper.accumulator / stepper.step`, em [0, 1), com `requestAnimationFrame` falso a 144 Hz e a 30 Hz (AC 1, door 1)
+**C1** - ✅ `GameLoop` chama `render(dt, alpha)` em todo quadro com `alpha = stepper.accumulator / stepper.step`, em [0, 1), com `requestAnimationFrame` falso a 144 Hz e a 30 Hz (AC 1, door 1)
 Proof: `npx vitest run tests/unit/gameLoop.test.ts -t "render receives the interpolation alpha"`
 
-**C2** - Com o `Car` real, depois de passos com o carro andando e virando, `car.drawPose(alpha)` põe `mesh.position` em `lerp(prev, curr, alpha)` ± 1e-6 m e `mesh.quaternion` em `slerp(prev, curr, alpha)` ± 1e-6, para alpha ∈ {0, 0.25, 0.5, 0.75, 0.99} (AC 1, door 1)
+**C2** - ✅ Com o `Car` real, depois de passos com o carro andando e virando, `car.drawPose(alpha)` põe `mesh.position` em `lerp(prev, curr, alpha)` ± 1e-6 m e `mesh.quaternion` em `slerp(prev, curr, alpha)` ± 1e-6, para alpha ∈ {0, 0.25, 0.5, 0.75, 0.99} (AC 1, door 1)
 Proof: `npx vitest run tests/physics/interpolation.test.ts -t "car draws the interpolated pose"`
 
-**C3** - No browser, durante a corrida, a posição desenhada de cada um dos 3 oponentes (`__game.race.opponents[i].drawn`) fica no segmento entre a pose do passo anterior e a atual (distância ao segmento ≤ 1e-4 m), e não é sempre a atual (AC 1)
+**C3** - ✅ No browser, durante a corrida, a posição desenhada de cada um dos 3 oponentes (`__game.race.opponents[i].drawn`) fica no segmento entre a pose do passo anterior e a atual (distância ao segmento ≤ 1e-4 m), e não é sempre a atual (AC 1)
 Proof: `npx playwright test tests/e2e/race.spec.ts -g "opponents draw the interpolated pose"`
 
-**C4** - Com o `Car` real a 100 km/h em linha reta e um `GameLoop` com quadros de 1/144 s por 2 s, a posição desenhada anda em todo quadro, entre 0.5 × e 1.5 × `v / 144` (AC 2)
+**C4** - ✅ Com o `Car` real a 100 km/h em linha reta e um `GameLoop` com quadros de 1/144 s por 2 s, a posição desenhada anda em todo quadro, entre 0.5 × e 1.5 × `v / 144` (AC 2)
 Proof: `npx vitest run tests/physics/interpolation.test.ts -t "car moves every frame at 144 hz"`
 
-**C5** - Depois de `teleport` e, noutro carro, de `reset`, o próximo desenho com alpha ∈ {0, 0.5, 0.99} fica exatamente na pose nova (distância 0 ± 1e-9 m, quaternion igual) (AC 3, door 1)
+**C5** - ✅ Depois de `teleport` e, noutro carro, de `reset`, o próximo desenho com alpha ∈ {0, 0.5, 0.99} fica exatamente na pose nova (distância 0 ± 1e-9 m, quaternion igual) (AC 3, door 1)
 Proof: `npx vitest run tests/physics/interpolation.test.ts -t "teleport and reset leave no trail"`
 
-**C6** - No browser, depois de um quadro, o alvo da câmera de perseguição é calculado da pose desenhada (`__game.car.drawn`), não da física: com o carro andando, a diferença entre o alvo e a pose desenhada é a mesma do caso parado ± 1e-4 m (AC 4)
+**C6** - ✅ No browser, depois de um quadro, o alvo da câmera de perseguição é calculado da pose desenhada (`__game.car.drawn`), não da física: com o carro andando, a diferença entre o alvo e a pose desenhada é a mesma do caso parado ± 1e-4 m (AC 4)
 Proof: `npx playwright test tests/e2e/drive.spec.ts -g "chase camera follows the drawn pose"`
 
-**C7** - `.specs/STATE.md` tem duas ADs novas, `active`: uma que estende a AD-006 com a interpolação de pose no render e outra que estende a AD-012 com a consulta de chão caminhável (door 1, door 2)
+**C7** - ✅ `.specs/STATE.md` tem duas ADs novas, `active`: uma que estende a AD-006 com a interpolação de pose no render e outra que estende a AD-012 com a consulta de chão caminhável (door 1, door 2)
 Proof: `npx vitest run tests/unit/docs.test.ts -t "interpolation and walkable ground are recorded decisions"`
 
 ### S2 - junção do anel sem degrau · 2 files · 37 KB · ~9k
@@ -91,7 +91,7 @@ Proof: `npx vitest run tests/physics/extras.test.ts -t "interior update allocate
 **C23** - O minimapa redesenha no máximo 30 vezes em 1 s de simulação a 60 passos, e redesenha no quadro seguinte a uma mudança do estado da corrida mesmo dentro do intervalo (AC 18)
 Proof: `npx vitest run tests/unit/minimap.test.ts -t "minimap redraws at most 30 times per second"`
 
-**C24** - `__game.car.x/y/z` e a posição dos oponentes nas sondas continuam sendo a pose física; a pose desenhada é um campo novo `drawn` (Impact, sondas DEV)
+**C24** - ✅ `__game.car.x/y/z` e a posição dos oponentes nas sondas continuam sendo a pose física; a pose desenhada é um campo novo `drawn` (Impact, sondas DEV)
 Proof: `npx playwright test tests/e2e/drive.spec.ts -g "probes keep the physics pose and add the drawn one"`
 
 **C25** - Com a nova `heightAt`, a base de cada lote, cada carro estacionado e cada piscina do seed 1337 ficam a ≤ 0.01 m do chão da malha (raio vertical no heightfield do Rapier) sob o centro deles (Impact, mundo)

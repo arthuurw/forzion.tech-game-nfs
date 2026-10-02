@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { advanceSim, buildingScenario, gotoGame, heading, holdKeySim, insideLot, position, speedKmh, teleport, waitSimUntil } from './helpers';
+import { advanceSim, buildingScenario, gotoGame, heading, holdKeySim, insideLot, position, speedKmh, teleport, waitFrames, waitSimUntil } from './helpers';
 
 test.describe('drive', () => {
   test.beforeEach(async ({ page }) => {
@@ -217,5 +217,91 @@ test.describe('drive', () => {
     // e o corpo vivo continua em pé logo depois
     const live = await page.evaluate(() => (window as any).__game.car.rotation);
     expect(1 - 2 * (live.x * live.x + live.z * live.z)).toBeGreaterThan(0.95);
+  });
+
+
+  // smooth-world C6 (AC 4) e C24 (Impact, sondas DEV), num boot só: a câmera segue a pose desenhada
+  // (`car.drawn`); `position` segue a física e o desenho é o campo novo `drawn`, no carro e nos oponentes
+  test('chase camera follows the drawn pose; probes keep the physics pose and add the drawn one', async ({ page }) => {
+    /** alvo da câmera menos a pose desenhada, no referencial do carro desenhado: para trás, para cima, para o lado − lateral */
+    const sample = () =>
+      page.evaluate(() => {
+        const g = (window as any).__game;
+        const d = g.car.drawn;
+        const t = g.camera.target;
+        const q = d.rotation;
+        const h = Math.atan2(2 * (q.x * q.z + q.w * q.y), 1 - 2 * (q.x * q.x + q.y * q.y));
+        const ox = t.x - d.x;
+        const oz = t.z - d.z;
+        const p = g.car.position;
+        return {
+          along: ox * Math.sin(h) + oz * Math.cos(h),
+          up: t.y - d.y,
+          side: ox * Math.cos(h) - oz * Math.sin(h) - g.camera.lateral,
+          gap: Math.hypot(p.x - d.x, p.y - d.y, p.z - d.z),
+        };
+      });
+    // parado no spawn
+    await advanceSim(page, 1);
+    await waitFrames(page, 1);
+    const parked = await sample();
+    expect(parked.gap).toBeLessThan(1e-3);
+    // andando a ~100 km/h em linha reta: alvo − pose desenhada igual ao caso parado, em todo quadro
+    await page.evaluate(() => (window as any).__game.car.setForwardSpeed(27.8));
+    await page.keyboard.down('KeyW');
+    let maxGap = 0;
+    for (let i = 0; i < 4; i++) {
+      await waitFrames(page, 1);
+      const m = await sample();
+      expect(Math.abs(m.along - parked.along), `quadro ${i} along`).toBeLessThanOrEqual(1e-4);
+      expect(Math.abs(m.up - parked.up), `quadro ${i} up`).toBeLessThanOrEqual(1e-4);
+      expect(Math.abs(m.side - parked.side), `quadro ${i} side`).toBeLessThanOrEqual(1e-4);
+      maxGap = Math.max(maxGap, m.gap);
+    }
+    // e a pose desenhada não é a física: a prova acima distingue as duas
+    expect(maxGap).toBeGreaterThan(1e-3);
+
+    // C24: um passo sem quadro muda `position` (física) e não muda `drawn` (o desenho só anda no quadro)
+    const car = await page.evaluate(() => {
+      const g = (window as any).__game;
+      const before = { p: g.car.position, d: g.car.drawn };
+      g.stepSim(1 / 60);
+      return { before, after: { p: g.car.position, d: g.car.drawn }, kmh: g.car.speedKmh as number };
+    });
+    await page.keyboard.up('KeyW');
+    const moved = (a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+    expect(car.kmh).toBeGreaterThan(60);
+    expect(moved(car.after.p, car.before.p)).toBeGreaterThan(car.kmh / 3.6 / 60 / 2);
+    expect(car.after.d).toEqual(car.before.d);
+    const drawnBefore = car.after.d;
+    await waitFrames(page, 1);
+    expect(moved(await page.evaluate(() => (window as any).__game.car.drawn), drawnBefore)).toBeGreaterThan(0.1);
+
+    // oponentes: uma corrida no circuito do centro, já andando
+    await page.evaluate(() => {
+      const g = (window as any).__game;
+      const r = g.race.races.find((x: any) => x.id === 'circuito-centro');
+      const h = r.grid[3].heading;
+      const x = r.marker.x - Math.sin(h) * 3;
+      const z = r.marker.z - Math.cos(h) * 3;
+      g.car.teleport(x, g.world.nearestRoad(x, z).y + 1.2, z, h);
+    });
+    await advanceSim(page, 0.1);
+    await page.keyboard.press('Enter');
+    expect(await waitSimUntil(page, "g.race.state === 'racing'", 5)).toBe(true);
+    await advanceSim(page, 2);
+    const ops = await page.evaluate(() => {
+      const g = (window as any).__game;
+      const pick = () => g.race.opponents.map((o: any) => ({ p: o.position, d: o.drawn }));
+      const before = pick();
+      g.stepSim(1 / 60);
+      return { before, after: pick() };
+    });
+    expect(ops.before).toHaveLength(3);
+    ops.before.forEach((b: any, i: number) => {
+      const a = ops.after[i];
+      expect(moved(a.p, b.p), `oponente ${i}`).toBeGreaterThan(0.01);
+      expect(a.d, `oponente ${i}`).toEqual(b.d);
+    });
   });
 });

@@ -189,8 +189,9 @@ export class RaceController {
 
   // ------------------------------------------------------------------ quadro
 
-  render(state: CarState): MinimapMark[] {
-    for (const op of this.opponents) op.car.sync();
+  /** `alpha`: fração do passo em que cada oponente é desenhado (smooth-world door 1). */
+  render(state: CarState, alpha: number): MinimapMark[] {
+    for (const op of this.opponents) op.car.drawPose(alpha);
     const race = this.race;
     const st = this.session.state;
 

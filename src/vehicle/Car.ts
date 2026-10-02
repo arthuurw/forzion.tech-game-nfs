@@ -19,7 +19,8 @@ import { yawAssistTorque } from './yawAssist';
 /**
  * O carro: um corpo rígido (chassi) + 4 rodas por raycast do Rapier (door 2).
  * O Rapier não desenha nada; este módulo mantém o mesh do three grudado no
- * corpo físico a cada frame (`sync`). Massa, geometria, arrasto, aderência
+ * corpo físico a cada frame: `drawPose(alpha)` desenha entre a pose de antes do
+ * último passo e a atual (smooth-world door 1, AD-020). Massa, geometria, arrasto, aderência
  * e suspensão vêm da ficha (`carSpec.ts`); motor, câmbio, freios e volante vêm de
  * `drivetrain.ts`. Aqui só aplicamos e medimos.
  */
@@ -119,6 +120,11 @@ export class Car {
   private readonly axis = new THREE.Vector3();
   private readonly scratch = new THREE.Vector3();
   private readonly quat = new THREE.Quaternion();
+  /** pose do corpo antes do último passo; o render desenha entre ela e a atual (door 1) */
+  private readonly prevPos = new THREE.Vector3();
+  private readonly prevQuat = new THREE.Quaternion();
+  private readonly currPos = new THREE.Vector3();
+  private readonly currQuat = new THREE.Quaternion();
 
   constructor(
     private readonly world: RAPIER.World,
@@ -188,11 +194,14 @@ export class Car {
     this.buildVisual(assets);
     this.mesh.name = 'car';
     scene.add(this.mesh);
+    this.keepPose();
     this.sync();
   }
 
   /** Um passo fixo de física: aplica o input e integra o veículo. */
   fixedUpdate(input: DriveInput, dt: number): void {
+    // a pose de antes deste passo: o render desenha entre ela e a de depois (door 1)
+    this.keepPose();
     const spec = this.spec;
     const speedMs = this.speedMs();
     this.skidding = isSkidding(input.handbrake, speedMs * 3.6, this.maxLateralSlip());
@@ -261,12 +270,53 @@ export class Car {
     return this.body.angvel().y;
   }
 
-  /** Copia a pose física para o mesh (uma vez por frame renderizado). */
+  /** Copia a pose física para o mesh, sem interpolar (boot, teleporte, sondas DEV). */
   sync(): void {
     const t = this.body.translation();
     const r = this.body.rotation();
     this.mesh.position.set(t.x, t.y, t.z);
     this.mesh.quaternion.set(r.x, r.y, r.z, r.w);
+    this.syncWheels();
+  }
+
+  /**
+   * Desenha o carro na fração `alpha` (em [0, 1)) entre a pose de antes do último passo e a
+   * atual: `lerp` na posição e `slerp` na rotação (smooth-world door 1, AD-020).
+   */
+  drawPose(alpha: number): void {
+    const t = this.body.translation();
+    const r = this.body.rotation();
+    this.mesh.position.lerpVectors(this.prevPos, this.currPos.set(t.x, t.y, t.z), alpha);
+    this.currQuat.set(r.x, r.y, r.z, r.w);
+    // sem giro no passo (parado, teleporte, reset) copia: o slerp renormaliza e sairia uns 1e-8 da pose
+    if (this.prevQuat.equals(this.currQuat)) this.mesh.quaternion.copy(this.currQuat);
+    else this.mesh.quaternion.slerpQuaternions(this.prevQuat, this.currQuat, alpha);
+    this.syncWheels();
+  }
+
+  /** Pose de antes do último passo (sondas DEV e provas). */
+  get prevPose(): { position: { x: number; y: number; z: number }; rotation: { x: number; y: number; z: number; w: number } } {
+    const p = this.prevPos;
+    const q = this.prevQuat;
+    return { position: { x: p.x, y: p.y, z: p.z }, rotation: { x: q.x, y: q.y, z: q.z, w: q.w } };
+  }
+
+  /** O estado do carro na pose desenhada (posição e heading do mesh): a câmera segue esta (AC 4). */
+  drawnState(): CarState {
+    const p = this.mesh.position;
+    const f = this.scratch.set(0, 0, 1).applyQuaternion(this.mesh.quaternion);
+    return { ...this.state(), x: p.x, y: p.y, z: p.z, heading: Math.atan2(f.x, f.z) };
+  }
+
+  /** A pose atual vira a anterior: antes de cada passo, e no teleporte e no reset, que não deixam rastro (AC 3). */
+  private keepPose(): void {
+    const t = this.body.translation();
+    const r = this.body.rotation();
+    this.prevPos.set(t.x, t.y, t.z);
+    this.prevQuat.set(r.x, r.y, r.z, r.w);
+  }
+
+  private syncWheels(): void {
     const steer = this.controller.numWheels() > 0 ? this.controller.wheelSteering(0) ?? 0 : 0;
     this.wheelMeshes.forEach((wheel, i) => {
       wheel.rotation.set(this.wheelSpin, i < 2 ? steer : 0, 0, 'YXZ');
@@ -330,6 +380,7 @@ export class Car {
       linvel: { ...this.body.linvel() },
       angvel: { ...this.body.angvel() },
     };
+    this.keepPose();
     this.sync();
   }
 
@@ -343,6 +394,7 @@ export class Car {
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.rest();
+    this.keepPose();
     this.sync();
   }
 
@@ -357,6 +409,7 @@ export class Car {
 
   setRotation(q: { x: number; y: number; z: number; w: number }): void {
     this.body.setRotation(q, true);
+    this.keepPose();
     this.sync();
   }
 

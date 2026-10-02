@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { formatRaceTime } from '../../src/race/raceProgress';
 import { PLAYER_SLOT, type RaceDef } from '../../src/race/raceRoutes';
 import { resetTarget } from '../../src/race/raceSession';
-import { advanceSim, gotoGame, holdKeySim, position, sampleCountdown, speedKmh, waitSimUntil } from './helpers';
+import { advanceSim, gotoGame, holdKeySim, position, sampleCountdown, speedKmh, waitFrames, waitSimUntil } from './helpers';
 
 // races: provas no browser (checks C9-C14, C16-C19, C21, C24, C25, C27-C32, C34, C36)
 
@@ -391,6 +391,31 @@ test.describe('races', () => {
     await startRace(page, 'circuito-centro');
     await holdKeySim(page, 'KeyW', 2);
     expect(await speedKmh(page)).toBeGreaterThan(20);
+  });
+
+  // smooth-world C3 (AC 1): cada oponente é desenhado no segmento entre a pose de antes do último passo e a atual
+  test('opponents draw the interpolated pose', async ({ page }) => {
+    await startRace(page, 'circuito-centro');
+    await advanceSim(page, 2);
+    const offCurrent = [0, 0, 0];
+    for (let f = 0; f < 4; f++) {
+      await waitFrames(page, 1);
+      const ops = await page.evaluate(() =>
+        (window as any).__game.race.opponents.map((o: any) => ({ a: o.prevStep, b: o.position, d: o.drawn })),
+      );
+      expect(ops).toHaveLength(3);
+      ops.forEach((o: any, i: number) => {
+        const ab = [o.b.x - o.a.x, o.b.y - o.a.y, o.b.z - o.a.z];
+        const ad = [o.d.x - o.a.x, o.d.y - o.a.y, o.d.z - o.a.z];
+        const len2 = ab[0]! ** 2 + ab[1]! ** 2 + ab[2]! ** 2;
+        const t = len2 > 0 ? Math.min(1, Math.max(0, (ad[0]! * ab[0]! + ad[1]! * ab[1]! + ad[2]! * ab[2]!) / len2)) : 0;
+        const off = Math.hypot(ad[0]! - ab[0]! * t, ad[1]! - ab[1]! * t, ad[2]! - ab[2]! * t);
+        expect(off, `quadro ${f} oponente ${i}`).toBeLessThanOrEqual(1e-4);
+        offCurrent[i] = Math.max(offCurrent[i]!, Math.hypot(o.d.x - o.b.x, o.d.y - o.b.y, o.d.z - o.b.z));
+      });
+    }
+    // andando, o desenho não é sempre a pose atual
+    offCurrent.forEach((d, i) => expect(d, `oponente ${i}`).toBeGreaterThan(1e-3));
   });
 });
 

@@ -146,10 +146,10 @@ None - nothing consumed outside
 
 | Assumption | Chosen default | Rationale | Confirmed? |
 | --- | --- | --- | --- |
-| orçamento por `update` de chunk | 8 ms em node com JIT aquecido e máquina ociosa | metade do quadro de 16.7 ms, deixando a outra metade ao render e à subida para a GPU, que o node não mede | n |
-| raio de pré-montagem no boot | 900 m | é o raio em que o `planChunks` já pede chunk hoje; custa ~0.2 s no boot, que o "Gerando cidade..." da play-fixes cobre | n |
-| folga do chão caminhável | `LOT_MARGIN + 0.25` m na `facadeDist` interpolada | 0.25 m ≥ raio do corpo do pedestre (0.22 m) | n |
-| taxa do minimapa | 30 Hz | o carro a 200 km/h anda 1.85 m por atualização, menos de 1 px na escala do minimapa | n |
+| orçamento por `update` de chunk | 8 ms em node com JIT aquecido e máquina ociosa | metade do quadro de 16.7 ms, deixando a outra metade ao render e à subida para a GPU, que o node não mede | y (user delegated) |
+| raio de pré-montagem no boot | 900 m | é o raio em que o `planChunks` já pede chunk hoje; custa ~0.2 s no boot, que o "Gerando cidade..." da play-fixes cobre | y (user delegated) |
+| folga do chão caminhável | `LOT_MARGIN + 0.25` m na `facadeDist` interpolada | 0.25 m ≥ raio do corpo do pedestre (0.22 m) | y (user delegated) |
+| taxa do minimapa | 30 Hz | o carro a 200 km/h anda 1.85 m por atualização, menos de 1 px na escala do minimapa | y (user delegated) |
 
 **Open questions:** none - all resolved or logged above.
 

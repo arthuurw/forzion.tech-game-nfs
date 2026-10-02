@@ -364,12 +364,13 @@ export class Game {
     this.effects.step(dt, this.car.skidding, this.car.rearWheelPositions(), this.car.heading());
   };
 
-  private readonly render = (dt: number): void => {
+  private readonly render = (dt: number, alpha: number): void => {
     // a troca de devicePixelRatio (outro monitor, zoom) nem sempre dispara `resize`
     if (window.devicePixelRatio !== this.dpr) this.handleResize();
-    this.car.sync();
+    // desenha entre o passo anterior e o atual (smooth-world door 1); a câmera segue a pose desenhada
+    this.car.drawPose(alpha);
     const state = this.car.state();
-    this.chase.update(dt, state, this.car.yawRate(), this.car.bodyRoll);
+    this.chase.update(dt, this.car.drawnState(), this.car.yawRate(), this.car.bodyRoll);
     this.city.chunks.update(state.x, state.z);
     this.city.chunks.endFrame();
     this.city.water.update(this.simTime);
@@ -383,7 +384,7 @@ export class Game {
     });
     (this.grade.uniforms.uBlur as { value: number }).value = blurFor(state.speedKmh);
     this.hud.update(state);
-    this.minimap.update(state, this.race.render(state));
+    this.minimap.update(state, this.race.render(state, alpha));
     // o acelerador que chegou ao carro: na contagem, o segurado (play-fixes AC 6)
     this.audio.update(state.rpm, this.driveInput.throttle);
 
@@ -471,9 +472,13 @@ export class Game {
         get opponents() {
           return game.race.opponents.map((o) => {
             const p = o.car.body.translation();
+            const d = o.car.mesh.position;
             return {
               index: o.index,
+              /** pose física; a desenhada no último quadro é `drawn`, a de antes do último passo `prevStep` (smooth-world) */
               position: { x: p.x, y: p.y, z: p.z },
+              drawn: { x: d.x, y: d.y, z: d.z },
+              prevStep: o.car.prevPose.position,
               speedKmh: o.car.speedKmh(),
               paint: o.car.paint,
               bodyColor: o.car.bodyColor(),
@@ -676,6 +681,16 @@ export class Game {
         },
         get rotation() {
           return { ...game.car.body.rotation() };
+        },
+        /** pose desenhada no último quadro (smooth-world door 1); `position` e `rotation` seguem a física */
+        get drawn() {
+          const p = game.car.mesh.position;
+          const q = game.car.mesh.quaternion;
+          return { x: p.x, y: p.y, z: p.z, rotation: { x: q.x, y: q.y, z: q.z, w: q.w } };
+        },
+        /** pose de antes do último passo, de onde parte a interpolação */
+        get prevStep() {
+          return game.car.prevPose;
         },
         get linvel() {
           return { ...game.car.body.linvel() };

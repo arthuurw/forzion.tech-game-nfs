@@ -54,6 +54,44 @@ describe('GameLoop', () => {
     }
   });
 
+  // smooth-world C1 (AC 1, door 1): alpha = acumulador / passo, em [0, 1), em todo quadro
+  it('render receives the interpolation alpha', () => {
+    for (const hz of [144, 30]) {
+      const queue: Array<(now: number) => void> = [];
+      vi.stubGlobal('requestAnimationFrame', (cb: (now: number) => void) => queue.push(cb));
+      vi.stubGlobal('cancelAnimationFrame', () => {});
+      let clock = 1000;
+      vi.spyOn(performance, 'now').mockImplementation(() => clock);
+      let steps = 0;
+      const seen: Array<{ steps: number; alpha: number }> = [];
+      const loop = new GameLoop(
+        () => steps++,
+        (_dt, alpha) => seen.push({ steps, alpha }),
+      );
+      loop.start();
+      const frames = hz * 2;
+      for (let f = 1; f <= frames; f++) {
+        clock += 1000 / hz;
+        queue.shift()!(clock);
+        // depois de f quadros passaram f/hz s: os passos inteiros de 1/60 rodaram e a sobra é o alpha
+        const exact = (f / hz) * 60;
+        const whole = Math.floor(exact + 1e-6);
+        const r = seen[f - 1]!;
+        expect(r.steps, `${hz} Hz quadro ${f}`).toBe(whole);
+        expect(Math.abs(r.alpha - (exact - whole)), `${hz} Hz quadro ${f}`).toBeLessThan(1e-9);
+        expect(r.alpha).toBeGreaterThanOrEqual(0);
+        expect(r.alpha).toBeLessThan(1);
+      }
+      expect(seen).toHaveLength(frames);
+      // a 144 Hz a sobra varia de quadro a quadro; a 30 Hz cada quadro fecha 2 passos inteiros
+      const distinct = new Set(seen.map((r) => r.alpha.toFixed(6))).size;
+      if (hz === 144) expect(distinct).toBeGreaterThan(5);
+      else expect(seen.every((r) => r.alpha < 1e-9)).toBe(true);
+      loop.stop();
+      vi.restoreAllMocks();
+    }
+  });
+
   // e2e-speed C1 (AC 1)
   it('runSteps calls fixedUpdate n times without render', () => {
     harness();
