@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 34,
+  "next_id": 37,
   "lessons": [
     {
       "id": "L-001",
@@ -601,10 +601,65 @@
       "recurrence": 1,
       "harmful": 0,
       "evidence": [
-        "C9 set - tests/e2e/visual.spec.ts:142 (tests/e2e)"
+        "C9 set - tests/e2e/visual.spec.ts:142 (tests/e2e)",
+        "round2 AC 9 set - tests/e2e/race.spec.ts:380 (201 vs 211 draw calls) (tests/e2e)"
       ],
       "created": "2026-10-01T17:13:40Z",
-      "last_seen": "2026-10-01T17:13:40Z"
+      "last_seen": "2026-10-02T21:20:54Z"
+    },
+    {
+      "id": "L-034",
+      "key": "surviving_mutant::playwright reads happen in real time while the sim keeps stepping compare deltas against the sim clock read in the same evaluate never against a fixed advance",
+      "text": "Playwright reads happen in real time while the sim keeps stepping; compare deltas against the sim clock read in the same evaluate, never against a fixed advance.",
+      "signal": "surviving_mutant",
+      "scope": "tests/e2e",
+      "status": "candidate",
+      "features": [
+        "e2e-speed"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "round2 F1 tests/e2e/helpers.ts:54, F2 helpers.ts:88 (tests/e2e)"
+      ],
+      "created": "2026-10-02T21:20:53Z",
+      "last_seen": "2026-10-02T21:20:53Z"
+    },
+    {
+      "id": "L-035",
+      "key": "ac_gap::re measure and rewrite a documented run time after any fix that changes what the run waits on a time measured before the fix goes stale",
+      "text": "Re-measure and rewrite a documented run time after any fix that changes what the run waits on; a time measured before the fix goes stale.",
+      "signal": "ac_gap",
+      "scope": "docs",
+      "status": "candidate",
+      "features": [
+        "e2e-speed"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "round2 C13 - AGENTS.md:14 (24.6 min doc vs 29.3 min green run) (docs)"
+      ],
+      "created": "2026-10-02T21:20:54Z",
+      "last_seen": "2026-10-02T21:20:54Z"
+    },
+    {
+      "id": "L-036",
+      "key": "spec_precision_gap::a sim clock advanced by summed fixed steps lands a few ulps short assert sim durations with a tolerance or as a step count never an exact on the seconds",
+      "text": "A sim clock advanced by summed fixed steps lands a few ulps short; assert sim durations with a tolerance or as a step count, never an exact >= on the seconds.",
+      "signal": "spec_precision_gap",
+      "scope": "tests/e2e",
+      "status": "candidate",
+      "features": [
+        "e2e-speed"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "round2 C6/C8 - tests/e2e/harness.spec.ts:68, :102 (tests/e2e)"
+      ],
+      "created": "2026-10-02T21:20:54Z",
+      "last_seen": "2026-10-02T21:20:54Z"
     }
   ]
 }

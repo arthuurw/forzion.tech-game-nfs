@@ -207,8 +207,26 @@ Seen once or not yet corroborated. Tracked, not trusted.
 ### L-033 - When sim waits move off the frame loop, sweep every test that reads render-smoothed state after a teleport or input, not only a hand-picked list; each such wait needs real frames.
 - signal: `ac_gap` · recurrence: 1 feature(s) · scope: `tests/e2e` · harmful: 0
 - features: e2e-speed
-- evidence: C9 set - tests/e2e/visual.spec.ts:142 (tests/e2e)
-- last seen: 2026-10-01T17:13:40Z
+- evidence: C9 set - tests/e2e/visual.spec.ts:142 (tests/e2e) (+1 more)
+- last seen: 2026-10-02T21:20:54Z
+
+### L-034 - Playwright reads happen in real time while the sim keeps stepping; compare deltas against the sim clock read in the same evaluate, never against a fixed advance.
+- signal: `surviving_mutant` · recurrence: 1 feature(s) · scope: `tests/e2e` · harmful: 0
+- features: e2e-speed
+- evidence: round2 F1 tests/e2e/helpers.ts:54, F2 helpers.ts:88 (tests/e2e)
+- last seen: 2026-10-02T21:20:53Z
+
+### L-035 - Re-measure and rewrite a documented run time after any fix that changes what the run waits on; a time measured before the fix goes stale.
+- signal: `ac_gap` · recurrence: 1 feature(s) · scope: `docs` · harmful: 0
+- features: e2e-speed
+- evidence: round2 C13 - AGENTS.md:14 (24.6 min doc vs 29.3 min green run) (docs)
+- last seen: 2026-10-02T21:20:54Z
+
+### L-036 - A sim clock advanced by summed fixed steps lands a few ulps short; assert sim durations with a tolerance or as a step count, never an exact >= on the seconds.
+- signal: `spec_precision_gap` · recurrence: 1 feature(s) · scope: `tests/e2e` · harmful: 0
+- features: e2e-speed
+- evidence: round2 C6/C8 - tests/e2e/harness.spec.ts:68, :102 (tests/e2e)
+- last seen: 2026-10-02T21:20:54Z
 
 ## Quarantined (failed when applied - ignore)
 
