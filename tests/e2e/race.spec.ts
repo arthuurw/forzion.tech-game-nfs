@@ -379,7 +379,8 @@ test.describe('races', () => {
   // C34 (AC 32)
   test('draw calls within budget while racing', async ({ page }) => {
     await startRace(page, 'circuito-centro');
-    await advanceSim(page, 0.2);
+    // a câmera de perseguição chega atrás do carro quadro a quadro; antes disso o quadro conta menos draw calls
+    await advanceSim(page, 1.5, { realtime: true });
     await test.info().attach('race-grid', { body: await page.screenshot(), contentType: 'image/png' });
     // night-city C24: a feature tirou 1 draw call líquida (postes −2, céu +1); o teto segue 220
     expect(await page.evaluate(() => (window as any).__game.render.calls as number)).toBeLessThanOrEqual(218);

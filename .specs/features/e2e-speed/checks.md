@@ -26,13 +26,13 @@ Proof: `npx playwright test tests/e2e/harness.spec.ts -g "next frame shows the l
 
 ### S2 - helpers pelo avanço rápido · 12 files · 172 KB · ~43k
 
-**C6** - `advanceSim(page, 3)` sem opção: `simTime` cresce ≥ 3, `__game.frames` cresce ≥ 1 e ≤ 10 durante a chamada (o laço de quadros levaria ≥ 36 quadros para 3 s a 5 passos por quadro) (AC 6)
+**C6** - `advanceSim(page, s)` sem opção, para s ∈ {3, 0.02}: os passos do próprio helper (espião em `__game.stepSim`, antes e depois lidos no mesmo `evaluate` da chamada) levam `simTime` de t0 a um valor ≥ t0 + s e ≤ t0 + s + 1/60 (± 1e-9); para s = 3, `__game.frames` cresce ≥ 1 e ≤ 10 durante a chamada (o laço de quadros levaria ≥ 36 quadros para 3 s a 5 passos por quadro). 0.02 s são 1.2 passos: `Math.round` dá 1 e só o passo extra alcança o alvo (AC 6; renegociado na verificação rodada 2, 2026-10-02, user delegated: o "cresce ≥ 3" lido entre `evaluate`s não via o passo extra)
 Proof: `npx playwright test tests/e2e/harness.spec.ts -g "advanceSim steps fast and waits one frame"`
 
 **C7** - `advanceSim(page, 1, { realtime: true })`: `simTime` cresce ≥ 1 e `__game.frames` cresce ≥ 12 durante a chamada (AC 7)
 Proof: `npx playwright test tests/e2e/harness.spec.ts -g "advanceSim realtime waits on the frame loop"`
 
-**C8** - Com `KeyW` pressionada, `waitSimUntil(page, 'g.car.speedKmh >= 30', 10)` devolve true e, na volta, 30 ≤ `speedKmh` < 30 + o ganho de um passo medido no mesmo teste (+ 0.5 km/h de folga); `waitSimUntil(page, 'false', 0.5)` devolve false com `simTime` crescido entre 0.5 e 0.75 (AC 8)
+**C8** - Com `KeyW` pressionada, `waitSimUntil(page, 'g.car.speedKmh >= 30', 10)` devolve true e, na volta, 30 ≤ `speedKmh` < 30 + o ganho de um passo medido no mesmo teste (+ 0.5 km/h de folga); `waitSimUntil(page, 'false', 0.5)` devolve false e os passos do próprio helper (espião em `__game.stepSim`) levam `simTime` de t0 a um valor ≥ t0 + 0.5 e ≤ t0 + 0.5 + 1/60 (± 1e-9) (AC 8; renegociado na verificação rodada 2, 2026-10-02, user delegated: o "entre 0.5 e 0.75" lido entre `evaluate`s não via um prazo um passo curto)
 Proof: `npx playwright test tests/e2e/harness.spec.ts -g "waitSimUntil stops on the first step that holds"`
 
 **C9** - As provas que dependem do quadro (Coverage "provas por quadro") passam e cada uma usa `{ realtime: true }`, `waitFrames` ou `sampleCountdown` em toda espera de simulação do corpo do teste (AC 9)

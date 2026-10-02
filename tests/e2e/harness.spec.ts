@@ -11,6 +11,35 @@ function clock(page: Page): Promise<{ simTime: number; frames: number }> {
   });
 }
 
+/**
+ * Espiona os `stepSim` que `run` faz: devolve o `simTime` antes do primeiro e depois do último, os
+ * dois lidos no mesmo `evaluate` do helper, sem quadros entre eles. `reached` é a comparação feita
+ * na página, com o mesmo `t0 + s` do helper.
+ */
+async function spySteps(page: Page, s: number, run: () => Promise<unknown>): Promise<{ span: number; reached: boolean }> {
+  await page.evaluate(() => {
+    const g = (window as any).__game;
+    const orig = g.stepSim;
+    const log: number[][] = [];
+    (window as any).__spy = { orig, log };
+    g.stepSim = (secs: number) => {
+      const before = g.simTime as number;
+      const r = orig(secs);
+      log.push([before, g.simTime as number]);
+      return r;
+    };
+  });
+  await run();
+  return page.evaluate((s) => {
+    const g = (window as any).__game;
+    const { orig, log } = (window as any).__spy;
+    g.stepSim = orig;
+    const t0 = log[0][0] as number;
+    const end = log[log.length - 1][1] as number;
+    return { span: end - t0, reached: end >= t0 + s };
+  }, s);
+}
+
 test.describe('harness - avanço rápido', () => {
   // C3 (AC 3)
   test('stepSim advances exactly the requested steps', { tag: '@smoke' }, async ({ page }) => {
@@ -63,12 +92,17 @@ test.describe('harness - helpers', () => {
   test('advanceSim steps fast and waits one frame', { tag: '@smoke' }, async ({ page }) => {
     await gotoGame(page);
     const a = await clock(page);
-    await advanceSim(page, 3);
+    const r = await spySteps(page, 3, () => advanceSim(page, 3));
     const b = await clock(page);
-    expect(b.simTime - a.simTime).toBeGreaterThanOrEqual(3);
+    expect(r.reached).toBe(true);
+    expect(r.span).toBeLessThanOrEqual(3 + 1 / 60 + 1e-9);
     expect(b.frames - a.frames).toBeGreaterThanOrEqual(1);
     // o laço de quadros levaria ≥ 36 quadros para 3 s a 5 passos por quadro
     expect(b.frames - a.frames).toBeLessThanOrEqual(10);
+    // 1.2 passos: Math.round dá 1, e só o passo extra alcança o alvo
+    const small = await spySteps(page, 0.02, () => advanceSim(page, 0.02));
+    expect(small.reached).toBe(true);
+    expect(small.span).toBeLessThanOrEqual(0.02 + 1 / 60 + 1e-9);
   });
 
   // C7 (AC 7)
@@ -96,10 +130,12 @@ test.describe('harness - helpers', () => {
     expect(r.at).toBeGreaterThanOrEqual(30);
     expect(r.at).toBeLessThan(30 + r.gain + 0.5);
 
-    const t0 = (await clock(page)).simTime;
-    expect(await waitSimUntil(page, 'false', 0.5)).toBe(false);
-    const dt = (await clock(page)).simTime - t0;
-    expect(dt).toBeGreaterThanOrEqual(0.5);
-    expect(dt).toBeLessThanOrEqual(0.75);
+    let held: boolean | undefined;
+    const d = await spySteps(page, 0.5, async () => {
+      held = await waitSimUntil(page, 'false', 0.5);
+    });
+    expect(held).toBe(false);
+    expect(d.reached).toBe(true);
+    expect(d.span).toBeLessThanOrEqual(0.5 + 1 / 60 + 1e-9);
   });
 });
