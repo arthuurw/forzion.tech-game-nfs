@@ -32,10 +32,10 @@ Proof: `npx vitest run tests/unit/docs.test.ts -t "interpolation and walkable gr
 
 ### S2 - junção do anel sem degrau · 2 files · 37 KB · ~9k
 
-**C8** - Nas 12 junções entre avenida e anel do seed 1337, cada vértice da borda final da fita da avenida fica a ≤ 0.02 m da altura da fita do anel logo abaixo dele (AC 5)
+**C8** - ✅ Nas 12 junções entre avenida e anel do seed 1337, cada vértice da borda final da fita da avenida fica a ≤ 0.02 m da altura da fita do anel logo abaixo dele (AC 5)
 Proof: `npx vitest run tests/unit/roads.test.ts -t "avenue ends meet the ring without a step"`
 
-**C9** - A inclinação máxima de toda estrada segue ≤ 10 %, inclusive nos últimos metros das avenidas que chegam ao anel (AC 6)
+**C9** - ✅ A inclinação máxima de toda estrada segue ≤ 10 %, inclusive nos últimos metros das avenidas que chegam ao anel (AC 6)
 Proof: `npx vitest run tests/unit/roads.test.ts -t "grade at most 10 percent"`
 
 ### S3 - ninguém entra em prédio · 5 files · 60 KB · ~15k

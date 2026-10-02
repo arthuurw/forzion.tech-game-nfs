@@ -25,7 +25,7 @@ Reusa o `FixedStepper.accumulator`, que já existe e que ninguém lê, como fra�
 1. `core/GameLoop` (exists): passa `alpha = accumulator / step` ao render (door 1).
 2. `vehicle/Car` (exists): guarda a pose anterior antes de cada passo e desenha a pose interpolada; `teleport` e `reset` zeram a interpolação (door 1). `race/RaceController` (exists) repassa o `alpha` aos oponentes.
 3. `camera/ChaseCamera` (exists): segue a pose interpolada.
-4. `world/roads/RoadGenerator` (exists): a ponta da avenida acompanha a inclinação do anel na junção.
+4. `world/roads/RoadGenerator` (exists): a ponta da avenida acompanha a inclinação do anel na junção. A seção final assenta na fita do anel e ganha inclinação transversal (`Road.bank`, opcional, por ponto), que some nos 60 m antes; `world/roads/roadMesh` (exists) a aplica na fita (render e física) e `world/terrain/carveRoads` (exists) no terreno aplainado.
 5. `world/interiors/BlockInteriors` (exists): consulta de chão caminhável, com o vértice arredondado para baixo e a distância à fachada (door 2). `world/interiors/interiorMotion` (exists) usa essa consulta para o pedestre, a fuga e o empurrão do gato.
 6. `world/ChunkManager` (exists): o build vira uma sequência de fatias, uma por `update`, e o boot pré-monta os chunks perto do spawn (door 3).
 7. `world/terrain/TerrainGenerator` (exists): `heightAt` usa a mesma diagonal da malha.

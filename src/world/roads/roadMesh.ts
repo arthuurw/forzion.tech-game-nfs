@@ -4,7 +4,8 @@
  * arrays para `BufferGeometry` / `InstancedMesh`.
  *
  * Fita: por ponto, 2 vértices a ±width/2 do eixo, perpendiculares ao heading
- * do ponto (diferença central), 5 cm acima da estrada. `u` vai de 0 a
+ * do ponto (diferença central), 5 cm acima da estrada; com `bank`, a borda
+ * esquerda sobe e a direita desce esse tanto (ponta da avenida no anel). `u` vai de 0 a
  * width/4 de borda a borda e `v` cresce 0.5 por ponto: 1 tile a cada 4 m nos
  * dois sentidos. O atributo `width` por vértice deixa o shader desenhar as
  * faixas em metros (u·4 atravessando, v·4 ao longo).
@@ -71,7 +72,8 @@ export function roadStripGeometry(road: Road, from = 0, to = road.points.length 
     const x = p[i * 3]!;
     const y = p[i * 3 + 1]! + ROAD_LIFT;
     const z = p[i * 3 + 2]!;
-    positions.set([x + lx * w2, y, z + lz * w2, x - lx * w2, y, z - lz * w2], k * 6);
+    const b = road.bank?.[i] ?? 0;
+    positions.set([x + lx * w2, y + b, z + lz * w2, x - lx * w2, y - b, z - lz * w2], k * 6);
     const v = ((from + k) * ROAD_STEP) / TILE_M;
     uvs.set([0, v, road.width / TILE_M, v], k * 4);
   }

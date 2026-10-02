@@ -41,6 +41,12 @@ export interface Road {
   points: Float32Array;
   /** trechos de ponte, índices inclusivos em `points` */
   bridges: Array<{ from: number; to: number }>;
+  /**
+   * inclinação transversal por ponto (m): a borda esquerda da fita fica `bank` acima do eixo e a
+   * direita o mesmo abaixo; sem o campo, a fita é plana na transversal. Só as pontas das avenidas
+   * no anel têm, para a fita acompanhar a rampa do anel (smooth-world AC 5)
+   */
+  bank?: Float32Array;
 }
 
 export interface RoadNetwork {
@@ -204,9 +210,37 @@ export function markBridges(points: Float32Array, hm: Heightmap): Array<{ from: 
   return ranges;
 }
 
-function makeRoad(id: number, kind: RoadKind, closed: boolean, points: Float32Array, hm: Heightmap): Road {
+function makeRoad(id: number, kind: RoadKind, closed: boolean, points: Float32Array, hm: Heightmap, bank?: Float32Array): Road {
   const spec = ROAD_SPECS[kind];
-  return { id, kind, lanes: spec.lanes, width: spec.width, closed, points, bridges: markBridges(points, hm) };
+  const road: Road = { id, kind, lanes: spec.lanes, width: spec.width, closed, points, bridges: markBridges(points, hm) };
+  if (bank) road.bank = bank;
+  return road;
+}
+
+/**
+ * Altura da fita de uma estrada fechada (plana na transversal) sob (x, z): a do eixo no pé da
+ * perpendicular ao segmento mais perto, interpolada ao longo dele.
+ */
+function ringStripY(road: Road, x: number, z: number): number {
+  const p = road.points;
+  const n = p.length / 3;
+  let best = Infinity;
+  let y = 0;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const ax = p[i * 3]!;
+    const az = p[i * 3 + 2]!;
+    const dx = p[j * 3]! - ax;
+    const dz = p[j * 3 + 2]! - az;
+    const len2 = dx * dx + dz * dz;
+    const t = Math.min(1, Math.max(0, ((x - ax) * dx + (z - az) * dz) / len2));
+    const d = (ax + dx * t - x) ** 2 + (az + dz * t - z) ** 2;
+    if (d < best) {
+      best = d;
+      y = p[i * 3 + 1]! + (p[j * 3 + 1]! - p[i * 3 + 1]!) * t;
+    }
+  }
+  return y;
 }
 
 /** Grade espacial dos pontos de estrada (célula de 32 m) para as buscas de vizinhança. */
@@ -365,7 +399,10 @@ export function generateRoads(seed: number, hm: Heightmap): RoadNetwork {
   const ring = makeRoad(0, 'highway', true, pack(ringXZ, profile(ringXZ, true, hm, false)), hm);
   register(ring);
 
-  // avenidas: de anel a anel, planas no centro, com as pontas na altura do anel
+  // avenidas: de anel a anel, planas no centro, com as pontas na altura do anel. A seção da ponta
+  // assenta na fita do anel, com a rampa dele na transversal (smooth-world AC 5); nos 60 m antes,
+  // a altura mistura com a do ponto do anel mais perto e a rampa transversal some aos poucos
+  const avenueHalf = ROAD_SPECS.avenue.width / 2;
   for (const line of avenueLines(seed)) {
     const s0 = avenueEnd(line, -1, seed);
     const s1 = avenueEnd(line, 1, seed);
@@ -374,6 +411,7 @@ export function generateRoads(seed: number, hm: Heightmap): RoadNetwork {
     const xz = resampleOpen(denseAv, ROAD_STEP);
     const y = profile(xz, false, hm, true);
     const n = xz.length / 2;
+    const bank = new Float32Array(n);
     const blend = 30;
     for (const end of [0, n - 1]) {
       const ex = xz[end * 2]!;
@@ -390,11 +428,22 @@ export function generateRoads(seed: number, hm: Heightmap): RoadNetwork {
       for (let k = 0; k < blend; k++) {
         const i = end === 0 ? k : n - 1 - k;
         const t = 1 - k / blend;
-        y[i] = y[i]! + (best - y[i]!) * t;
+        // bordas da seção (perpendicular ao heading por diferença central, como a fita)
+        const a = Math.max(0, i - 1);
+        const b = Math.min(n - 1, i + 1);
+        const h = Math.atan2(xz[b * 2]! - xz[a * 2]!, xz[b * 2 + 1]! - xz[a * 2 + 1]!);
+        const lx = Math.cos(h) * avenueHalf;
+        const lz = -Math.sin(h) * avenueHalf;
+        const x = xz[i * 2]!;
+        const z = xz[i * 2 + 1]!;
+        const left = ringStripY(ring, x + lx, z + lz);
+        const right = ringStripY(ring, x - lx, z - lz);
+        y[i] = y[i]! + ((k === 0 ? (left + right) / 2 : best) - y[i]!) * t;
+        bank[i] = ((left - right) / 2) * t;
       }
     }
     limitGrade(y, PROFILE_GRADE * ROAD_STEP, false);
-    register(makeRoad(roads.length, 'avenue', false, pack(xz, y), hm));
+    register(makeRoad(roads.length, 'avenue', false, pack(xz, y), hm, bank));
   }
 
   // estradas de morro: partem de pontos da rodovia e das avenidas fora do centro

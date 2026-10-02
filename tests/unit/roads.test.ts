@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { generateTerrain, type Heightmap } from '../../src/world/terrain/TerrainGenerator';
 import { carveRoads } from '../../src/world/terrain/carveRoads';
 import { ROAD_SPECS, generateRoads, type Road } from '../../src/world/roads/RoadGenerator';
-import { generateLamps } from '../../src/world/roads/roadMesh';
+import { generateLamps, roadStripGeometry } from '../../src/world/roads/roadMesh';
 
 const hm = generateTerrain(1337);
 const net = generateRoads(1337, hm);
@@ -148,7 +148,58 @@ describe('road network', () => {
         const g = Math.abs(by - ay) / Math.hypot(bx - ax, bz - az);
         if (g > 0.1) throw new Error(`road ${r.id} step ${i}: grade ${g}`);
       }
+      // smooth-world C9 (AC 6): nas avenidas, também nas bordas da fita, que nas pontas acompanham a rampa do anel
+      if (r.kind !== 'avenue') continue;
+      const strip = roadStripGeometry(r, 0, last).positions;
+      for (let k = 0; k < last; k++) {
+        for (const side of [0, 3]) {
+          const a = k * 6 + side;
+          const b = (k + 1) * 6 + side;
+          const g = Math.abs(strip[b + 1]! - strip[a + 1]!) / Math.hypot(strip[b]! - strip[a]!, strip[b + 2]! - strip[a + 2]!);
+          if (g > 0.1) throw new Error(`road ${r.id} step ${k} edge ${side / 3}: grade ${g}`);
+        }
+      }
     }
+  });
+
+  // smooth-world C8 (AC 5): a borda final de cada avenida fica na altura da fita do anel logo abaixo
+  it('avenue ends meet the ring without a step', () => {
+    const ring = net.roads.find((r) => r.kind === 'highway')!;
+    const rs = roadStripGeometry(ring, 0, count(ring));
+    /** altura da fita do anel sob (x, z): o triângulo dela que contém o ponto, por baricêntricas */
+    const ringY = (x: number, z: number): number | null => {
+      const P = rs.positions;
+      for (let t = 0; t < rs.indices.length; t += 3) {
+        const [i, j, k] = [rs.indices[t]! * 3, rs.indices[t + 1]! * 3, rs.indices[t + 2]! * 3];
+        const det = (P[j]! - P[i]!) * (P[k + 2]! - P[i + 2]!) - (P[k]! - P[i]!) * (P[j + 2]! - P[i + 2]!);
+        const u = ((x - P[i]!) * (P[k + 2]! - P[i + 2]!) - (P[k]! - P[i]!) * (z - P[i + 2]!)) / det;
+        const v = ((P[j]! - P[i]!) * (z - P[i + 2]!) - (x - P[i]!) * (P[j + 2]! - P[i + 2]!)) / det;
+        if (u < -1e-9 || v < -1e-9 || u + v > 1 + 1e-9) continue;
+        return P[i + 1]! + (P[j + 1]! - P[i + 1]!) * u + (P[k + 1]! - P[i + 1]!) * v;
+      }
+      return null;
+    };
+    const avenues = net.roads.filter((r) => r.kind === 'avenue');
+    expect(avenues).toHaveLength(6);
+    let junctions = 0;
+    let worst = 0;
+    for (const av of avenues) {
+      const g = roadStripGeometry(av).positions;
+      const n = count(av);
+      for (const end of [0, n - 1]) {
+        junctions++;
+        for (const side of [0, 3]) {
+          const o = end * 6 + side;
+          const y = ringY(g[o]!, g[o + 2]!);
+          expect(y, `avenida ${av.id} ponta ${end} borda ${side / 3} sobre o anel`).not.toBeNull();
+          const d = Math.abs(g[o + 1]! - y!);
+          worst = Math.max(worst, d);
+          expect(d, `avenida ${av.id} ponta ${end} borda ${side / 3}`).toBeLessThanOrEqual(0.02);
+        }
+      }
+    }
+    expect(junctions).toBe(12);
+    expect(worst).toBeLessThanOrEqual(0.02);
   });
 
   // C19 (AC 16)

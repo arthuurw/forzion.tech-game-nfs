@@ -5,9 +5,12 @@
  * fora de ponte é "dona" do ponto que a cobre melhor (menor `distância −
  * width/2`, então num cruzamento vence a estrada cujo eixo está mais perto).
  * Até `width/2` a amostra fica na altura da estrada; nos 6 m seguintes mistura
- * suavemente com a altura original. Sob pontes nada muda.
+ * suavemente com a altura original. Sob pontes nada muda. Numa estrada com
+ * `bank` (ponta de avenida no anel), a altura acompanha a inclinação
+ * transversal da fita, presa à das bordas.
  */
 import type { RoadNetwork } from '../roads/RoadGenerator';
+import { pointHeading } from '../roads/roadMesh';
 import type { Heightmap } from './TerrainGenerator';
 
 export const CARVE_BLEND = 6;
@@ -30,6 +33,11 @@ export function carveRoads(hm: Heightmap, network: RoadNetwork): Heightmap {
       const px = p[i * 3]!;
       const py = p[i * 3 + 1]!;
       const pz = p[i * 3 + 2]!;
+      const bank = road.bank?.[i] ?? 0;
+      const h = bank !== 0 ? pointHeading(road, i) : 0;
+      // esquerda do heading, por metro de largura: a altura sobe `bank` na borda esquerda
+      const lx = Math.cos(h) / w2;
+      const lz = -Math.sin(h) / w2;
       const ix0 = Math.max(0, Math.ceil((px - reach - hm.origin) / hm.spacing));
       const ix1 = Math.min(n - 1, Math.floor((px + reach - hm.origin) / hm.spacing));
       const iz0 = Math.max(0, Math.ceil((pz - reach - hm.origin) / hm.spacing));
@@ -46,7 +54,7 @@ export function carveRoads(hm: Heightmap, network: RoadNetwork): Heightmap {
             score[k] = sc;
             dist[k] = d;
             half[k] = w2;
-            target[k] = py;
+            target[k] = bank === 0 ? py : py + bank * Math.min(1, Math.max(-1, dx * lx + dz * lz));
           }
         }
       }
