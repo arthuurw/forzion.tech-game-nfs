@@ -27,7 +27,8 @@ export function carveRoads(hm: Heightmap, network: RoadNetwork): Heightmap {
     const w2 = road.width / 2;
     const reach = w2 + CARVE_BLEND;
     const onBridge = new Uint8Array(p.length / 3);
-    for (const b of road.bridges) for (let i = b.from; i <= b.to; i++) onBridge[i] = 1;
+    // numa estrada fechada, o trecho que passa pela costura tem `to` ≥ n
+    for (const b of road.bridges) for (let i = b.from; i <= b.to; i++) onBridge[i % onBridge.length] = 1;
     for (let i = 0; i < p.length / 3; i++) {
       if (onBridge[i]) continue;
       const px = p[i * 3]!;

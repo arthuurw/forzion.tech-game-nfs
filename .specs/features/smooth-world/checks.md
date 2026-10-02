@@ -77,7 +77,7 @@ Proof: `npx vitest run tests/unit/terrain.test.ts -t "heightAt follows the mesh 
 
 ### S6 - pontes e extrusões certas · 4 files · 40 KB · ~10k
 
-**C20** - Numa estrada fechada sintética com ponte sobre o índice 0, sai 1 trecho de ponte que passa pela costura, e o tabuleiro e o guarda-corpo têm quads em todos os segmentos dele, inclusive `n-1 → 0` (AC 15)
+**C20** - ✅ Numa estrada fechada sintética com ponte sobre o índice 0, sai 1 trecho de ponte que passa pela costura, e o tabuleiro e o guarda-corpo têm quads em todos os segmentos dele, inclusive `n-1 → 0` (AC 15)
 Proof: `npx vitest run tests/unit/bridges.test.ts -t "bridge across the closed road seam"`
 
 **C21** - Em calçada, tabuleiro, guarda-corpo e pilar montados do seed 1337, a normal de cada vértice difere ≤ 1° da normal da face do triângulo a que pertence (AC 16)

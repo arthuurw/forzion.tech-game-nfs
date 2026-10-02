@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CHUNK_SIZE, CHUNKS_PER_SIDE, chunkOf, planChunks } from './chunks';
 import type { Road, RoadNetwork } from './roads/RoadGenerator';
-import { bridgeMeshes, extrudeAlong, pillarBox, type BridgeParts } from './roads/bridges';
+import { bridgeMeshes, bridgeRuns, extrudeAlong, pillarBox, type BridgeParts } from './roads/bridges';
 import { roadStripGeometry } from './roads/roadMesh';
 import type { Heightmap } from './terrain/TerrainGenerator';
 import type { BlockInteriors } from './interiors/BlockInteriors';
@@ -155,12 +155,8 @@ export class ChunkManager {
     }
     const bridges = new MeshBuilder();
     for (const { road, parts } of this.bridges) {
-      const mine = parts.indices.filter((i) => this.pointChunk(road, i) === id);
-      for (const run of splitRuns(mine)) {
-        // um ponto a mais para emendar com o chunk vizinho
-        const last = run[run.length - 1]!;
-        if (parts.indices.includes(last + 1)) run.push(last + 1);
-        if (run.length < 2) continue;
+      // os trechos deste chunk, com um ponto a mais para emendar com o vizinho (na ordem da ponte: n−1 → 0 conta)
+      for (const run of bridgeRuns(parts.indices, (i) => this.pointChunk(road, i) === id)) {
         const { deck, rails } = bridgeMeshes(road, { indices: run, pillars: [] });
         for (const m of [deck, ...rails]) bridges.add(m.positions, m.indices);
       }

@@ -29,7 +29,7 @@ Reusa o `FixedStepper.accumulator`, que já existe e que ninguém lê, como fra�
 5. `world/interiors/BlockInteriors` (exists): consulta de chão caminhável, com o vértice arredondado para baixo e a distância à fachada (door 2). `world/interiors/interiorMotion` (exists) usa essa consulta para o pedestre, a fuga e o empurrão do gato (o ponto de partida de um trecho, onde ele já está, não conta). `world/interiors/InteriorProps` (exists) sorteia pedestres e gatos de zona só em vértices caminháveis.
 6. `world/ChunkManager` (exists): o build vira uma sequência de fatias, uma por `update`, e o boot pré-monta os chunks perto do spawn (door 3).
 7. `world/terrain/TerrainGenerator` (exists): `heightAt` usa a mesma diagonal da malha.
-8. `world/roads/RoadGenerator`, `world/roads/bridges` e `world/ChunkManager` (exists): trechos de ponte com índice modular em estrada fechada, e vértices por face nas extrusões.
+8. `world/roads/RoadGenerator`, `world/roads/bridges` e `world/ChunkManager` (exists): trechos de ponte com índice modular em estrada fechada (`to` ≥ n no trecho que passa pela costura; `roadMesh`, `carveRoads` e a escolha do começo das estradas de morro leem módulo n; `bridgeRuns` corta a ponte por chunk na ordem dela), e vértices por face nas extrusões.
 9. `world/interiors/InteriorScene` (exists): temporários reaproveitados como campos. `hud/Minimap` (exists) redesenha com passo limitado.
 
 ## Impact
@@ -45,6 +45,7 @@ Reusa o `FixedStepper.accumulator`, que já existe e que ninguém lê, como fra�
 | mundo | bases de lote, colunas do trem, carros estacionados e piscinas mudam de altura até 0.19 m, com a nova `heightAt` |
 | mundo | com o seed 1337, as avenidas mudam de altura só nos últimos metros antes do anel |
 | memória | as extrusões ganham ~4× vértices por seção (normais por face) |
+| checks de outras features | city-terrain C27 (`deck rails and pillars`) e o teste de orientação das faces em `roadMesh.test.ts` liam os cantos da seção pelo layout de 4 vértices por seção; passam a ler pelo layout de 4 vértices por face, com as mesmas asserções |
 | stored data | nada para migrar |
 
 ## Relations

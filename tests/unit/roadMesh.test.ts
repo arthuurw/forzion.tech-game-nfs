@@ -68,10 +68,14 @@ describe('road mesh winding', () => {
         const [i, j, k] = [mesh.indices[t]!, mesh.indices[t + 1]!, mesh.indices[t + 2]!];
         const { n, c } = tri(mesh.positions, i, j, k);
         // centro da seção do ponto de estrada da face: eixo deslocado para o lado do guarda-corpo
-        // nas tampas (os 3 vértices na mesma seção) a referência é a seção vizinha, para dentro da caixa
+        // nas tampas (os 3 vértices na mesma seção) a referência é a seção vizinha, para dentro da caixa.
+        // Cada face de cada segmento tem 4 vértices próprios (smooth-world AC 16): o quad q = segmento·4 + face,
+        // e depois dos (m − 1)·4 quads vêm a tampa do começo e a do fim
         const m = parts.indices.length;
-        let sec = Math.floor(i / 4);
-        if (Math.floor(j / 4) === sec && Math.floor(k / 4) === sec) sec = sec === 0 ? 1 : m - 2;
+        const q = Math.floor(i / 4);
+        let sec = Math.floor(q / 4);
+        if (q === (m - 1) * 4) sec = 1;
+        else if (q === (m - 1) * 4 + 1) sec = m - 2;
         const idx = parts.indices[Math.min(m - 1, sec)]!;
         const h = Math.atan2(road.points[Math.min(road.points.length / 3 - 1, idx + 1) * 3]! - road.points[Math.max(0, idx - 1) * 3]!, road.points[Math.min(road.points.length / 3 - 1, idx + 1) * 3 + 2]! - road.points[Math.max(0, idx - 1) * 3 + 2]!);
         const lat = (road.width / 2 - 0.15) * offset;

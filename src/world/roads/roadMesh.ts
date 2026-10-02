@@ -124,7 +124,7 @@ export function lampColor(lamp: Pick<Lamp, 'x' | 'z'>, road: Pick<Road, 'kind'>)
 export function nonBridgeStretches(road: Road): number[][] {
   const n = road.points.length / 3;
   const bridge = new Uint8Array(n);
-  for (const b of road.bridges) for (let i = b.from; i <= b.to; i++) bridge[i] = 1;
+  for (const b of road.bridges) for (let i = b.from; i <= b.to; i++) bridge[i % n] = 1;
   if (road.closed && road.bridges.length === 0) {
     // laço inteiro: repete o primeiro ponto no fim para contar o último segmento
     return [[...Array.from({ length: n }, (_, i) => i), 0]];

@@ -2,14 +2,103 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { describe, expect, it } from 'vitest';
 import { WorldPhysics } from '../../src/world/WorldPhysics';
 import { generateTerrain, heightAt, riverCenterX, type Heightmap } from '../../src/world/terrain/TerrainGenerator';
-import { generateRoads, markBridges } from '../../src/world/roads/RoadGenerator';
-import { bridgeMeshes, bridgeParts, pillarBox, PILLAR_SIZE } from '../../src/world/roads/bridges';
+import { generateRoads, markBridges, type Road } from '../../src/world/roads/RoadGenerator';
+import { bridgeMeshes, bridgeParts, bridgeRuns, pillarBox, PILLAR_SIZE, RAIL_HEIGHT, RAIL_WIDTH, type TriMesh } from '../../src/world/roads/bridges';
 import { pointHeading } from '../../src/world/roads/roadMesh';
 
 const hm = generateTerrain(1337);
 const net = generateRoads(1337, hm);
 
+/**
+ * Canto `c` (0 topo esquerdo, 1 topo direito, 2 fundo direito, 3 fundo esquerdo) da seção `k` de
+ * uma extrusão de `m` seções. Cada face de cada segmento tem 4 vértices próprios (smooth-world
+ * AC 16): o quad da face f do segmento s começa no vértice (s·4 + f)·4, com os cantos u e v da
+ * face na seção s e depois na s + 1; o topo é a face 0 (cantos 0, 1) e o fundo a face 2 (2, 3).
+ */
+function corner(positions: Float32Array, m: number, k: number, c: number): [number, number, number] {
+  const seg = Math.min(k, m - 2);
+  const face = c < 2 ? 0 : 2;
+  const v = (seg * 4 + face) * 4 + (k > seg ? 2 : 0) + (c % 2);
+  return [positions[v * 3]!, positions[v * 3 + 1]!, positions[v * 3 + 2]!];
+}
+
+/** algum triângulo de `mesh` contém (x, z) no plano e passa a até 0.05 m de `y` ali? */
+function covers(mesh: TriMesh, x: number, y: number, z: number): boolean {
+  const P = mesh.positions;
+  for (let t = 0; t < mesh.indices.length; t += 3) {
+    const [i, j, k] = [mesh.indices[t]! * 3, mesh.indices[t + 1]! * 3, mesh.indices[t + 2]! * 3];
+    const det = (P[j]! - P[i]!) * (P[k + 2]! - P[i + 2]!) - (P[k]! - P[i]!) * (P[j + 2]! - P[i + 2]!);
+    if (Math.abs(det) < 1e-9) continue;
+    const u = ((x - P[i]!) * (P[k + 2]! - P[i + 2]!) - (P[k]! - P[i]!) * (z - P[i + 2]!)) / det;
+    const v = ((P[j]! - P[i]!) * (z - P[i + 2]!) - (x - P[i]!) * (P[j + 2]! - P[i + 2]!)) / det;
+    if (u < -1e-6 || v < -1e-6 || u + v > 1 + 1e-6) continue;
+    if (Math.abs(P[i + 1]! + (P[j + 1]! - P[i + 1]!) * u + (P[k + 1]! - P[i + 1]!) * v - y) <= 0.05) return true;
+  }
+  return false;
+}
+
 describe('bridges', () => {
+  // smooth-world C20 (AC 15): estrada fechada com ponte sobre o índice 0
+  it('bridge across the closed road seam', () => {
+    // anel de raio 100 em volta da origem, um ponto a cada ~2 m, pista a 5 m; o índice 0 fica em (100, 0)
+    const n = 314;
+    const points = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      points.set([100 * Math.cos(a), 5, 100 * Math.sin(a)], i * 3);
+    }
+    // terreno a 5 m, com água (−5) numa faixa |z| < 14 do lado x > 0: o anel cruza a água em volta do índice 0
+    const heights = new Float32Array(101 * 101);
+    for (let iz = 0; iz < 101; iz++) {
+      for (let ix = 0; ix < 101; ix++) heights[iz * 101 + ix] = -200 + ix * 4 > 0 && Math.abs(-200 + iz * 4) < 14 ? -5 : 5;
+    }
+    const hm: Heightmap = { size: 101, spacing: 4, origin: -200, heights };
+    const ranges = markBridges(points, hm, true);
+    // 1 trecho só, que começa antes da costura e termina depois dela
+    expect(ranges).toHaveLength(1);
+    const range = ranges[0]!;
+    expect(range.from).toBeGreaterThan(n / 2);
+    expect(range.from).toBeLessThan(n);
+    expect(range.to).toBeGreaterThanOrEqual(n);
+    expect(range.to - n).toBeLessThan(n / 2);
+    // e aberto, o mesmo traçado corta o trecho em dois na costura
+    expect(markBridges(points, hm)).toHaveLength(2);
+
+    const road: Road = { id: 0, kind: 'highway', lanes: 6, width: 24, closed: true, points, bridges: ranges };
+    const parts = bridgeParts(road, range, hm);
+    const at = parts.indices.indexOf(n - 1);
+    expect(at).toBeGreaterThanOrEqual(0);
+    expect(parts.indices[at + 1]).toBe(0);
+    expect(parts.indices).toHaveLength(range.to - range.from + 1);
+    const { deck, rails } = bridgeMeshes(road, parts);
+    // tabuleiro e guarda-corpos com quad em todo segmento do trecho, inclusive n−1 → 0
+    const w2 = road.width / 2;
+    let segments = 0;
+    for (let k = 0; k + 1 < parts.indices.length; k++) {
+      const a = parts.indices[k]!;
+      const b = parts.indices[k + 1]!;
+      const mx = (points[a * 3]! + points[b * 3]!) / 2;
+      const mz = (points[a * 3 + 2]! + points[b * 3 + 2]!) / 2;
+      const h = Math.atan2(points[b * 3]! - points[a * 3]!, points[b * 3 + 2]! - points[a * 3 + 2]!);
+      expect(covers(deck, mx, 5, mz), `tabuleiro ${a} → ${b}`).toBe(true);
+      rails.forEach((rail, r) => {
+        const off = (r === 0 ? 1 : -1) * (w2 - RAIL_WIDTH / 2);
+        expect(covers(rail, mx + Math.cos(h) * off, 5 + RAIL_HEIGHT, mz - Math.sin(h) * off), `guarda-corpo ${r} ${a} → ${b}`).toBe(true);
+      });
+      segments++;
+    }
+    expect(segments).toBe(range.to - range.from);
+
+    // por chunk: um chunk que acaba na costura ainda leva o segmento n−1 → 0, e os dois juntos levam todos uma vez
+    expect(bridgeRuns(parts.indices, () => true)).toEqual([parts.indices]);
+    const before = bridgeRuns(parts.indices, (i) => i >= n / 2);
+    const after = bridgeRuns(parts.indices, (i) => i < n / 2);
+    expect(before).toHaveLength(1);
+    expect(before[0]!.slice(-2)).toEqual([n - 1, 0]);
+    const segs = [...before, ...after].flatMap((run) => run.slice(1).map((b, k) => `${run[k]}-${b}`));
+    expect(segs.sort()).toEqual(parts.indices.slice(1).map((b, k) => `${parts.indices[k]}-${b}`).sort());
+  });
+
   // C26 (AC 20, door 6)
   it('bridge stretches where the road is high or over water', () => {
     let total = 0;
@@ -77,30 +166,30 @@ describe('bridges', () => {
         const parts = bridgeParts(r, range, hm);
         const { deck, rails } = bridgeMeshes(r, parts);
         // tabuleiro: por ponto, topo na altura da estrada e fundo 0.8 abaixo, bordas a ±width/2
+        const m = parts.indices.length;
         parts.indices.forEach((i, k) => {
           const y = r.points[i * 3 + 1]!;
           const x = r.points[i * 3]!;
           const z = r.points[i * 3 + 2]!;
-          const ys = [1, 4, 7, 10].map((o) => deck.positions[k * 12 + o]!);
+          const ys = [0, 1, 2, 3].map((c) => corner(deck.positions, m, k, c)[1]);
           expect(ys[0]).toBeCloseTo(y, 4);
           expect(ys[1]).toBeCloseTo(y, 4);
           expect(ys[2]).toBeCloseTo(y - 0.8, 4);
           expect(ys[3]).toBeCloseTo(y - 0.8, 4);
           for (const v of [0, 1]) {
-            const vx = deck.positions[k * 12 + v * 3]!;
-            const vz = deck.positions[k * 12 + v * 3 + 2]!;
+            const [vx, , vz] = corner(deck.positions, m, k, v);
             expect(Math.hypot(vx - x, vz - z)).toBeCloseTo(r.width / 2, 3);
           }
           // guarda-corpos: 1 m de altura acima do tabuleiro, face externa em ±width/2, um de cada lado
           const h = pointHeading(r, i);
           const sides = rails.map((rail) => {
-            const topY = rail.positions[k * 12 + 1]!;
-            const botY = rail.positions[k * 12 + 7]!;
+            const topY = corner(rail.positions, m, k, 0)[1];
+            const botY = corner(rail.positions, m, k, 2)[1];
             expect(topY - botY).toBeCloseTo(1, 4);
             expect(botY).toBeCloseTo(y, 4);
             const lat = [0, 1].map((v) => {
-              const vx = rail.positions[k * 12 + v * 3]! - x;
-              const vz = rail.positions[k * 12 + v * 3 + 2]! - z;
+              const vx = corner(rail.positions, m, k, v)[0] - x;
+              const vz = corner(rail.positions, m, k, v)[2] - z;
               return vx * Math.cos(h) - vz * Math.sin(h);
             });
             const outer = Math.max(...lat.map(Math.abs));

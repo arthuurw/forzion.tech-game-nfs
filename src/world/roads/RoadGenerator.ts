@@ -39,7 +39,10 @@ export interface Road {
   closed: boolean;
   /** x, y, z a cada 2 m */
   points: Float32Array;
-  /** trechos de ponte, índices inclusivos em `points` */
+  /**
+   * trechos de ponte, índices inclusivos em `points`; numa estrada fechada, um trecho que passa
+   * pela costura tem `to` ≥ n (os índices seguem módulo n, smooth-world AC 15)
+   */
   bridges: Array<{ from: number; to: number }>;
   /**
    * inclinação transversal por ponto (m): a borda esquerda da fita fica `bank` acima do eixo e a
@@ -180,10 +183,13 @@ function pack(xz: number[], y: number[]): Float32Array {
  * Trechos de ponte: água sob o eixo ou pista mais de 4 m acima do terreno.
  * Cada trecho se estende para os dois lados enquanto a pista ainda está a mais
  * de 1.5 m do terreno (o aterro baixo que sobra cabe na mistura de 6 m do
- * carve sem degrau), mais 3 pontos de folga.
+ * carve sem degrau), mais 3 pontos de folga. Numa estrada fechada (`closed`) os
+ * trechos dão a volta na costura: um trecho sobre o índice 0 sai inteiro, com
+ * `from` em [0, n) e `to` ≥ n (smooth-world AC 15).
  */
-export function markBridges(points: Float32Array, hm: Heightmap): Array<{ from: number; to: number }> {
+export function markBridges(points: Float32Array, hm: Heightmap, closed = false): Array<{ from: number; to: number }> {
   const n = points.length / 3;
+  if (closed) return markClosedBridges(points, hm);
   const cond: boolean[] = [];
   const gap: number[] = [];
   for (let i = 0; i < n; i++) {
@@ -210,9 +216,54 @@ export function markBridges(points: Float32Array, hm: Heightmap): Array<{ from: 
   return ranges;
 }
 
+/**
+ * `markBridges` de uma estrada fechada: a mesma regra lida em volta do laço. Começa num ponto que
+ * nenhum trecho alcança (sem condição e com a pista a até 1.5 m do terreno, longe da folga), então
+ * nenhum trecho é cortado na costura; os índices voltam para [0, n) no `from`.
+ */
+function markClosedBridges(points: Float32Array, hm: Heightmap): Array<{ from: number; to: number }> {
+  const n = points.length / 3;
+  const at = (i: number) => ((i % n) + n) % n;
+  const cond: boolean[] = [];
+  const gap: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const h = heightAt(hm, points[i * 3]!, points[i * 3 + 2]!);
+    cond.push(h < WATER_Y || points[i * 3 + 1]! - h > BRIDGE_HEIGHT);
+    gap.push(Math.abs(points[i * 3 + 1]! - h));
+  }
+  // ponto de partida: fora de condição e de aterro alto com BRIDGE_PAD + 1 pontos de cada lado assim
+  const calm = (i: number) => !cond[at(i)] && gap[at(i)]! <= BRIDGE_TOUCH;
+  let start = -1;
+  for (let i = 0; i < n && start < 0; i++) {
+    let ok = true;
+    for (let d = -BRIDGE_PAD - 1; d <= BRIDGE_PAD + 1 && ok; d++) ok = calm(i + d);
+    if (ok) start = i;
+  }
+  // laço inteiro de ponte: um trecho só
+  if (start < 0) return cond.some(Boolean) ? [{ from: 0, to: n - 1 }] : [];
+  const ranges: Array<{ from: number; to: number }> = [];
+  for (let k = 0; k < n; k++) {
+    const i = start + k;
+    if (!cond[at(i)]) continue;
+    let j = i;
+    while (j + 1 < start + n && cond[at(j + 1)]) j++;
+    let a = i;
+    let b = j;
+    while (gap[at(a - 1)]! > BRIDGE_TOUCH) a--;
+    while (gap[at(b + 1)]! > BRIDGE_TOUCH) b++;
+    const from = a - BRIDGE_PAD;
+    const to = b + BRIDGE_PAD;
+    const last = ranges[ranges.length - 1];
+    if (last && from <= last.to + 1) last.to = to;
+    else ranges.push({ from, to });
+    k = b - start;
+  }
+  return ranges.map((r) => ({ from: at(r.from), to: at(r.from) + (r.to - r.from) })).sort((x, y) => x.from - y.from);
+}
+
 function makeRoad(id: number, kind: RoadKind, closed: boolean, points: Float32Array, hm: Heightmap, bank?: Float32Array): Road {
   const spec = ROAD_SPECS[kind];
-  const road: Road = { id, kind, lanes: spec.lanes, width: spec.width, closed, points, bridges: markBridges(points, hm) };
+  const road: Road = { id, kind, lanes: spec.lanes, width: spec.width, closed, points, bridges: markBridges(points, hm, closed) };
   if (bank) road.bank = bank;
   return road;
 }
@@ -455,7 +506,9 @@ export function generateRoads(seed: number, hm: Heightmap): RoadNetwork {
       const x = p[i * 3]!;
       const z = p[i * 3 + 2]!;
       if (Math.max(Math.abs(x), Math.abs(z)) < DOWNTOWN_HALF + 60) continue;
-      if (road.bridges.some((b) => i >= b.from - 10 && i <= b.to + 10)) continue;
+      // numa estrada fechada a folga de 10 pontos dá a volta na costura
+      const shifts = road.closed ? [-p.length / 3, 0, p.length / 3] : [0];
+      if (road.bridges.some((b) => shifts.some((d) => i + d >= b.from - 10 && i + d <= b.to + 10))) continue;
       starts.push({ road, i });
     }
   }
