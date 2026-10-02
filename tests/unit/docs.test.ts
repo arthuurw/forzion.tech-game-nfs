@@ -76,13 +76,13 @@ describe('docs', () => {
     expect(section(readme, 'Como é feito')).toContain('## Intent');
   });
 
-  // e2e-speed C13 (AC 13): os tempos medidos da suíte (C11: 24.6 min, C12: 2.4 min) e a variável dos workers
+  // e2e-speed C13 (AC 13): os tempos medidos da suíte (C11: 28.9 min, C12: 2.4 min) e a variável dos workers
   it('agents gives the e2e times and workers', () => {
     const lines = agents.split('\n');
     const full = lines.find((l) => l.startsWith('npm run test:e2e '));
     const smoke = lines.find((l) => l.startsWith('npm run test:e2e:smoke '));
     expect(full).toContain('E2E_WORKERS');
-    expect(full).toContain('24.6 min');
+    expect(full).toContain('28.9 min');
     expect(full).not.toContain('~1 h');
     expect(smoke).toContain('2.4 min');
   });

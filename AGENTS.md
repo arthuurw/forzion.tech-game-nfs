@@ -11,7 +11,7 @@ npm run dev             # vite dev server (porta 5173)
 npm run build           # tsc --noEmit + build de produção
 npm test                # vitest: tests/unit e tests/physics (Rapier real em node), tudo
 npm run test:quick      # vitest sem a tag `slow` (~16 s), para iterar
-npm run test:e2e        # playwright chromium contra o dev server (24.6 min medidos com 2 workers; E2E_WORKERS muda os workers, E2E_PORT a porta)
+npm run test:e2e        # playwright chromium contra o dev server (28.9 min medidos com 2 workers; E2E_WORKERS muda os workers, E2E_PORT a porta)
 npm run test:e2e:smoke  # só os testes `@smoke` (2 por arquivo, 2.4 min medidos), para iterar
 npm run fetch:textures  # baixa de novo as texturas CC0 do ambientCG
 ```
