@@ -27,7 +27,7 @@ Reusa o `FixedStepper.accumulator`, que já existe e que ninguém lê, como fra�
 3. `camera/ChaseCamera` (exists): segue a pose interpolada.
 4. `world/roads/RoadGenerator` (exists): a ponta da avenida acompanha a inclinação do anel na junção. A seção final assenta na fita do anel e ganha inclinação transversal (`Road.bank`, opcional, por ponto), que some nos 60 m antes; `world/roads/roadMesh` (exists) a aplica na fita (render e física) e `world/terrain/carveRoads` (exists) no terreno aplainado.
 5. `world/interiors/BlockInteriors` (exists): consulta de chão caminhável, com o vértice arredondado para baixo e a distância à fachada (door 2). `world/interiors/interiorMotion` (exists) usa essa consulta para o pedestre, a fuga e o empurrão do gato (o ponto de partida de um trecho, onde ele já está, não conta). `world/interiors/InteriorProps` (exists) sorteia pedestres e gatos de zona só em vértices caminháveis.
-6. `world/ChunkManager` (exists): o build vira uma sequência de fatias, uma por `update`, e o boot pré-monta os chunks perto do spawn (door 3).
+6. `world/ChunkManager` (exists): o build vira uma sequência de fatias, uma por `update`, e o boot pré-monta os chunks perto do spawn (door 3); `core/Game` (exists) chama `prebuild` no lugar do `update` do boot, e as sondas DEV contam fatias (`maxSlicesInOneFrame`, `slices`), builds e os chunks do boot (`prebuilt`).
 7. `world/terrain/TerrainGenerator` (exists): `heightAt` usa a mesma diagonal da malha.
 8. `world/roads/RoadGenerator`, `world/roads/bridges` e `world/ChunkManager` (exists): trechos de ponte com índice modular em estrada fechada (`to` ≥ n no trecho que passa pela costura; `roadMesh`, `carveRoads` e a escolha do começo das estradas de morro leem módulo n; `bridgeRuns` corta a ponte por chunk na ordem dela), e vértices por face nas extrusões.
 9. `world/interiors/InteriorScene` (exists): temporários reaproveitados como campos. `hud/Minimap` (exists) redesenha com passo limitado.
@@ -40,6 +40,7 @@ Reusa o `FixedStepper.accumulator`, que já existe e que ninguém lê, como fra�
 | decisões | a AD-012 ganha a consulta de chão caminhável para o que se move, por uma AD nova que a estende (door 2) |
 | checks de outras features | block-fill C32 (pedestre arredonda para vértice da zona) continua; os pedestres passam a ter caminhos menores perto das fachadas |
 | checks de outras features | city-terrain C2 (`heightAt` no meio de 4 amostras = média bilinear): passa a ser o triângulo da malha (AC 14); o teste `769 x 769 samples every 4 m` troca a média pela média das pontas da diagonal |
+| checks de outras features | test-hardening C19 (`maxBuildsInOneFrame` conta builds entre dois quadros): o contador vira `maxSlicesInOneFrame` e o teste `max slices counts slices between frames` faz as mesmas asserções sobre fatias (2 `update` num quadro = 2, 1 por quadro = 1) |
 | checks de outras features | city-terrain `world.spec.ts:361` (`maxBuildsInOneFrame` ≤ 1): depois da test-hardening mede builds por quadro; aqui passa a contar fatias |
 | sondas DEV | `__game.car.x/y/z` e as posições dos oponentes continuam sendo a pose física. A pose desenhada entra como campo novo, para os testes de pixel não mudarem de referência |
 | mundo | bases de lote, colunas do trem, carros estacionados e piscinas mudam de altura até 0.19 m, com a nova `heightAt` |

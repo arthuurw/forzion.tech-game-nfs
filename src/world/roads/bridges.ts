@@ -105,11 +105,25 @@ export function extrudeAlong(road: Road, indices: number[], offset: number, half
   const positions = new Float32Array(((m - 1) * 4 + 2) * 4 * 3);
   const tris = new Uint32Array(((m - 1) * 4 + 2) * 6);
   let quad = 0;
+  const copy = (c: number, v: number): void => {
+    positions[v * 3] = corners[c * 3]!;
+    positions[v * 3 + 1] = corners[c * 3 + 1]!;
+    positions[v * 3 + 2] = corners[c * 3 + 2]!;
+  };
   /** um quad com 4 vértices próprios (cantos `c0..c3`), em 2 triângulos (0, 1, 2) e (1, 3, 2) */
   const put = (c0: number, c1: number, c2: number, c3: number): void => {
     const v = quad * 4;
-    [c0, c1, c2, c3].forEach((c, j) => positions.set(corners.subarray(c * 3, c * 3 + 3), (v + j) * 3));
-    tris.set([v, v + 1, v + 2, v + 1, v + 3, v + 2], quad * 6);
+    copy(c0, v);
+    copy(c1, v + 1);
+    copy(c2, v + 2);
+    copy(c3, v + 3);
+    const t = quad * 6;
+    tris[t] = v;
+    tris[t + 1] = v + 1;
+    tris[t + 2] = v + 2;
+    tris[t + 3] = v + 1;
+    tris[t + 4] = v + 3;
+    tris[t + 5] = v + 2;
     quad++;
   };
   for (let k = 0; k < m - 1; k++) {

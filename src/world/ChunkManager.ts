@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CHUNK_SIZE, CHUNKS_PER_SIDE, chunkOf, planChunks } from './chunks';
+import { CHUNK_BUILD_M, CHUNK_SIZE, CHUNKS_PER_SIDE, chunkCenter, chunkOf, planChunks } from './chunks';
 import type { Road, RoadNetwork } from './roads/RoadGenerator';
 import { bridgeMeshes, bridgeRuns, extrudeAlong, pillarBox, type BridgeParts } from './roads/bridges';
 import { roadStripGeometry } from './roads/roadMesh';
@@ -21,6 +21,29 @@ export interface ChunkMaterials {
 
 const SIDEWALK_WIDTH = 5;
 const SIDEWALK_HEIGHT = 0.12;
+/** linhas de terreno (das 129 de um chunk) por fatia do build (smooth-world door 3) */
+export const TERRAIN_BAND_ROWS = 33;
+
+/** arrays do terreno de um chunk, preenchidos faixa a faixa */
+interface TerrainArrays {
+  positions: Float32Array;
+  normals: Float32Array;
+  colors: Float32Array;
+  bounce: Float32Array;
+  zones: Float32Array;
+  interior: Uint8Array;
+}
+
+/** build de um chunk em andamento: a próxima fatia é a faixa de terreno `row`, depois `roads`, depois `bridges` */
+interface ChunkJob {
+  id: number;
+  group: THREE.Group;
+  /** linhas de terreno por fatia (`TERRAIN_BAND_ROWS`; 129 = o terreno inteiro numa fatia) */
+  band: number;
+  row: number;
+  stage: 'terrain' | 'roads' | 'bridges';
+  terrain: TerrainArrays;
+}
 
 /**
  * Streaming das malhas do mundo por chunks de 512 m (door 7 da city-terrain).
@@ -28,13 +51,25 @@ const SIDEWALK_HEIGHT = 0.12;
  * descartar, e monta por chunk: terreno (129 × 129 vértices, sem as células
  * do centro, que ficam sob o espelho), asfalto (do centro e de fora),
  * calçadas do centro e pontes. Colisão não passa por aqui: está toda no boot.
+ *
+ * smooth-world door 3: o build de um chunk é uma sequência de fatias (o
+ * terreno em faixas de até 33 linhas, depois estradas e calçadas, depois
+ * pontes e pilares) e cada `update` roda no máximo uma; o chunk entra na cena
+ * quando a última termina. No boot, `prebuild` monta de uma vez os chunks a
+ * até 900 m do spawn, antes do primeiro quadro.
  */
 export class ChunkManager {
   readonly loaded = new Map<number, THREE.Group>();
-  /** maior número de builds entre dois `endFrame` (door 7: no máximo 1 por quadro) */
-  maxBuildsInOneFrame = 0;
+  /** maior número de fatias de build entre dois `endFrame` (door 3: no máximo 1 por quadro) */
+  maxSlicesInOneFrame = 0;
+  /** fatias de build rodadas pelo `update` */
+  slices = 0;
+  /** chunks que o `update` terminou de montar (o `prebuild` não conta) */
   builds = 0;
-  private buildsAtFrameStart = 0;
+  /** chunks montados de uma vez pelo `prebuild` do boot */
+  readonly prebuilt: number[] = [];
+  private slicesAtFrameStart = 0;
+  private job: ChunkJob | null = null;
   /**
    * Últimos chunks descartados: quantas geometrias cada um tinha e quantas já
    * emitiram o evento `dispose` do three (door 7; lido por C37).
@@ -66,10 +101,34 @@ export class ChunkManager {
     }
   }
 
+  /** Monta de uma vez, sem contar como fatia nem build, todo chunk a até 900 m de (x, z) (boot, door 3). */
+  prebuild(x: number, z: number): void {
+    for (let id = 0; id < CHUNKS_PER_SIDE * CHUNKS_PER_SIDE; id++) {
+      const [cx, cz] = chunkCenter(id);
+      if (this.loaded.has(id) || Math.hypot(cx - x, cz - z) > CHUNK_BUILD_M) continue;
+      this.add(id, this.buildNow(id));
+      this.prebuilt.push(id);
+    }
+  }
+
+  /** O build de uma vez de um chunk (o terreno numa fatia só), sem pôr na cena. */
+  buildNow(id: number): THREE.Group {
+    const job = this.startJob(id, CHUNK_SIZE / this.carved.spacing + 1);
+    while (!this.runSlice(job));
+    return job.group;
+  }
+
+  /**
+   * Descarta os chunks longe do carro e roda no máximo uma fatia do build em andamento, ou do
+   * chunk mais perto que falta (door 3); o chunk entra na cena quando a última fatia termina.
+   */
   update(carX: number, carZ: number): void {
-    const plan = planChunks(carX, carZ, new Set(this.loaded.keys()));
+    const planned = new Set(this.loaded.keys());
+    if (this.job) planned.add(this.job.id);
+    const plan = planChunks(carX, carZ, planned);
     for (const id of plan.dispose) {
-      const group = this.loaded.get(id)!;
+      const group = this.loaded.get(id);
+      if (!group) continue;
       this.dropped.push(group.userData.disposal);
       if (this.dropped.length > 64) this.dropped.shift();
       this.scene.remove(group);
@@ -78,18 +137,25 @@ export class ChunkManager {
       });
       this.loaded.delete(id);
     }
-    for (const id of plan.build) {
-      const group = this.build(id);
-      this.scene.add(group);
-      this.loaded.set(id, group);
-      this.builds++;
-    }
+    if (!this.job && plan.build.length > 0) this.job = this.startJob(plan.build[0]!, TERRAIN_BAND_ROWS);
+    const job = this.job;
+    if (!job) return;
+    this.slices++;
+    if (!this.runSlice(job)) return;
+    this.job = null;
+    this.add(job.id, job.group);
+    this.builds++;
   }
 
-  /** Fecha o quadro: guarda quantos builds aconteceram desde o `endFrame` anterior. */
+  /** Fecha o quadro: guarda quantas fatias rodaram desde o `endFrame` anterior. */
   endFrame(): void {
-    this.maxBuildsInOneFrame = Math.max(this.maxBuildsInOneFrame, this.builds - this.buildsAtFrameStart);
-    this.buildsAtFrameStart = this.builds;
+    this.maxSlicesInOneFrame = Math.max(this.maxSlicesInOneFrame, this.slices - this.slicesAtFrameStart);
+    this.slicesAtFrameStart = this.slices;
+  }
+
+  private add(id: number, group: THREE.Group): void {
+    this.scene.add(group);
+    this.loaded.set(id, group);
   }
 
   /**
@@ -122,7 +188,7 @@ export class ChunkManager {
     return out;
   }
 
-  private build(id: number): THREE.Group {
+  private startJob(id: number, band: number): ChunkJob {
     const group = new THREE.Group();
     group.name = `chunk-${id}`;
     const cx = id % CHUNKS_PER_SIDE;
@@ -130,10 +196,52 @@ export class ChunkManager {
     const x0 = this.carved.origin + cx * CHUNK_SIZE;
     const z0 = this.carved.origin + cz * CHUNK_SIZE;
     group.userData.downtown = x0 < DOWNTOWN_HALF && x0 + CHUNK_SIZE > -DOWNTOWN_HALF && z0 < DOWNTOWN_HALF && z0 + CHUNK_SIZE > -DOWNTOWN_HALF;
+    const side = CHUNK_SIZE / this.carved.spacing + 1; // 129
+    const terrain: TerrainArrays = {
+      positions: new Float32Array(side * side * 3),
+      normals: new Float32Array(side * side * 3),
+      colors: new Float32Array(side * side * 3),
+      // block-fill: peso da luz rebatida e zona de cada vértice (−1 fora do miolo)
+      bounce: new Float32Array(side * side),
+      zones: new Float32Array(side * side).fill(-1),
+      interior: new Uint8Array(side * side),
+    };
+    return { id, group, band, row: 0, stage: 'terrain', terrain };
+  }
 
-    const terrain = this.terrainMesh(cx, cz);
-    if (terrain) group.add(terrain);
+  /** Roda a próxima fatia do build; verdadeiro quando o chunk ficou pronto. */
+  private runSlice(job: ChunkJob): boolean {
+    const cx = job.id % CHUNKS_PER_SIDE;
+    const cz = Math.floor(job.id / CHUNKS_PER_SIDE);
+    if (job.stage === 'terrain') {
+      const side = CHUNK_SIZE / this.carved.spacing + 1;
+      const end = Math.min(side, job.row + job.band);
+      this.terrainRows(cx, cz, job.row, end, job.terrain);
+      job.row = end;
+      if (end < side) return false;
+      const terrain = this.terrainMesh(cx, cz, job.terrain);
+      if (terrain) job.group.add(terrain);
+      job.stage = 'roads';
+      return false;
+    }
+    if (job.stage === 'roads') {
+      this.roadMeshes(job.id, job.group);
+      job.stage = 'bridges';
+      return false;
+    }
+    this.bridgeMesh(job.id, job.group);
+    const disposal = { id: job.id, geometries: 0, disposed: 0 };
+    job.group.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      disposal.geometries++;
+      o.geometry.addEventListener('dispose', () => disposal.disposed++);
+    });
+    job.group.userData.disposal = disposal;
+    return true;
+  }
 
+  /** Fatia de estradas e calçadas: asfalto do centro e de fora, calçadas do centro. */
+  private roadMeshes(id: number, group: THREE.Group): void {
     const downtownRoads = new MeshBuilder();
     const outerRoads = new MeshBuilder();
     const sidewalks = new MeshBuilder();
@@ -153,6 +261,16 @@ export class ChunkManager {
         }
       }
     }
+    const meshes: Array<[MeshBuilder, THREE.Material, string]> = [
+      [downtownRoads, this.materials.roadDowntown, 'road-downtown'],
+      [outerRoads, this.materials.roadOuter, 'road-outer'],
+      [sidewalks, this.materials.sidewalk, 'sidewalk'],
+    ];
+    for (const [builder, material, name] of meshes) addMesh(group, builder, material, name);
+  }
+
+  /** Fatia de pontes: tabuleiros, guarda-corpos e pilares deste chunk. */
+  private bridgeMesh(id: number, group: THREE.Group): void {
     const bridges = new MeshBuilder();
     for (const { road, parts } of this.bridges) {
       // os trechos deste chunk, com um ponto a mais para emendar com o vizinho (na ordem da ponte: n−1 → 0 conta)
@@ -166,26 +284,7 @@ export class ChunkManager {
         bridges.add(box.positions, box.indices);
       }
     }
-    const meshes: Array<[MeshBuilder, THREE.Material, string]> = [
-      [downtownRoads, this.materials.roadDowntown, 'road-downtown'],
-      [outerRoads, this.materials.roadOuter, 'road-outer'],
-      [sidewalks, this.materials.sidewalk, 'sidewalk'],
-      [bridges, this.materials.bridge, 'bridge'],
-    ];
-    for (const [builder, material, name] of meshes) {
-      const mesh = builder.mesh(material);
-      if (!mesh) continue;
-      mesh.name = name;
-      group.add(mesh);
-    }
-    const disposal = { id, geometries: 0, disposed: 0 };
-    group.traverse((o) => {
-      if (!(o instanceof THREE.Mesh)) return;
-      disposal.geometries++;
-      o.geometry.addEventListener('dispose', () => disposal.disposed++);
-    });
-    group.userData.disposal = disposal;
-    return group;
+    addMesh(group, bridges, this.materials.bridge, 'bridge');
   }
 
   private pointChunk(road: Road, i: number): number {
@@ -257,24 +356,19 @@ export class ChunkManager {
     return false;
   }
 
-  private terrainMesh(cx: number, cz: number): THREE.Mesh | null {
+  /** Fatia de terreno: as linhas de vértices `z0..z1-1` do chunk (posição, normal, cor, luz rebatida, zona). */
+  private terrainRows(cx: number, cz: number, z0: number, z1: number, t: TerrainArrays): void {
     const hm = this.carved;
     const cells = CHUNK_SIZE / hm.spacing; // 128
     const side = cells + 1; // 129
     const ix0 = cx * cells;
     const iz0 = cz * cells;
-    const positions = new Float32Array(side * side * 3);
-    const normals = new Float32Array(side * side * 3);
-    const colors = new Float32Array(side * side * 3);
-    // block-fill: peso da luz rebatida e zona de cada vértice (−1 fora do miolo)
-    const bounce = new Float32Array(side * side);
-    const zones = new Float32Array(side * side).fill(-1);
-    const interior = new Uint8Array(side * side);
+    const { positions, normals, colors, bounce, zones, interior } = t;
     const n = hm.size;
     const H = (ix: number, iz: number) =>
       hm.heights[Math.min(n - 1, Math.max(0, iz)) * n + Math.min(n - 1, Math.max(0, ix))]!;
     const bi = this.interiors;
-    for (let z = 0; z < side; z++) {
+    for (let z = z0; z < z1; z++) {
       for (let x = 0; x < side; x++) {
         const ix = ix0 + x;
         const iz = iz0 + z;
@@ -308,7 +402,24 @@ export class ChunkManager {
         if (kind === 'downtown' && Math.abs(vx) <= DOWNTOWN_HALF && Math.abs(vz) <= DOWNTOWN_HALF) positions[k * 3 + 1] = h + PATIO_LIFT;
       }
     }
-    const indices: number[] = [];
+  }
+
+  /** Malha de terreno do chunk com as linhas já preenchidas; null sem célula para desenhar. */
+  private terrainMesh(cx: number, cz: number, t: TerrainArrays): THREE.Mesh | null {
+    const hm = this.carved;
+    const cells = CHUNK_SIZE / hm.spacing; // 128
+    const side = cells + 1; // 129
+    const ix0 = cx * cells;
+    const iz0 = cz * cells;
+    const { positions, normals, colors, bounce, zones, interior } = t;
+    // índices num array tipado do tamanho máximo: a fatia final do terreno cabe no orçamento (door 3)
+    const indices = side * side <= 0xffff ? new Uint16Array(cells * cells * 6) : new Uint32Array(cells * cells * 6);
+    let count = 0;
+    const tri = (a: number, b: number, c: number) => {
+      indices[count++] = a;
+      indices[count++] = b;
+      indices[count++] = c;
+    };
     for (let z = 0; z < cells; z++) {
       for (let x = 0; x < cells; x++) {
         const wx = hm.origin + (ix0 + x) * hm.spacing;
@@ -317,26 +428,35 @@ export class ChunkManager {
         // células inteiramente no centro ficam sob o espelho, menos o pátio do miolo (block-fill):
         // cada triângulo com os 3 vértices no miolo é desenhado
         if (wx >= -DOWNTOWN_HALF && wx + hm.spacing <= DOWNTOWN_HALF && wz >= -DOWNTOWN_HALF && wz + hm.spacing <= DOWNTOWN_HALF) {
-          if (interior[a] && interior[a + side] && interior[a + 1]) indices.push(a, a + side, a + 1);
-          if (interior[a + 1] && interior[a + side] && interior[a + side + 1]) indices.push(a + 1, a + side, a + side + 1);
+          if (interior[a] && interior[a + side] && interior[a + 1]) tri(a, a + side, a + 1);
+          if (interior[a + 1] && interior[a + side] && interior[a + side + 1]) tri(a + 1, a + side, a + side + 1);
           continue;
         }
-        indices.push(a, a + side, a + 1, a + 1, a + side, a + side + 1);
+        tri(a, a + side, a + 1);
+        tri(a + 1, a + side, a + side + 1);
       }
     }
-    if (indices.length === 0) return null;
+    if (count === 0) return null;
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geometry.setAttribute('aBounce', new THREE.BufferAttribute(bounce, 1));
     geometry.setAttribute('aZone', new THREE.BufferAttribute(zones, 1));
-    geometry.setIndex(indices);
+    geometry.setIndex(new THREE.BufferAttribute(indices.slice(0, count), 1));
     geometry.computeBoundingSphere();
     const mesh = new THREE.Mesh(geometry, this.materials.terrain);
     mesh.name = 'terrain';
     return mesh;
   }
+}
+
+/** Põe na `group` a malha do `builder` (se houver triângulos), com o nome dado. */
+function addMesh(group: THREE.Group, builder: MeshBuilder, material: THREE.Material, name: string): void {
+  const mesh = builder.mesh(material);
+  if (!mesh) return;
+  mesh.name = name;
+  group.add(mesh);
 }
 
 function gridKey(x: number, z: number): number {
@@ -345,36 +465,87 @@ function gridKey(x: number, z: number): number {
 
 /** Junta várias malhas (mesmos atributos) numa só geometria. */
 class MeshBuilder {
-  private readonly positions: number[] = [];
-  private readonly indices: number[] = [];
-  private readonly uvs: number[] = [];
-  private readonly widths: number[] = [];
-  private hasUv = false;
+  private readonly parts: Array<{ positions: ArrayLike<number>; indices: ArrayLike<number>; extra?: { uv: ArrayLike<number>; width: ArrayLike<number> } }> = [];
+  private vertices = 0;
+  private triangles = 0;
 
   add(positions: ArrayLike<number>, indices: ArrayLike<number>, extra?: { uv: ArrayLike<number>; width: ArrayLike<number> }): void {
-    const base = this.positions.length / 3;
-    for (let i = 0; i < positions.length; i++) this.positions.push(positions[i]!);
-    for (let i = 0; i < indices.length; i++) this.indices.push(indices[i]! + base);
-    if (extra) {
-      this.hasUv = true;
-      for (let i = 0; i < extra.uv.length; i++) this.uvs.push(extra.uv[i]!);
-      for (let i = 0; i < extra.width.length; i++) this.widths.push(extra.width[i]!);
-    }
+    this.parts.push({ positions, indices, extra });
+    this.vertices += positions.length / 3;
+    this.triangles += indices.length / 3;
   }
 
+  /** As partes numa geometria só, copiadas em arrays tipados (sem `push` por número: cabe numa fatia, door 3). */
   mesh(material: THREE.Material): THREE.Mesh | null {
-    if (this.indices.length === 0) return null;
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(this.positions, 3));
-    if (this.hasUv) {
-      g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uvs, 2));
-      g.setAttribute('aWidth', new THREE.Float32BufferAttribute(this.widths, 1));
+    if (this.triangles === 0) return null;
+    const positions = new Float32Array(this.vertices * 3);
+    const indices = new Uint32Array(this.triangles * 3);
+    const hasUv = this.parts.some((p) => p.extra);
+    const uvs = hasUv ? new Float32Array(this.vertices * 2) : null;
+    const widths = hasUv ? new Float32Array(this.vertices) : null;
+    let v = 0;
+    let t = 0;
+    for (const p of this.parts) {
+      positions.set(p.positions, v * 3);
+      for (let i = 0; i < p.indices.length; i++) indices[t + i] = p.indices[i]! + v;
+      if (p.extra) {
+        uvs!.set(p.extra.uv, v * 2);
+        widths!.set(p.extra.width, v);
+      }
+      v += p.positions.length / 3;
+      t += p.indices.length;
     }
-    g.setIndex(this.indices);
-    g.computeVertexNormals();
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    if (uvs && widths) {
+      g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+      g.setAttribute('aWidth', new THREE.BufferAttribute(widths, 1));
+    }
+    g.setIndex(new THREE.BufferAttribute(indices, 1));
+    g.setAttribute('normal', new THREE.BufferAttribute(vertexNormals(positions, indices), 3));
     g.computeBoundingSphere();
     return new THREE.Mesh(g, material);
   }
+}
+
+/**
+ * Normais por vértice como o `computeVertexNormals` do three (soma das normais dos triângulos do
+ * vértice, normalizada), direto nos arrays tipados: sem um `Vector3` por leitura, cabe na fatia.
+ */
+function vertexNormals(p: Float32Array, indices: Uint32Array): Float32Array {
+  const n = new Float32Array(p.length);
+  for (let t = 0; t < indices.length; t += 3) {
+    const a = indices[t]! * 3;
+    const b = indices[t + 1]! * 3;
+    const c = indices[t + 2]! * 3;
+    // (c − b) × (a − b), como o three
+    const cbx = p[c]! - p[b]!;
+    const cby = p[c + 1]! - p[b + 1]!;
+    const cbz = p[c + 2]! - p[b + 2]!;
+    const abx = p[a]! - p[b]!;
+    const aby = p[a + 1]! - p[b + 1]!;
+    const abz = p[a + 2]! - p[b + 2]!;
+    const nx = cby * abz - cbz * aby;
+    const ny = cbz * abx - cbx * abz;
+    const nz = cbx * aby - cby * abx;
+    n[a] = n[a]! + nx;
+    n[a + 1] = n[a + 1]! + ny;
+    n[a + 2] = n[a + 2]! + nz;
+    n[b] = n[b]! + nx;
+    n[b + 1] = n[b + 1]! + ny;
+    n[b + 2] = n[b + 2]! + nz;
+    n[c] = n[c]! + nx;
+    n[c + 1] = n[c + 1]! + ny;
+    n[c + 2] = n[c + 2]! + nz;
+  }
+  for (let i = 0; i < n.length; i += 3) {
+    const len = Math.hypot(n[i]!, n[i + 1]!, n[i + 2]!);
+    if (len === 0) continue;
+    n[i] = n[i]! / len;
+    n[i + 1] = n[i + 1]! / len;
+    n[i + 2] = n[i + 2]! / len;
+  }
+  return n;
 }
 
 function splitRuns(idx: number[]): number[][] {

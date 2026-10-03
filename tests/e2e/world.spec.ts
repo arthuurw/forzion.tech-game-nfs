@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { advanceSim, gotoGame, holdKeySim, position, simTime } from './helpers';
+import { advanceSim, gotoGame, holdKeySim, position, simTime, waitFrames } from './helpers';
 
 type Pt = { x: number; z: number };
 
@@ -348,21 +348,61 @@ test.describe('city-terrain - mundo', () => {
     expect(checked).toBe(r.lots);
   });
 
-  // C37 (AC 30, door 7)
-  test('chunks stream around the car', async ({ page }) => {
-    await gotoGame(page);
+  // smooth-world C14 (AC 10, door 3) e C15 (AC 11) num boot só, com a C37 (AC 30, door 7) da city-terrain:
+  // o boot monta os chunks perto do spawn antes do primeiro quadro; andando, no máximo 1 fatia de build por quadro
+  test('boot prebuilds the chunks near the spawn; chunks stream around the car', async ({ page }) => {
+    // o streaming não depende da qualidade; sem GTAO e espelho o quadro custa menos no SwiftShader (60 quadros abaixo)
+    await gotoGame(page, '?quality=low');
+    const centerDist = (id: number, p: { x: number; z: number }) =>
+      Math.hypot(-1536 + 256 + (id % 6) * 512 - p.x, -1536 + 256 + Math.floor(id / 6) * 512 - p.z);
+    const boot = await page.evaluate(() => ({ chunks: (window as any).__game.world.chunks, frames: (window as any).__game.frames as number }));
+    const near = Array.from({ length: 36 }, (_, id) => id).filter((id) => centerDist(id, boot.chunks.spawn) <= 900);
+    expect(near.length).toBeGreaterThanOrEqual(4);
+    // montados no boot, antes do primeiro quadro (o `prebuild` roda no construtor, antes do laço)
+    for (const id of near) {
+      expect(boot.chunks.prebuilt, `chunk ${id}`).toContain(id);
+      expect(boot.chunks.loaded, `chunk ${id}`).toContain(id);
+    }
+    expect(boot.chunks.builds).toBe(0);
+    expect(boot.chunks.slices).toBe(0);
+    // 60 quadros com o carro parado no spawn: nenhum build, nenhuma fatia
+    await waitFrames(page, 60 - boot.frames);
+    const parked = await page.evaluate(() => ({ chunks: (window as any).__game.world.chunks, frames: (window as any).__game.frames as number, kmh: (window as any).__game.car.speedKmh as number }));
+    expect(parked.frames).toBeGreaterThanOrEqual(60);
+    expect(Math.abs(parked.kmh)).toBeLessThan(1);
+    expect(parked.chunks.builds).toBe(0);
+    expect(parked.chunks.slices).toBe(0);
+
     await page.evaluate(() => {
       const g = (window as any).__game;
       g.car.teleport(0, g.world.heightAt(0, -1300) + 1.5, -1300, 0);
     });
-    await advanceSim(page, 3, { realtime: true });
-    const r = await page.evaluate(() => ({ chunks: (window as any).__game.world.chunks, p: (window as any).__game.car.position }));
-    const dist = (id: number) =>
-      Math.hypot(-1536 + 256 + (id % 6) * 512 - r.p.x, -1536 + 256 + Math.floor(id / 6) * 512 - r.p.z);
+    // andando para o centro até todo chunk a ≤ 900 m do carro estar na cena (fatia a fatia, quadro a quadro)
+    await page.keyboard.down('KeyW');
+    await page.waitForFunction(
+      () => {
+        const g = (window as any).__game;
+        const p = g.car.position;
+        const loaded = g.world.chunks.loaded as number[];
+        for (let id = 0; id < 36; id++) {
+          const d = Math.hypot(-1536 + 256 + (id % 6) * 512 - p.x, -1536 + 256 + Math.floor(id / 6) * 512 - p.z);
+          if (d <= 900 && !loaded.includes(id)) return false;
+        }
+        return g.world.chunks.builds > 0;
+      },
+      null,
+      { timeout: 90_000 },
+    );
+    await page.keyboard.up('KeyW');
+    const r = await page.evaluate(() => ({ chunks: (window as any).__game.world.chunks, p: (window as any).__game.car.position, kmh: (window as any).__game.car.speedKmh as number }));
+    const dist = (id: number) => centerDist(id, r.p);
+    expect(r.kmh).toBeGreaterThan(5);
     // todo chunk a ≤ 900 m carregado; nenhum carregado a > 1200 m (entre os dois, a histerese da door 7 decide)
     for (let id = 0; id < 36; id++) if (dist(id) <= 900) expect(r.chunks.loaded, `chunk ${id}`).toContain(id);
     for (const id of r.chunks.loaded) expect(dist(id), `chunk ${id}`).toBeLessThanOrEqual(1200);
-    expect(r.chunks.maxBuildsInOneFrame).toBe(1);
+    // smooth-world C15: as fatias de build, no máximo 1 por quadro (era a contagem de builds da door 7)
+    expect(r.chunks.slices).toBeGreaterThanOrEqual(6 * r.chunks.builds);
+    expect(r.chunks.maxSlicesInOneFrame).toBe(1);
     // door 7: o teleporte deixa chunks do spawn a > 1200 m; cada um saiu de `loaded` com todas as geometrias descartadas
     const dropped = r.chunks.dropped as Array<{ id: number; geometries: number; disposed: number }>;
     expect(dropped.length).toBeGreaterThan(0);

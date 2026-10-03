@@ -188,8 +188,8 @@ export class Game {
     this.spawn = spawn;
     this.car = new Car(this.world, this.scene, assets, { x: spawn.x, y: spawn.y + 1.2, z: spawn.z }, DEFAULT_CAR);
     this.car.teleport(spawn.x, spawn.y + 1.2, spawn.z, spawn.heading);
-    this.city.chunks.update(spawn.x, spawn.z);
-    this.city.chunks.endFrame(); // o build do boot não conta como quadro
+    // os chunks a até 900 m do spawn ficam prontos antes do primeiro quadro (smooth-world door 3)
+    this.city.chunks.prebuild(spawn.x, spawn.z);
 
     // farol: única luz presa ao carro
     const headlight = new THREE.SpotLight('#dfe8ff', 40, 60, Math.PI / 5, 0.6, 1.2);
@@ -1397,8 +1397,12 @@ export class Game {
       get chunks() {
         return {
           loaded: [...game.city.chunks.loaded.keys()].sort((a, b) => a - b),
-          maxBuildsInOneFrame: game.city.chunks.maxBuildsInOneFrame,
+          /** smooth-world door 3: fatias de build por quadro, builds do `update`, chunks do boot e o spawn */
+          maxSlicesInOneFrame: game.city.chunks.maxSlicesInOneFrame,
+          slices: game.city.chunks.slices,
           builds: game.city.chunks.builds,
+          prebuilt: [...game.city.chunks.prebuilt],
+          spawn: { x: game.spawn.x, z: game.spawn.z },
           dropped: game.city.chunks.dropped.map((d) => ({ ...d })),
         };
       },

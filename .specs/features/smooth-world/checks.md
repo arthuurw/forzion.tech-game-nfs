@@ -54,17 +54,17 @@ Proof: `npx vitest run tests/unit/interiorMotion.test.ts -t "walker segments sta
 
 ### S4 - streaming sem engasgo · 4 files · 60 KB · ~15k
 
-**C14** - No browser, antes do primeiro quadro todos os chunks a ≤ 900 m do spawn estão montados, e nos 60 primeiros quadros com o carro parado o contador de builds fica em 0 (AC 10, door 3)
+**C14** - ✅ No browser, antes do primeiro quadro todos os chunks a ≤ 900 m do spawn estão montados, e nos 60 primeiros quadros com o carro parado o contador de builds fica em 0 (AC 10, door 3)
 Proof: `npx playwright test tests/e2e/world.spec.ts -g "boot prebuilds the chunks near the spawn"`
 
-**C15** - `ChunkManager.update` roda no máximo 1 fatia por chamada, com 5 chunks pendentes; e no browser, andando, o maior número de fatias num quadro é 1 (substitui a contagem de builds da city-terrain `world.spec.ts:360`) (AC 11, door 3)
+**C15** - ✅ `ChunkManager.update` roda no máximo 1 fatia por chamada, com 5 chunks pendentes; e no browser, andando, o maior número de fatias num quadro é 1 (substitui a contagem de builds da city-terrain `world.spec.ts:360`) (AC 11, door 3)
 Proof: `npx vitest run tests/unit/chunkManager.test.ts -t "one build slice per update"`
 Proof: `npx playwright test tests/e2e/world.spec.ts -g "chunks stream around the car"`
 
-**C16** - Em node, JIT aquecido, carro percorrendo o anel inteiro do seed 1337 a passos de 2 m: nenhuma chamada a `ChunkManager.update` passa de 8 ms (AC 12)
+**C16** - ✅ Em node, JIT aquecido, carro percorrendo o anel inteiro do seed 1337 a passos de 2 m: nenhuma chamada a `ChunkManager.update` passa de 8 ms (AC 12)
 Proof: `npx vitest run tests/physics/streaming.test.ts -t "chunk update stays under 8 ms around the ring"`
 
-**C17** - Para todos os chunks do seed 1337, o build em fatias dá o mesmo número de vértices e as mesmas posições (± 1e-6 m) do build de uma vez, em cada uma das 3 partes (terreno em faixas de ≤ 33 linhas; estradas e calçadas; pontes e props) (AC 13, door 3)
+**C17** - ✅ Para todos os chunks do seed 1337, o build em fatias dá o mesmo número de vértices e as mesmas posições (± 1e-6 m) do build de uma vez, em cada uma das 3 partes (terreno em faixas de ≤ 33 linhas; estradas e calçadas; pontes e props) (AC 13, door 3)
 Proof: `npx vitest run tests/physics/streaming.test.ts -t "sliced build equals the one-shot build"`
 
 ### S5 - uma altura de chão só · 3 files · 20 KB · ~5k
@@ -80,7 +80,7 @@ Proof: `npx vitest run tests/unit/terrain.test.ts -t "heightAt follows the mesh 
 **C20** - ✅ Numa estrada fechada sintética com ponte sobre o índice 0, sai 1 trecho de ponte que passa pela costura, e o tabuleiro e o guarda-corpo têm quads em todos os segmentos dele, inclusive `n-1 → 0` (AC 15)
 Proof: `npx vitest run tests/unit/bridges.test.ts -t "bridge across the closed road seam"`
 
-**C21** - Em calçada, tabuleiro, guarda-corpo e pilar montados do seed 1337, a normal de cada vértice difere ≤ 1° da normal da face do triângulo a que pertence (AC 16)
+**C21** - ✅ Em calçada, tabuleiro, guarda-corpo e pilar montados do seed 1337, a normal de cada vértice difere ≤ 1° da normal da face do triângulo a que pertence (AC 16)
 Proof: `npx vitest run tests/unit/chunkManager.test.ts -t "extrusions have flat face normals"`
 
 ### S7 - menos trabalho por quadro · 4 files · 55 KB · ~14k
