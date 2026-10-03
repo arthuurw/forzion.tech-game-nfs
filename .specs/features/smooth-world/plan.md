@@ -30,7 +30,7 @@ Reusa o `FixedStepper.accumulator`, que já existe e que ninguém lê, como fra�
 6. `world/ChunkManager` (exists): o build vira uma sequência de fatias, uma por `update`, e o boot pré-monta os chunks perto do spawn (door 3); `core/Game` (exists) chama `prebuild` no lugar do `update` do boot, e as sondas DEV contam fatias (`maxSlicesInOneFrame`, `slices`), builds e os chunks do boot (`prebuilt`).
 7. `world/terrain/TerrainGenerator` (exists): `heightAt` usa a mesma diagonal da malha.
 8. `world/roads/RoadGenerator`, `world/roads/bridges` e `world/ChunkManager` (exists): trechos de ponte com índice modular em estrada fechada (`to` ≥ n no trecho que passa pela costura; `roadMesh`, `carveRoads` e a escolha do começo das estradas de morro leem módulo n; `bridgeRuns` corta a ponte por chunk na ordem dela), e vértices por face nas extrusões.
-9. `world/interiors/InteriorScene` (exists): temporários reaproveitados como campos. `hud/Minimap` (exists) redesenha com passo limitado.
+9. `world/interiors/InteriorScene` (exists): temporários reaproveitados como campos. `hud/Minimap` (exists) redesenha com passo limitado, pelo relógio da simulação e o estado da corrida que o `core/Game` (exists) passa.
 
 ## Impact
 

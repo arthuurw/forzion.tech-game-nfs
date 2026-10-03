@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Assets } from '../../src/core/Loader';
 import { qualityPreset } from '../../src/core/quality';
 import { Car } from '../../src/vehicle/Car';
@@ -17,6 +17,30 @@ import { generateTerrain, heightAt } from '../../src/world/terrain/TerrainGenera
 import { WorldPhysics } from '../../src/world/WorldPhysics';
 
 // block-life-extras: provas com o Rapier real no mundo do seed 1337 (AD-011)
+
+// smooth-world C22: contador nos construtores de Vector3, Matrix4, Quaternion e Euler do three, ligado só na medida.
+// Os módulos do jogo importam estas subclasses; o resto do arquivo não muda (a classe é a mesma, mais o contador)
+const made = vi.hoisted(() => ({ on: false, Vector3: 0, Matrix4: 0, Quaternion: 0, Euler: 0 }));
+vi.mock('three', async (importOriginal) => {
+  const three = await importOriginal<typeof import('three')>();
+  type Kind = 'Vector3' | 'Matrix4' | 'Quaternion' | 'Euler';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const counted = <T extends new (...args: any[]) => object>(Base: T, kind: Kind): T =>
+    class extends Base {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      constructor(...args: any[]) {
+        super(...args);
+        if (made.on) made[kind]++;
+      }
+    };
+  return {
+    ...three,
+    Vector3: counted(three.Vector3, 'Vector3'),
+    Matrix4: counted(three.Matrix4, 'Matrix4'),
+    Quaternion: counted(three.Quaternion, 'Quaternion'),
+    Euler: counted(three.Euler, 'Euler'),
+  };
+});
 const DT = 1 / 60;
 const ASSETS: Assets = { carModel: null, placeholder: true, textures: {}, loadedSets: [], failedSets: [] };
 const raw = generateTerrain(1337);
@@ -192,5 +216,41 @@ describe('train portals in the real world', () => {
     expect(speedBefore).toBeGreaterThanOrEqual(55);
     expect(speedAfter).toBeGreaterThanOrEqual(0.9 * speedBefore);
     car.dispose();
+  });
+});
+
+describe('interior scene per frame', () => {
+  // smooth-world C22 (AC 17)
+  it('interior update allocates no math objects', () => {
+    // o contador conta mesmo
+    made.on = true;
+    void new THREE.Vector3();
+    void new THREE.Matrix4();
+    void new THREE.Quaternion();
+    void new THREE.Euler();
+    made.on = false;
+    expect([made.Vector3, made.Matrix4, made.Quaternion, made.Euler]).toEqual([1, 1, 1, 1]);
+    Object.assign(made, { Vector3: 0, Matrix4: 0, Quaternion: 0, Euler: 0 });
+
+    const scene = new InteriorScene(interiors, props, 1337, qualityPreset('high'), carved, { carModel: null, placeholder: true });
+    // carro parado perto de um gato: pedestres e gatos ativos, e as malhas deles se movem no `update`
+    const cat = props.cats[0]!;
+    const car = { x: cat.x + 40, z: cat.z, heading: 0 };
+    for (let i = 0; i < 60; i++) scene.stepWalkers(DT, car, i * DT);
+    expect(scene.walkers.length).toBeGreaterThan(0);
+    expect(scene.cats.filter((c) => c.state !== 'gone').length).toBeGreaterThan(0);
+    // canteiros (lança e holofotes) e fachos para o céu também se movem no `update`
+    expect(props.sites.length).toBeGreaterThan(0);
+    expect(props.searchlights.length).toBeGreaterThan(0);
+    scene.update(1);
+    made.on = true;
+    for (let i = 1; i <= 100; i++) scene.update(1 + i * DT);
+    made.on = false;
+    expect({ Vector3: made.Vector3, Matrix4: made.Matrix4, Quaternion: made.Quaternion, Euler: made.Euler }).toEqual({
+      Vector3: 0,
+      Matrix4: 0,
+      Quaternion: 0,
+      Euler: 0,
+    });
   });
 });

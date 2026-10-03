@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { Minimap } from '../../src/hud/Minimap';
 import {
   MINIMAP_GATE_COLOR,
   MINIMAP_MARKER_COLOR,
@@ -83,5 +84,42 @@ describe('minimap math', () => {
       { kind: 'opponent', x: 90, y: 80, color: '#2f8cff' },
       { kind: 'opponent', x: 60, y: 60, color: '#3fe07a' },
     ]);
+  });
+
+  // smooth-world C23 (AC 18): no máximo 30 redesenhos por segundo de simulação; mudança da corrida redesenha já
+  it('minimap redraws at most 30 times per second', () => {
+    // canvas falso: cada redesenho começa com um `clearRect`
+    let clears = 0;
+    const noop = () => {};
+    const ctx = new Proxy({ clearRect: () => clears++ } as Record<string, unknown>, {
+      get: (target, key) => (key in target ? target[key as string] : noop),
+      set: () => true,
+    });
+    const canvas = { width: 0, height: 0, getContext: () => ctx } as unknown as HTMLCanvasElement;
+    const network = { roads: [{ closed: false, points: new Float32Array([0, 0, 0, 2, 0, 0]) }] } as never;
+    const map = new Minimap(canvas, network);
+    const state = { x: 0, y: 0, z: 0, heading: 0, speedMs: 0, speedKmh: 0, gear: 1, rpm: 900 };
+    // 1 s de simulação a 60 passos, um `update` por passo, com o relógio somado passo a passo
+    let t = 0;
+    for (let k = 0; k < 60; k++) {
+      map.update(state, [], t, 'free');
+      t += 1 / 60;
+    }
+    expect(clears).toBe(30);
+    // logo abaixo e logo acima de 1/30 s desde o último desenho (em t = 58/60)
+    const last = 58 / 60;
+    map.update(state, [], last + 1 / 30 - 0.001, 'free');
+    expect(clears).toBe(30);
+    map.update(state, [], last + 1 / 30, 'free');
+    expect(clears).toBe(31);
+    // a corrida muda dentro do intervalo: redesenha nesse mesmo quadro, e o seguinte volta ao teto
+    const now = last + 1 / 30;
+    map.update(state, [], now + 1 / 60, 'countdown');
+    expect(clears).toBe(32);
+    map.update(state, [], now + 2 / 60, 'countdown');
+    expect(clears).toBe(32);
+    map.update(state, [], now + 2.5 / 60, 'racing');
+    expect(clears).toBe(33);
+    expect(map.draws).toBe(33);
   });
 });

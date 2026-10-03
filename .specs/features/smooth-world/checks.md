@@ -85,10 +85,10 @@ Proof: `npx vitest run tests/unit/chunkManager.test.ts -t "extrusions have flat 
 
 ### S7 - menos trabalho por quadro · 4 files · 55 KB · ~14k
 
-**C22** - `InteriorScene.update` chamado 100 vezes depois da primeira cria 0 `Vector3`, `Matrix4`, `Quaternion` e `Euler` novos (contador nos construtores do three, em node) (AC 17)
+**C22** - ✅ `InteriorScene.update` chamado 100 vezes depois da primeira cria 0 `Vector3`, `Matrix4`, `Quaternion` e `Euler` novos (contador nos construtores do three, em node) (AC 17)
 Proof: `npx vitest run tests/physics/extras.test.ts -t "interior update allocates no math objects"`
 
-**C23** - O minimapa redesenha no máximo 30 vezes em 1 s de simulação a 60 passos, e redesenha no quadro seguinte a uma mudança do estado da corrida mesmo dentro do intervalo (AC 18)
+**C23** - ✅ O minimapa redesenha no máximo 30 vezes em 1 s de simulação a 60 passos, e redesenha no quadro seguinte a uma mudança do estado da corrida mesmo dentro do intervalo (AC 18)
 Proof: `npx vitest run tests/unit/minimap.test.ts -t "minimap redraws at most 30 times per second"`
 
 **C24** - ✅ `__game.car.x/y/z` e a posição dos oponentes nas sondas continuam sendo a pose física; a pose desenhada é um campo novo `drawn` (Impact, sondas DEV)

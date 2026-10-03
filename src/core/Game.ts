@@ -384,7 +384,8 @@ export class Game {
     });
     (this.grade.uniforms.uBlur as { value: number }).value = blurFor(state.speedKmh);
     this.hud.update(state);
-    this.minimap.update(state, this.race.render(state, alpha));
+    // no máximo 30 vezes por segundo de simulação, e logo que o estado da corrida muda (smooth-world AC 18)
+    this.minimap.update(state, this.race.render(state, alpha), this.simTime, this.race.session.state);
     // o acelerador que chegou ao carro: na contagem, o segurado (play-fixes AC 6)
     this.audio.update(state.rpm, this.driveInput.throttle);
 

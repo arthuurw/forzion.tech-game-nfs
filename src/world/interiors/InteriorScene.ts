@@ -83,6 +83,11 @@ const FLOOD_ACROSS = 4.5;
 const BEACON_ON = 4;
 /** comprimento da contra-lança (m) */
 const COUNTER_JIB = 9;
+/** eixos fixos dos temporários do quadro */
+const UP = new THREE.Vector3(0, 1, 0);
+const ONE = new THREE.Vector3(1, 1, 1);
+/** inclinação fixa dos fachos dos holofotes para o céu */
+const SEARCHLIGHT_TILT_Q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), (SEARCHLIGHT_TILT * Math.PI) / 180);
 
 /**
  * Render do miolo das quadras (block-fill): o que o terreno precisa para a luz
@@ -160,6 +165,13 @@ export class InteriorScene {
   readonly searchlightMesh: THREE.InstancedMesh;
   /** heading de cada facho na última atualização */
   readonly searchlightHeadings: number[];
+  /** temporários do `update` de cada quadro (smooth-world AC 17): nenhum objeto de matemática novo por quadro */
+  private readonly tmpMatrix = new THREE.Matrix4();
+  private readonly tmpQuat = new THREE.Quaternion();
+  private readonly tmpEuler = new THREE.Euler();
+  private readonly tmpPos = new THREE.Vector3();
+  private readonly tmpScale = new THREE.Vector3();
+  private readonly tmpColor = new THREE.Color();
 
   constructor(
     readonly interiors: BlockInteriors,
@@ -391,16 +403,14 @@ export class InteriorScene {
   }
 
   private updateSearchlights(time: number): void {
-    const m = new THREE.Matrix4();
-    const yaw = new THREE.Quaternion();
-    const tilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), (SEARCHLIGHT_TILT * Math.PI) / 180);
-    const up = new THREE.Vector3(0, 1, 0);
-    const one = new THREE.Vector3(1, 1, 1);
+    const m = this.tmpMatrix;
+    const yaw = this.tmpQuat;
+    const p = this.tmpPos;
     this.props.searchlights.forEach((s, i) => {
       const h = searchlightHeading(time, s.period, s.phase);
       this.searchlightHeadings[i] = h;
-      yaw.setFromAxisAngle(up, h).multiply(tilt);
-      this.searchlightMesh.setMatrixAt(i, m.compose(new THREE.Vector3(s.x, s.y, s.z), yaw, one));
+      yaw.setFromAxisAngle(UP, h).multiply(SEARCHLIGHT_TILT_Q);
+      this.searchlightMesh.setMatrixAt(i, m.compose(p.set(s.x, s.y, s.z), yaw, ONE));
     });
     this.searchlightMesh.instanceMatrix.needsUpdate = true;
   }
@@ -424,21 +434,20 @@ export class InteriorScene {
   /** Matrizes dos gatos ativos (os `gone` não aparecem): chão, virados para onde andam, abaixados quando sentam. */
   private updateCatMesh(): void {
     const mesh = this.catMesh;
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const up = new THREE.Vector3(0, 1, 0);
-    const scale = new THREE.Vector3();
-    const p = new THREE.Vector3();
+    const m = this.tmpMatrix;
+    const q = this.tmpQuat;
+    const scale = this.tmpScale;
+    const p = this.tmpPos;
     const shown = [...this.activeCats].filter(([, c]) => c.state !== 'gone').slice(0, mesh.instanceMatrix.count);
     this.catSlots = shown.map(([i]) => i);
     const colors = extraColors(
       shown.map(([i]) => i),
       CAT_PALETTE,
     );
-    const color = new THREE.Color();
+    const color = this.tmpColor;
     shown.forEach(([, c], k) => {
       const yaw = Math.atan2(c.toX - c.fromX, c.toZ - c.fromZ) || 0;
-      q.setFromAxisAngle(up, yaw);
+      q.setFromAxisAngle(UP, yaw);
       p.set(c.x, heightAt(this.carved, c.x, c.z), c.z);
       mesh.setMatrixAt(k, m.compose(p, q, scale.set(1, 1 - c.crouch, 1)));
       mesh.setColorAt(k, color.set(colors[k]!));
@@ -565,23 +574,21 @@ export class InteriorScene {
   /** Matrizes dos pedestres ativos: altura do chão + balanço do corpo, virados para onde andam. */
   private updateWalkerMesh(time: number): void {
     const mesh = this.walkerMesh;
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const up = new THREE.Vector3(0, 1, 0);
-    const one = new THREE.Vector3(1, 1, 1);
-    const p = new THREE.Vector3();
+    const m = this.tmpMatrix;
+    const q = this.tmpQuat;
+    const p = this.tmpPos;
     const shown = [...this.active].slice(0, mesh.instanceMatrix.count);
     this.walkerSlots = shown.map(([i]) => i);
     const colors = extraColors(
       shown.map(([i]) => i),
       WALKER_PALETTE,
     );
-    const color = new THREE.Color();
+    const color = this.tmpColor;
     shown.forEach(([, w], k) => {
       const yaw = Math.atan2(w.toX - w.fromX, w.toZ - w.fromZ) || 0;
-      q.setFromAxisAngle(up, yaw);
+      q.setFromAxisAngle(UP, yaw);
       p.set(w.x, heightAt(this.carved, w.x, w.z) + walkerBob(time + w.phase), w.z);
-      mesh.setMatrixAt(k, m.compose(p, q, one));
+      mesh.setMatrixAt(k, m.compose(p, q, ONE));
       mesh.setColorAt(k, color.set(colors[k]!));
     });
     mesh.count = shown.length;
@@ -648,14 +655,13 @@ export class InteriorScene {
   /** Lança, farol e holofotes no instante `time`. */
   private updateSites(time: number): void {
     const sites = this.props.sites;
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const up = new THREE.Vector3(0, 1, 0);
-    const one = new THREE.Vector3(1, 1, 1);
+    const m = this.tmpMatrix;
+    const q = this.tmpQuat;
+    const p = this.tmpPos;
     this.floodHeadings.length = 0;
     sites.forEach((s, i) => {
-      q.setFromAxisAngle(up, jibAngle(time, cranePeriod(s.x, s.z), this.jibPhases[i]!));
-      this.jibs.setMatrixAt(i, m.compose(new THREE.Vector3(s.x, s.y + s.towerHeight, s.z), q, one));
+      q.setFromAxisAngle(UP, jibAngle(time, cranePeriod(s.x, s.z), this.jibPhases[i]!));
+      this.jibs.setMatrixAt(i, m.compose(p.set(s.x, s.y + s.towerHeight, s.z), q, ONE));
       s.floodlights.forEach((f, k) => {
         const heading = this.floodsFrozen ? f.heading : floodSweep(time, f.heading);
         const j = i * 2 + k;
@@ -664,8 +670,8 @@ export class InteriorScene {
         const dirX = Math.sin(heading);
         const dirZ = Math.cos(heading);
         const tilt = Math.atan2(f.y - s.y, FLOOD_REACH);
-        q.setFromEuler(new THREE.Euler(tilt, heading, 0, 'YXZ'));
-        this.floodHeads.setMatrixAt(j, m.compose(new THREE.Vector3(f.x, f.y, f.z), q, one));
+        q.setFromEuler(this.tmpEuler.set(tilt, heading, 0, 'YXZ'));
+        this.floodHeads.setMatrixAt(j, m.compose(p.set(f.x, f.y, f.z), q, ONE));
         if (j < MAX_FLOODS) {
           this.terrainUniforms.uFlood.value[j]!.set(f.x + dirX * FLOOD_REACH, f.z + dirZ * FLOOD_REACH, dirX, dirZ);
         }

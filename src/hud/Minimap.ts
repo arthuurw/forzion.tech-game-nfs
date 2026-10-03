@@ -3,10 +3,19 @@ import type { RoadNetwork } from '../world/roads/RoadGenerator';
 import { MINIMAP_SIZE_PX, minimapSegments, type MinimapMark } from './minimapMath';
 
 export const MINIMAP_ROAD_COLOR = '#4a5068';
+/** redesenhos por segundo de simulação, no máximo (smooth-world AC 18) */
+export const MINIMAP_HZ = 30;
 
-/** Minimapa 2D: estradas da janela de 320 m como linhas, carro como triângulo no centro (city-terrain AC 34). */
+/**
+ * Minimapa 2D: estradas da janela de 320 m como linhas, carro como triângulo no centro (city-terrain AC 34).
+ * Redesenha no máximo 30 vezes por segundo de simulação, e logo que o estado da corrida muda.
+ */
 export class Minimap {
   private readonly ctx: CanvasRenderingContext2D;
+  private lastDraw = -Infinity;
+  private lastRace: string | null = null;
+  /** redesenhos feitos (para as provas) */
+  draws = 0;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -17,8 +26,16 @@ export class Minimap {
     this.ctx = canvas.getContext('2d')!;
   }
 
-  /** `marks`: marcas de corrida já projetadas (`minimapRaceMarks`), desenhadas sobre as estradas. */
-  update(state: CarState, marks: ReadonlyArray<MinimapMark> = []): void {
+  /**
+   * `marks`: marcas de corrida já projetadas (`minimapRaceMarks`), desenhadas sobre as estradas.
+   * `time`: relógio da simulação (s); `race`: estado da corrida. Sem mudança na corrida, só redesenha
+   * passado 1/30 s de simulação do último desenho (a soma de passos fica uns ulps abaixo: folga de 1e-9).
+   */
+  update(state: CarState, marks: ReadonlyArray<MinimapMark>, time: number, race: string): void {
+    if (race === this.lastRace && time - this.lastDraw < 1 / MINIMAP_HZ - 1e-9) return;
+    this.lastRace = race;
+    this.lastDraw = time;
+    this.draws++;
     const ctx = this.ctx;
     const size = MINIMAP_SIZE_PX;
     ctx.clearRect(0, 0, size, size);
