@@ -386,17 +386,13 @@ test.describe('races', () => {
     expect(await page.evaluate(() => (window as any).__game.render.calls as number)).toBeLessThanOrEqual(218);
   });
 
-  // C36 (AC 11, 18)
-  test('player drives after go', async ({ page }) => {
+  // C36 (AC 11, 18); smooth-world C3 (AC 1) na mesma corrida, para não pagar outro boot: cada oponente é
+  // desenhado no segmento entre a pose de antes do último passo e a atual
+  test('player drives after go; opponents draw the interpolated pose', async ({ page }) => {
     await startRace(page, 'circuito-centro');
     await holdKeySim(page, 'KeyW', 2);
     expect(await speedKmh(page)).toBeGreaterThan(20);
-  });
 
-  // smooth-world C3 (AC 1): cada oponente é desenhado no segmento entre a pose de antes do último passo e a atual
-  test('opponents draw the interpolated pose', async ({ page }) => {
-    await startRace(page, 'circuito-centro');
-    await advanceSim(page, 2);
     const offCurrent = [0, 0, 0];
     for (let f = 0; f < 4; f++) {
       await waitFrames(page, 1);

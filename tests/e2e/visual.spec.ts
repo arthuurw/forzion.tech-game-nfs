@@ -339,7 +339,8 @@ test.describe('visual - S4 câmera (rodada 2)', () => {
         direction: g.camera.direction as { x: number; y: number; z: number },
         up: g.camera.up as { x: number; y: number; z: number },
         camera: g.camera.position as { x: number; y: number; z: number },
-        car: g.car.position as { x: number; y: number; z: number },
+        // a câmera segue a pose desenhada do carro (smooth-world AC 4), não a do passo
+        car: g.car.drawn as { x: number; y: number; z: number },
       };
     });
     await page.keyboard.up('KeyA');

@@ -42,6 +42,7 @@ Reusa o `FixedStepper.accumulator`, que já existe e que ninguém lê, como fra�
 | checks de outras features | city-terrain C2 (`heightAt` no meio de 4 amostras = média bilinear): passa a ser o triângulo da malha (AC 14); o teste `769 x 769 samples every 4 m` troca a média pela média das pontas da diagonal |
 | checks de outras features | test-hardening C19 (`maxBuildsInOneFrame` conta builds entre dois quadros): o contador vira `maxSlicesInOneFrame` e o teste `max slices counts slices between frames` faz as mesmas asserções sobre fatias (2 `update` num quadro = 2, 1 por quadro = 1) |
 | checks de outras features | city-terrain `world.spec.ts:361` (`maxBuildsInOneFrame` ≤ 1): depois da test-hardening mede builds por quadro; aqui passa a contar fatias |
+| checks de outras features | car-feel C16 (`camera leans with the body`): a câmera olha 1 m acima da pose desenhada (AC 4), então o ponto de `lookAt` da prova passa de `car.position` para `car.drawn`, com a mesma tolerância |
 | sondas DEV | `__game.car.x/y/z` e as posições dos oponentes continuam sendo a pose física. A pose desenhada entra como campo novo, para os testes de pixel não mudarem de referência |
 | mundo | bases de lote, colunas do trem, carros estacionados e piscinas mudam de altura até 0.19 m, com a nova `heightAt` |
 | mundo | com o seed 1337, as avenidas mudam de altura só nos últimos metros antes do anel |
