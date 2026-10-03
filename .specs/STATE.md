@@ -53,10 +53,10 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 
 ## Handoff
 
-**Feature**: `e2e-speed` concluída (Verifier PASS rodada 3, 2026-10-02, 13 checks, 5 faults mortos; a rodada 1 pegou o trem com a soma de passos uns ulps abaixo de 2 e a chuva no caminho rápido, a rodada 2 o laço extra do `advanceSim` e o prazo do `waitSimUntil` sem prova, o orçamento de draw calls da corrida antes da câmera assentar e o tempo velho no `AGENTS.md`). `play-fixes` concluída antes (PASS rodada 2)
-**Where**: `main`; `npm test` 253; `npm run test:e2e` 172 testes em 28.9-29.6 min (2 workers, limite 30, folga curta), smoke 22 em 2.4 min; `npm run test:quick` e `npm run test:e2e:smoke` para iterar
-**In progress**: none
-**Next step**: `smooth-world` (plano e checks escritos), depois `pre-garage`, `car-look`, `speed-feel`, `hud-look`
+**Feature**: `smooth-world` construída, aguardando o Verifier (25 de 26 checks; C25 parada para renegociar: a base do lote é o canto mais baixo do lote, não o chão sob o centro, e 930 de 1224 lotes do seed 1337 ficam a mais de 0.01 m dele). Antes: `e2e-speed` concluída (Verifier PASS rodada 3, 2026-10-02)
+**Where**: `main`; `npm test` 272; `npm run test:e2e` 175 testes (2 workers, limite 30 min, folga curta: o tempo medido está no relatório do builder), smoke 22; `npm run test:quick` e `npm run test:e2e:smoke` para iterar
+**In progress**: Verifier da `smooth-world`; C25 com o usuário
+**Next step**: Verifier da `smooth-world`, depois `pre-garage`, `car-look`, `speed-feel`, `hud-look`
 **Blockers**: none
 **Branch**: `main`
 
