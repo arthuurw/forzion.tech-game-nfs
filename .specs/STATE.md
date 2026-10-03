@@ -53,9 +53,9 @@ Cada sub-projeto é uma feature própria (plan → checks → build → verify),
 
 ## Handoff
 
-**Feature**: `smooth-world` construída, aguardando o Verifier (25 de 26 checks; C25 parada para renegociar: a base do lote é o canto mais baixo do lote, não o chão sob o centro, e 930 de 1224 lotes do seed 1337 ficam a mais de 0.01 m dele). Antes: `e2e-speed` concluída (Verifier PASS rodada 3, 2026-10-02)
-**Where**: `main`; `npm test` 272; `npm run test:e2e` 175 testes (2 workers, limite 30 min, folga curta: o tempo medido está no relatório do builder), smoke 22; `npm run test:quick` e `npm run test:e2e:smoke` para iterar
-**In progress**: Verifier da `smooth-world`; C25 com o usuário
+**Feature**: `smooth-world` construída, aguardando o Verifier (26 de 26 checks; C25 renegociada no build pelo usuário: a base do lote no ponto mais baixo, não no centro). Antes: `e2e-speed` concluída (Verifier PASS rodada 3, 2026-10-02)
+**Where**: `main`; `npm test` 273; `npm run test:e2e` 173 testes (2 workers, limite 30 min; o build mediu 31.4 min numa máquina ocupada, o Verifier mede ociosa), smoke 22; `npm run test:quick` e `npm run test:e2e:smoke` para iterar
+**In progress**: Verifier da `smooth-world` (mede a suíte e2e numa máquina ociosa)
 **Next step**: Verifier da `smooth-world`, depois `pre-garage`, `car-look`, `speed-feel`, `hud-look`
 **Blockers**: none
 **Branch**: `main`

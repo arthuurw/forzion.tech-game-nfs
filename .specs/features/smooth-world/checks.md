@@ -94,7 +94,7 @@ Proof: `npx vitest run tests/unit/minimap.test.ts -t "minimap redraws at most 30
 **C24** - ✅ `__game.car.x/y/z` e a posição dos oponentes nas sondas continuam sendo a pose física; a pose desenhada é um campo novo `drawn` (Impact, sondas DEV)
 Proof: `npx playwright test tests/e2e/drive.spec.ts -g "probes keep the physics pose and add the drawn one"`
 
-**C25** - Com a nova `heightAt`, a base de cada lote, cada carro estacionado e cada piscina do seed 1337 ficam a ≤ 0.01 m do chão da malha (raio vertical no heightfield do Rapier) sob o centro deles (Impact, mundo)
+**C25** - ✅ Com a nova `heightAt`, a base de cada lote do seed 1337 fica a ≤ 0.01 m do chão da malha (raio vertical no heightfield do Rapier) no mais baixo dos pontos que o `LotGenerator` amostra (centro e 4 cantos); cada carro estacionado fica a ≤ 0.01 m do chão da malha sob o centro dele, e cada piscina a ≤ 0.01 m do chão da malha sob o centro mais os 0.05 m documentados de `Pool.y` (superfície da água) (Impact, mundo; renegociado no build, 2026-10-02, decisão do usuário: a base do lote fica no ponto mais baixo (city-terrain), não no centro)
 Proof: `npx vitest run tests/physics/walkable.test.ts -t "props stand on the mesh ground"`
 
 **C26** - ✅ `interiorMotion.ts` e `BlockInteriors.ts` seguem puros e na lista da trava de pureza (door 2)

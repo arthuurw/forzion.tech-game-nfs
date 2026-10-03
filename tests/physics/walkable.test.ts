@@ -4,7 +4,7 @@ import { mulberry32 } from '../../src/world/CityGenerator';
 import { findBlockInteriors } from '../../src/world/interiors/BlockInteriors';
 import { placeInteriorProps } from '../../src/world/interiors/InteriorProps';
 import { createCat, createWalker, stepCat, stepWalker, type CarPose } from '../../src/world/interiors/interiorMotion';
-import { generateLots, type Lot } from '../../src/world/lots/LotGenerator';
+import { generateLots, lotCorners, type Lot } from '../../src/world/lots/LotGenerator';
 import { generateRoads } from '../../src/world/roads/RoadGenerator';
 import { carveRoads } from '../../src/world/terrain/carveRoads';
 import { generateTerrain, heightAt } from '../../src/world/terrain/TerrainGenerator';
@@ -169,5 +169,38 @@ describe('one ground height', () => {
     }
     expect(hits).toBe(20_000);
     expect(worst).toBeLessThanOrEqual(0.005);
+  });
+
+  // C25 (Impact, mundo; renegociado no build: a base do lote fica no ponto mais baixo dos que o LotGenerator
+  // amostra, centro e 4 cantos, não no centro)
+  it('props stand on the mesh ground', () => {
+    const ground = (x: number, z: number): number => {
+      const g = groundRay(x, z);
+      expect(g, `raio em (${x}, ${z})`).not.toBeNull();
+      return g!;
+    };
+    let lotWorst = 0;
+    for (const l of lots) {
+      const lowest = Math.min(ground(l.x, l.z), ...lotCorners(l).map(([x, z]) => ground(x, z)));
+      const d = Math.abs(l.y - lowest);
+      lotWorst = Math.max(lotWorst, d);
+      if (d > 0.01) expect.fail(`lote em (${l.x.toFixed(1)}, ${l.z.toFixed(1)}): base ${l.y.toFixed(3)}, chão mais baixo ${lowest.toFixed(3)}`);
+    }
+    let carWorst = 0;
+    for (const c of props.parking) {
+      const d = Math.abs(c.y - ground(c.x, c.z));
+      carWorst = Math.max(carWorst, d);
+      if (d > 0.01) expect.fail(`carro estacionado em (${c.x.toFixed(1)}, ${c.z.toFixed(1)}): ${d.toFixed(3)} m do chão`);
+    }
+    // a piscina guarda a superfície da água, 0.05 m acima do chão no centro (`Pool.y`, InteriorProps)
+    let poolWorst = 0;
+    for (const p of props.pools) {
+      const d = Math.abs(p.y - 0.05 - ground(p.x, p.z));
+      poolWorst = Math.max(poolWorst, d);
+      if (d > 0.01) expect.fail(`piscina em (${p.x.toFixed(1)}, ${p.z.toFixed(1)}): ${d.toFixed(3)} m do chão + 0.05`);
+    }
+    expect(lots.length).toBeGreaterThan(1000);
+    expect(props.parking.length).toBeGreaterThan(50);
+    expect(props.pools.length).toBeGreaterThan(30);
   });
 });
